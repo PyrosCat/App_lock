@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">App Lock</string>
+    <string name="accessibility_service_label">App Lock protection</string>
+    <string name="accessibility_service_description">App Lock uses this service to detect when a protected app is opened so it can show the lock screen. It does not read screen content.</string>
+    <string name="enter_pin">Enter your PIN</string>
+    <string name="pin_incorrect">Incorrect PIN — try again</string>
+    <string name="set_pin_title">Create a PIN</string>
+    <string name="confirm_pin_title">Confirm your PIN</string>
+    <string name="pins_do_not_match">PINs didn\'t match — start over</string>
+    <string name="accessibility_needed_title">Protection is off</string>
+    <string name="accessibility_needed_body">App Lock needs the Accessibility permission to detect when protected apps open. Enable "App Lock protection" in Settings.</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="settings_title">Settings</string>
+    <string name="back">Back</string>
+    <string name="relock_policy_title">Relock policy</string>
+    <string name="relock_immediate_title">Immediately</string>
+    <string name="relock_immediate_desc">Relock as soon as you leave the app</string>
+    <string name="relock_grace_title">After 10 seconds</string>
+    <string name="relock_grace_desc">Brief grace period when switching between apps</string>
+    <string name="relock_screen_off_title">When screen turns off</string>
+    <string name="relock_screen_off_desc">Stay unlocked until the screen turns off</string>
+</resources>
