@@ -20,4 +20,21 @@
     <string name="relock_grace_desc">Brief grace period when switching between apps</string>
     <string name="relock_screen_off_title">When screen turns off</string>
     <string name="relock_screen_off_desc">Stay unlocked until the screen turns off</string>
+    <string name="lockout_title">Too many failed attempts</string>
+    <string name="lockout_countdown">Try again in %1$s</string>
+    <string name="unlock_with_biometrics">Unlock with fingerprint or face</string>
+    <string name="biometric_prompt_title">Unlock %1$s</string>
+    <string name="biometric_prompt_negative">Use PIN</string>
+    <string name="settings_biometric_title">Biometric unlock</string>
+    <string name="settings_biometric_desc">Use fingerprint or face instead of the PIN</string>
+    <string name="settings_uninstall_protection_title">Uninstall protection</string>
+    <string name="settings_uninstall_protection_desc">Require deactivating device admin before App Lock can be uninstalled</string>
+    <string name="device_admin_label">App Lock uninstall protection</string>
+    <string name="device_admin_description">Prevents App Lock from being uninstalled without your PIN.</string>
+    <string name="device_admin_disable_warning">Turning this off allows App Lock to be uninstalled, removing protection from all locked apps.</string>
+    <string name="watchdog_channel_name">Protection status</string>
+    <string name="watchdog_notification_title">App Lock is protecting your apps</string>
+    <string name="watchdog_notification_body">Protection is active</string>
+    <string name="protection_lost_title">App protection is OFF</string>
+    <string name="protection_lost_body">The Accessibility permission was turned off. Tap to re-enable App Lock protection.</string>
 </resources>

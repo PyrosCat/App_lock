@@ -6,6 +6,8 @@ import com.applock.applocker.policy.LockPolicyManager
 import com.applock.applocker.session.LockSessionManager
 import com.applock.core.database.AppLockDatabase
 import com.applock.core.security.CredentialRepository
+import com.applock.core.security.EncryptedPrefsLockoutStorage
+import com.applock.core.security.LockoutManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,6 +27,10 @@ object Graph {
 
     val credentialRepository: CredentialRepository by lazy { CredentialRepository(appContext) }
 
+    val lockoutManager: LockoutManager by lazy {
+        LockoutManager(EncryptedPrefsLockoutStorage(appContext))
+    }
+
     val policyManager: LockPolicyManager by lazy {
         LockPolicyManager(database.protectedAppDao(), appScope)
     }
@@ -40,6 +46,7 @@ object Graph {
             context = appContext,
             policyManager = policyManager,
             sessionManager = sessionManager,
+            lockoutManager = lockoutManager,
             securityEventDao = database.securityEventDao(),
             scope = appScope,
         )

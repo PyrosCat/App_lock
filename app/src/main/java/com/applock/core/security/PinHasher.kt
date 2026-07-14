@@ -5,7 +5,8 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 
 /**
- * PBKDF2-HmacSHA256 PIN hashing. Phase 2 upgrade path: Argon2id (per TAS §7.1).
+ * Legacy PBKDF2-HmacSHA256 PIN hashing. Kept only so Phase 1 credentials can
+ * verify once and be upgraded to [Argon2PinHasher] (see CredentialRepository).
  */
 object PinHasher {
 

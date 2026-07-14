@@ -1,8 +1,13 @@
 package com.applock.ui
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -29,8 +34,10 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -46,14 +53,39 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.applock.R
 import com.applock.applocker.service.AppDetectionService
+import com.applock.applocker.service.ProtectionWatchdogService
 import com.applock.authentication.ui.PinPad
 import com.applock.core.Graph
+import com.applock.core.security.LockoutState
 import com.applock.ui.theme.AppLockTheme
+import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // FR-171: settings/app-list show what's protected — keep them out of
+        // screenshots in release. Debug stays capturable for emulator E2E.
+        val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        if (!debuggable) {
+            window.setFlags(
+                WindowManager.LayoutParams.FLAG_SECURE,
+                WindowManager.LayoutParams.FLAG_SECURE,
+            )
+        }
+
+        if (Build.VERSION.SDK_INT >= 33 &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
+        }
+
+        if (Graph.credentialRepository.isPinSet()) {
+            ProtectionWatchdogService.start(this)
+        }
+
         setContent {
             AppLockTheme {
                 Surface(Modifier.fillMaxSize()) {
@@ -110,16 +142,47 @@ private fun PinSetupScreen(onDone: () -> Unit) {
 @Composable
 private fun SelfGateScreen(onUnlocked: () -> Unit) {
     var error by remember { mutableStateOf(false) }
+
+    // The app's own gate counts toward the same lockout as protected apps
+    // (FR-174) — otherwise it would be a free brute-force surface.
+    var lockoutRemainingMs by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            lockoutRemainingMs =
+                (Graph.lockoutManager.currentState() as? LockoutState.LockedOut)
+                    ?.remainingMs ?: 0L
+            delay(250)
+        }
+    }
+
+    val subtitle = if (lockoutRemainingMs > 0) {
+        val totalSeconds = (lockoutRemainingMs + 999) / 1000
+        stringResource(
+            R.string.lockout_countdown,
+            "%d:%02d".format(totalSeconds / 60, totalSeconds % 60),
+        )
+    } else if (error) {
+        stringResource(R.string.pin_incorrect)
+    } else {
+        stringResource(R.string.enter_pin)
+    }
+
     PinEntryScaffold(
         title = stringResource(R.string.app_name),
-        subtitle = if (error) stringResource(R.string.pin_incorrect)
-        else stringResource(R.string.enter_pin),
+        subtitle = subtitle,
     ) { pin ->
+        if (lockoutRemainingMs > 0 ||
+            Graph.lockoutManager.currentState() is LockoutState.LockedOut
+        ) {
+            return@PinEntryScaffold true
+        }
         if (Graph.credentialRepository.verifyPin(pin)) {
+            Graph.lockoutManager.recordSuccess()
             onUnlocked()
             false
         } else {
             error = true
+            Graph.lockoutManager.recordFailure()
             true
         }
     }

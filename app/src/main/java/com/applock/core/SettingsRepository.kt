@@ -15,7 +15,13 @@ class SettingsRepository(context: Context) {
         )
         set(value) = prefs.edit { putString(KEY_RELOCK_POLICY, value.name) }
 
+    /** Biometric unlock alongside PIN (FR-002/FR-006). Only honored when hardware allows. */
+    var biometricUnlockEnabled: Boolean
+        get() = prefs.getBoolean(KEY_BIOMETRIC_UNLOCK, true)
+        set(value) = prefs.edit { putBoolean(KEY_BIOMETRIC_UNLOCK, value) }
+
     private companion object {
         const val KEY_RELOCK_POLICY = "relock_policy"
+        const val KEY_BIOMETRIC_UNLOCK = "biometric_unlock"
     }
 }

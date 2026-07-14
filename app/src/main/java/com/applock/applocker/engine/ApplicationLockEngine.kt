@@ -9,6 +9,8 @@ import com.applock.authentication.ui.LockScreenActivity
 import com.applock.core.database.SecurityEventDao
 import com.applock.core.database.SecurityEventEntity
 import com.applock.core.database.SecurityEventType
+import com.applock.core.security.LockoutManager
+import com.applock.core.security.LockoutState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -21,6 +23,7 @@ class ApplicationLockEngine(
     private val context: Context,
     private val policyManager: LockPolicyManager,
     private val sessionManager: LockSessionManager,
+    private val lockoutManager: LockoutManager,
     private val securityEventDao: SecurityEventDao,
     private val scope: CoroutineScope,
 ) {
@@ -57,15 +60,28 @@ class ApplicationLockEngine(
         }
     }
 
-    fun onUnlockSuccess(packageName: String) {
+    fun onUnlockSuccess(packageName: String, method: UnlockMethod = UnlockMethod.PIN) {
         sessionManager.markUnlocked(packageName)
+        lockoutManager.recordSuccess()
         lockScreenTarget = null
-        logEvent(SecurityEventType.UNLOCK_SUCCESS, packageName)
+        logEvent(
+            when (method) {
+                UnlockMethod.PIN -> SecurityEventType.UNLOCK_SUCCESS
+                UnlockMethod.BIOMETRIC -> SecurityEventType.BIOMETRIC_UNLOCK_SUCCESS
+            },
+            packageName,
+        )
     }
 
-    fun onUnlockFailure(packageName: String) {
+    /** Returns the lockout state after counting this failure (FR-174). */
+    fun onUnlockFailure(packageName: String): LockoutState {
         logEvent(SecurityEventType.UNLOCK_FAILURE, packageName)
-        // Phase 2 hook: count failures here -> intruder selfie.
+        val state = lockoutManager.recordFailure()
+        if (state is LockoutState.LockedOut) {
+            logEvent(SecurityEventType.LOCKOUT_TRIGGERED, packageName)
+        }
+        return state
+        // Phase 3 hook: intruder selfie on lockout.
     }
 
     /** User backed out of the lock screen without authenticating. */
@@ -97,6 +113,8 @@ class ApplicationLockEngine(
             securityEventDao.insert(SecurityEventEntity(eventType = type, packageName = packageName))
         }
     }
+
+    enum class UnlockMethod { PIN, BIOMETRIC }
 
     private companion object {
         const val TAG = "AppLockEngine"

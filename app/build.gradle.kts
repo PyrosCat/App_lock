@@ -57,6 +57,9 @@ dependencies {
     ksp(libs.androidx.room.compiler)
     implementation(libs.androidx.security.crypto)
     implementation(libs.androidx.biometric)
+    implementation(libs.bouncycastle.provider)
+    implementation(libs.sqlcipher.android)
+    implementation(libs.androidx.sqlite.ktx)
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(libs.junit)
