@@ -96,4 +96,54 @@ class LockoutManagerTest {
         assertTrue(state is LockoutState.LockedOut)
         assertTrue((state as LockoutState.LockedOut).remainingMs <= LockoutManager.MAX_LOCKOUT_MS)
     }
+
+    @Test
+    fun `extreme failure counts do not overflow the duration`() {
+        // 1000 doublings of 30s would overflow Long without the guard.
+        assertEquals(LockoutManager.MAX_LOCKOUT_MS, LockoutManager.lockoutDurationFor(1000))
+        assertEquals(LockoutManager.MAX_LOCKOUT_MS, LockoutManager.lockoutDurationFor(Int.MAX_VALUE))
+        assertTrue(LockoutManager.lockoutDurationFor(Int.MIN_VALUE) > 0)
+    }
+
+    @Test
+    fun `currentState is idempotent during an active lockout`() {
+        failTimes(LockoutManager.FAILURE_THRESHOLD)
+        now += 10_000
+        val first = manager.currentState()
+        val second = manager.currentState()
+        assertEquals(first, second)
+        // Reading state must not push the deadline out.
+        assertEquals(
+            LockoutManager.BASE_LOCKOUT_MS - 10_000,
+            (second as LockoutState.LockedOut).remainingMs,
+        )
+    }
+
+    @Test
+    fun `failure during an active lockout restarts a longer window`() {
+        failTimes(LockoutManager.FAILURE_THRESHOLD)
+        now += 5_000 // still locked out
+        val state = manager.recordFailure()
+        // Attempt while locked (shouldn't be possible via UI, but the manager
+        // must stay safe): count goes to 6, window doubles from now.
+        assertEquals(LockoutState.LockedOut(2 * LockoutManager.BASE_LOCKOUT_MS), state)
+    }
+
+    @Test
+    fun `lockout state remains sane when the clock starts at zero`() {
+        now = 0L
+        val state = failTimes(LockoutManager.FAILURE_THRESHOLD)
+        assertEquals(LockoutState.LockedOut(LockoutManager.BASE_LOCKOUT_MS), state)
+        now += LockoutManager.BASE_LOCKOUT_MS
+        assertEquals(LockoutState.Available, manager.currentState())
+    }
+
+    @Test
+    fun `expiry exactly at the deadline frees authentication`() {
+        failTimes(LockoutManager.FAILURE_THRESHOLD)
+        now += LockoutManager.BASE_LOCKOUT_MS // remaining == 0 exactly
+        assertEquals(LockoutState.Available, manager.currentState())
+        // And the stored deadline is cleared, not just reported clear.
+        assertEquals(0L, storage.lockoutUntil)
+    }
 }

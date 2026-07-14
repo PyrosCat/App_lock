@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.applock.applocker.service.ProtectionWatchdogService
 import com.applock.core.Graph
 import com.applock.core.database.ProtectedAppEntity
 import com.applock.core.database.SecurityEventEntity
@@ -62,6 +63,9 @@ class AppListViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             if (protect) {
                 dao.upsert(ProtectedAppEntity(packageName = packageName, enabled = true))
+                // The watchdog stops itself when nothing is protected; protecting
+                // an app must bring it back without waiting for the next launch.
+                ProtectionWatchdogService.start(getApplication())
             } else {
                 dao.delete(packageName)
             }

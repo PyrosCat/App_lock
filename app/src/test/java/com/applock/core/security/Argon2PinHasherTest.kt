@@ -68,6 +68,51 @@ class Argon2PinHasherTest {
     }
 
     @Test
+    fun `hash output is 32 bytes`() {
+        val hash = Argon2PinHasher.hash("1234".toCharArray(), Argon2PinHasher.newSalt(), m, t, p)
+        assertEquals(32, hash.size)
+    }
+
+    @Test
+    fun `empty pin hashes and verifies without crashing`() {
+        // Setup UI enforces 4+ digits, but the hasher must stay total.
+        val salt = Argon2PinHasher.newSalt()
+        val hash = Argon2PinHasher.hash(CharArray(0), salt, m, t, p)
+        assertTrue(Argon2PinHasher.verify(CharArray(0), salt, m, t, p, hash))
+        assertFalse(Argon2PinHasher.verify("1".toCharArray(), salt, m, t, p, hash))
+    }
+
+    @Test
+    fun `twelve digit pin round-trips`() {
+        // FR-003: PIN length configurable up to 12 digits.
+        val pin = "123456789012"
+        val salt = Argon2PinHasher.newSalt()
+        val hash = Argon2PinHasher.hash(pin.toCharArray(), salt, m, t, p)
+        assertTrue(Argon2PinHasher.verify(pin.toCharArray(), salt, m, t, p, hash))
+        assertFalse(Argon2PinHasher.verify("123456789013".toCharArray(), salt, m, t, p, hash))
+    }
+
+    @Test
+    fun `truncated stored hash is rejected, not partially matched`() {
+        val salt = Argon2PinHasher.newSalt()
+        val hash = Argon2PinHasher.hash("1234".toCharArray(), salt, m, t, p)
+        val truncated = hash.copyOf(16)
+        assertFalse(Argon2PinHasher.verify("1234".toCharArray(), salt, m, t, p, truncated))
+        assertFalse(Argon2PinHasher.verify("1234".toCharArray(), salt, m, t, p, ByteArray(0)))
+    }
+
+    @Test
+    fun `verification does not mutate the stored hash or salt`() {
+        val salt = Argon2PinHasher.newSalt()
+        val hash = Argon2PinHasher.hash("1234".toCharArray(), salt, m, t, p)
+        val saltCopy = salt.copyOf()
+        val hashCopy = hash.copyOf()
+        Argon2PinHasher.verify("9999".toCharArray(), salt, m, t, p, hash)
+        assertTrue(salt.contentEquals(saltCopy))
+        assertTrue(hash.contentEquals(hashCopy))
+    }
+
+    @Test
     fun `production parameters complete within the one second budget`() {
         val salt = Argon2PinHasher.newSalt()
         val start = System.nanoTime()
