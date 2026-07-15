@@ -62,6 +62,10 @@ class LockoutManager(
         storage.lockoutUntil = NOT_LOCKED
     }
 
+    /** Consecutive failures since the last success (drives FR-081 capture). */
+    @Synchronized
+    fun failureCount(): Int = storage.failureCount
+
     companion object {
         const val FAILURE_THRESHOLD = 5
         const val BASE_LOCKOUT_MS = 30_000L

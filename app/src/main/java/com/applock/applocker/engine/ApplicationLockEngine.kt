@@ -11,6 +11,7 @@ import com.applock.core.database.SecurityEventEntity
 import com.applock.core.database.SecurityEventType
 import com.applock.core.security.LockoutManager
 import com.applock.core.security.LockoutState
+import com.applock.privacy.IntruderCaptureManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
@@ -25,6 +26,7 @@ class ApplicationLockEngine(
     private val sessionManager: LockSessionManager,
     private val lockoutManager: LockoutManager,
     private val securityEventDao: SecurityEventDao,
+    private val intruderCapture: IntruderCaptureManager,
     private val scope: CoroutineScope,
 ) {
 
@@ -41,11 +43,13 @@ class ApplicationLockEngine(
         if (packageName in IGNORED_PACKAGES) return
 
         val previous = lastForegroundPackage
-        if (previous == packageName) return
         lastForegroundPackage = packageName
 
-        // The user left the previous app — apply its relock policy.
-        previous?.let { sessionManager.onAppLeft(it) }
+        // A genuine app switch (not a repeat window event from the same app)
+        // means the user left the previous app — apply its relock policy.
+        if (previous != packageName) {
+            previous?.let { sessionManager.onAppLeft(it) }
+        }
 
         val decision = policyManager.evaluate(
             packageName = packageName,
@@ -54,9 +58,19 @@ class ApplicationLockEngine(
         Log.d(TAG, "$packageName -> $decision")
 
         if (decision.requiresAuthentication) {
+            // Re-lock on EVERY foreground event for a protected app that has no
+            // session — including a repeat of the same package. Rapidly
+            // relaunching a protected app slides its window over our lock screen,
+            // which then self-finishes (noHistory); deduping same-package events
+            // here would leave the app exposed (fast-switch bypass). Launching is
+            // idempotent (singleTop), and only the first transition is
+            // audit-logged so the security log doesn't fill with repeats.
+            val newlyLocked = lockScreenTarget != packageName
             lockScreenTarget = packageName
-            logEvent(SecurityEventType.LOCK_TRIGGERED, packageName)
+            if (newlyLocked) logEvent(SecurityEventType.LOCK_TRIGGERED, packageName)
             launchLockScreen(packageName)
+        } else if (previous != packageName) {
+            lockScreenTarget = null
         }
     }
 
@@ -74,14 +88,19 @@ class ApplicationLockEngine(
     }
 
     /** Returns the lockout state after counting this failure (FR-174). */
-    fun onUnlockFailure(packageName: String): LockoutState {
+    fun onUnlockFailure(
+        packageName: String,
+        method: UnlockMethod = UnlockMethod.PIN,
+    ): LockoutState {
         logEvent(SecurityEventType.UNLOCK_FAILURE, packageName)
         val state = lockoutManager.recordFailure()
         if (state is LockoutState.LockedOut) {
             logEvent(SecurityEventType.LOCKOUT_TRIGGERED, packageName)
         }
+        // FR-081: the capture manager decides (policy + settings) whether this
+        // particular failure crosses the intruder threshold.
+        intruderCapture.onAuthFailure(packageName, method.name, lockoutManager.failureCount())
         return state
-        // Phase 3 hook: intruder selfie on lockout.
     }
 
     /** User backed out of the lock screen without authenticating. */

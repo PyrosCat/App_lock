@@ -6,25 +6,60 @@ import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.applock.core.security.DatabaseKeyProvider
 import net.zetetic.database.sqlcipher.SupportOpenHelperFactory
 import java.io.File
 import android.database.sqlite.SQLiteDatabase as FrameworkSQLiteDatabase
 
 @Database(
-    entities = [ProtectedAppEntity::class, SecurityEventEntity::class],
-    version = 1,
+    entities = [
+        ProtectedAppEntity::class,
+        SecurityEventEntity::class,
+        IntruderEventEntity::class,
+        VaultItemEntity::class,
+    ],
+    version = 2,
     exportSchema = false,
 )
 abstract class AppLockDatabase : RoomDatabase() {
 
     abstract fun protectedAppDao(): ProtectedAppDao
     abstract fun securityEventDao(): SecurityEventDao
+    abstract fun intruderEventDao(): IntruderEventDao
+    abstract fun vaultItemDao(): VaultItemDao
 
     companion object {
 
         private const val TAG = "AppLockDatabase"
         private const val DB_NAME = "applock.db"
+
+        /** Phase 3: intruder events (FR-082) and vault index (FR-106). */
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `intruder_events` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`timestamp` INTEGER NOT NULL, " +
+                        "`packageName` TEXT, " +
+                        "`authMethod` TEXT NOT NULL, " +
+                        "`failedAttempts` INTEGER NOT NULL, " +
+                        "`batteryPercent` INTEGER NOT NULL, " +
+                        "`orientation` TEXT NOT NULL, " +
+                        "`photoFileName` TEXT)"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `vault_items` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`displayName` TEXT NOT NULL, " +
+                        "`mimeType` TEXT NOT NULL, " +
+                        "`sizeBytes` INTEGER NOT NULL, " +
+                        "`importedAt` INTEGER NOT NULL, " +
+                        "`fileName` TEXT NOT NULL)"
+                )
+            }
+        }
 
         /**
          * SQLCipher-encrypted Room (FR-162/FR-164). A database created by
@@ -54,6 +89,7 @@ abstract class AppLockDatabase : RoomDatabase() {
 
             val room = Room.databaseBuilder(context, AppLockDatabase::class.java, DB_NAME)
                 .openHelperFactory(SupportOpenHelperFactory(passphrase.toByteArray()))
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
 

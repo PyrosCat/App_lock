@@ -34,3 +34,38 @@ interface SecurityEventDao {
     @Query("DELETE FROM security_events WHERE timestamp < :olderThan")
     suspend fun prune(olderThan: Long)
 }
+
+@Dao
+interface IntruderEventDao {
+
+    @Insert
+    suspend fun insert(event: IntruderEventEntity): Long
+
+    @Query("SELECT * FROM intruder_events ORDER BY timestamp DESC")
+    fun observeAll(): Flow<List<IntruderEventEntity>>
+
+    @Query("SELECT * FROM intruder_events WHERE id = :id")
+    suspend fun get(id: Long): IntruderEventEntity?
+
+    @Query("DELETE FROM intruder_events WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("DELETE FROM intruder_events")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface VaultItemDao {
+
+    @Insert
+    suspend fun insert(item: VaultItemEntity): Long
+
+    @Query("SELECT * FROM vault_items ORDER BY importedAt DESC")
+    fun observeAll(): Flow<List<VaultItemEntity>>
+
+    @Query("SELECT * FROM vault_items WHERE id = :id")
+    suspend fun get(id: Long): VaultItemEntity?
+
+    @Query("DELETE FROM vault_items WHERE id = :id")
+    suspend fun delete(id: Long)
+}

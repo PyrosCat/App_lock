@@ -37,4 +37,46 @@
     <string name="watchdog_notification_body">Protection is active</string>
     <string name="protection_lost_title">App protection is OFF</string>
     <string name="protection_lost_body">The Accessibility permission was turned off. Tap to re-enable App Lock protection.</string>
+
+    <!-- Intruder selfie (FR-081..085) -->
+    <string name="intruder_channel_name">Intruder alerts</string>
+    <string name="intruder_notification_title">Intruder alert</string>
+    <string name="intruder_notification_body">Someone failed to unlock a protected app. Tap to review.</string>
+    <string name="settings_intruder_title">Intruder selfie</string>
+    <string name="settings_intruder_desc">Photograph whoever repeatedly fails to unlock, using the front camera</string>
+    <string name="settings_intruder_threshold_title">Failed attempts before capture</string>
+    <string name="settings_intruder_log_title">Intruder log</string>
+    <string name="settings_intruder_log_desc">Review captured intruder events</string>
+    <string name="camera_permission_denied">Camera permission denied — intruder selfie stays off</string>
+    <string name="intruder_log_title">Intruder log</string>
+    <string name="intruder_log_empty">No intruder events recorded</string>
+    <string name="intruder_event_details">%1$d failed attempts · %2$s</string>
+    <string name="intruder_event_meta">Battery %1$d%% · %2$s</string>
+    <string name="intruder_no_photo">No photo captured</string>
+    <string name="intruder_delete_all">Delete all</string>
+    <string name="intruder_delete_all_confirm">Delete all intruder events and photos? This cannot be undone.</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Vault (FR-106..125) -->
+    <string name="vault_title">Vault</string>
+    <string name="vault_open">Open vault</string>
+    <string name="vault_empty_title">Your vault is empty</string>
+    <string name="vault_empty_body">Files you add are encrypted and only visible inside App Lock.</string>
+    <string name="vault_add_files">Add files</string>
+    <string name="vault_importing">Encrypting %1$d file(s)…</string>
+    <string name="vault_import_done">Added %1$d file(s) to the vault</string>
+    <string name="vault_import_failed">%1$d file(s) could not be imported</string>
+    <string name="vault_delete_originals_title">Delete originals?</string>
+    <string name="vault_delete_originals_body">The files are now encrypted in the vault. Delete the unprotected originals from the device?</string>
+    <string name="vault_keep_originals">Keep</string>
+    <string name="vault_originals_deleted">%1$d original(s) deleted</string>
+    <string name="vault_originals_delete_failed">%1$d original(s) could not be deleted</string>
+    <string name="vault_delete_item_confirm">Remove "%1$s" from the vault? The encrypted copy is destroyed and cannot be recovered.</string>
+    <string name="vault_export">Export</string>
+    <string name="vault_export_done">File exported</string>
+    <string name="vault_export_failed">Export failed</string>
+    <string name="vault_preview_unavailable">No preview for this file type — export it to view.</string>
+    <string name="vault_preview_failed">This file could not be decoded — it may be corrupted.</string>
+    <string name="close">Close</string>
 </resources>

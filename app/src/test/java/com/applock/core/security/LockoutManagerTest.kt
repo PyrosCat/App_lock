@@ -35,6 +35,23 @@ class LockoutManagerTest {
     }
 
     @Test
+    fun `failure count tracks consecutive failures and resets on success`() {
+        assertEquals(0, manager.failureCount())
+        failTimes(3)
+        assertEquals(3, manager.failureCount())
+        manager.recordSuccess()
+        assertEquals(0, manager.failureCount())
+    }
+
+    @Test
+    fun `failure count keeps climbing past the lockout threshold`() {
+        failTimes(LockoutManager.FAILURE_THRESHOLD)
+        now += LockoutManager.BASE_LOCKOUT_MS
+        manager.recordFailure()
+        assertEquals(LockoutManager.FAILURE_THRESHOLD + 1, manager.failureCount())
+    }
+
+    @Test
     fun `lockout expires after its duration`() {
         failTimes(LockoutManager.FAILURE_THRESHOLD)
         now += LockoutManager.BASE_LOCKOUT_MS - 1

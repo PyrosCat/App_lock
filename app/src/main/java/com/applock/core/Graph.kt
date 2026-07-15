@@ -6,8 +6,12 @@ import com.applock.applocker.policy.LockPolicyManager
 import com.applock.applocker.session.LockSessionManager
 import com.applock.core.database.AppLockDatabase
 import com.applock.core.security.CredentialRepository
+import com.applock.core.security.EncryptedFileStore
 import com.applock.core.security.EncryptedPrefsLockoutStorage
 import com.applock.core.security.LockoutManager
+import com.applock.privacy.IntruderCaptureManager
+import com.applock.privacy.IntruderPolicy
+import com.applock.vault.VaultRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -41,6 +45,30 @@ object Graph {
         LockSessionManager(policyProvider = { settings.relockPolicy })
     }
 
+    val encryptedFileStore: EncryptedFileStore by lazy { EncryptedFileStore(appContext) }
+
+    val intruderCaptureManager: IntruderCaptureManager by lazy {
+        IntruderCaptureManager(
+            context = appContext,
+            policy = IntruderPolicy(
+                enabled = { settings.intruderCaptureEnabled },
+                threshold = { settings.intruderCaptureThreshold },
+            ),
+            intruderEventDao = database.intruderEventDao(),
+            securityEventDao = database.securityEventDao(),
+            fileStore = encryptedFileStore,
+            scope = appScope,
+        )
+    }
+
+    val vaultRepository: VaultRepository by lazy {
+        VaultRepository(
+            context = appContext,
+            vaultItemDao = database.vaultItemDao(),
+            fileStore = encryptedFileStore,
+        )
+    }
+
     val lockEngine: ApplicationLockEngine by lazy {
         ApplicationLockEngine(
             context = appContext,
@@ -48,6 +76,7 @@ object Graph {
             sessionManager = sessionManager,
             lockoutManager = lockoutManager,
             securityEventDao = database.securityEventDao(),
+            intruderCapture = intruderCaptureManager,
             scope = appScope,
         )
     }

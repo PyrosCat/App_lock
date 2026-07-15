@@ -1,0 +1,71 @@
+CHANGELOG
+=========
+Newest entries on top. Each entry holds the longer detail that would
+otherwise go in the git commit body; commit subjects stay to one line.
+
+
+Phase 3 — Encrypted vault + intruder selfie   (2026-07-15, uncommitted)
+----------------------------------------------------------------------
+Encrypted media vault and intruder-selfie capture, plus two security
+fixes found during validation.
+
+Added:
+- Encrypted vault (vault/ package). SAF import copies each file into an
+  AES-256-GCM EncryptedFile blob (UUID-named, perms 0600) under filesDir;
+  the human-readable index (name/type/size/date) lives only in the
+  SQLCipher DB. Supports in-memory image preview, byte-identical export
+  round-trip, secure delete (index row + ciphertext blob), and an opt-in
+  "delete originals from device" prompt after import (FR-106..119).
+- Intruder selfie (privacy/ package). After a configurable number of
+  consecutive failed unlocks, captures a front-camera photo with no
+  visible camera UI (CameraX ImageCapture bound to a throwaway
+  LifecycleOwner) and writes the JPEG straight into an EncryptedFile.
+  Logs an event with timestamp/app/method/attempts/battery/orientation,
+  raises a high-priority owner notification, and exposes a history viewer
+  (FR-081/082/084/085). Threshold is user-configurable (3/5/10).
+- Shared EncryptedFileStore helper (androidx.security.crypto) backing both
+  vault blobs and intruder photos.
+- Database v2: new intruder_events and vault_items tables via a
+  hand-written MIGRATION_1_2.
+- Settings: intruder-selfie toggle (requests CAMERA at opt-in) and
+  failed-attempt threshold; CAMERA permission + camera uses-feature.
+
+Fixed (security defects found during validation):
+- Self-gate was not re-applied on resume: after unlocking once,
+  backgrounding and resuming the app returned straight to the app list,
+  leaving the vault and intruder log reachable with no re-authentication
+  (violated FR-108). Now re-gates on ON_STOP via a SelfLock lifecycle
+  observer, skipping config changes and carving out the SAF picker
+  round-trip so import/export doesn't bounce the user to the gate.
+- Fast-relaunch gating bypass: rapidly relaunching a protected app slid
+  its window over the lock screen (which self-finishes via noHistory),
+  and the engine deduped the repeat foreground event, so it never
+  re-locked and the app's content was exposed. Removed the same-package
+  dedup; a protected app with no session now re-locks on every foreground
+  event (idempotent singleTop launch, only the first transition logged).
+
+Validation:
+- 67/67 JVM unit tests; clean debug and release (R8) builds.
+- On-device E2E on headless Pixel_5 (API 30): gating (back / recents /
+  fast-switch / rapid-relaunch), vault encrypt-export-delete, reboot
+  persistence (data + lockout counter FR-174 + watchdog + a11y rebind),
+  force-stop, incoming-call interruption, low-battery capture, encryption-
+  at-rest sweep, and clean-room fresh install (encrypted-from-birth DB, no
+  migration). Full plan and results: docs/PHASE3_TEST_PLAN.md.
+
+
+Phase 2 — Security hardening   (2026-07-14, commits 2a9ec37, 5e49c5f)
+--------------------------------------------------------------------
+Argon2id PIN hashing (BouncyCastle) with PBKDF2->Argon2id upgrade-on-verify;
+SQLCipher-encrypted Room with plaintext->encrypted migration; brute-force
+lockout with persisted counters; biometric unlock with PIN fallback;
+foreground protection watchdog + boot receiver (a11y-revocation alert);
+opt-in device-admin uninstall protection; FLAG_SECURE on non-debug builds.
+Expanded to 48 unit tests.
+
+
+Phase 1 — Core app-lock system   (commit 61f1db4)
+-------------------------------------------------
+Foreground-app detection via accessibility service, PIN authentication,
+relock policies (immediate / grace / screen-off), and the settings and
+app-list UI.

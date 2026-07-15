@@ -1,9 +1,17 @@
 package com.applock.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,6 +20,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -33,6 +42,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -40,10 +50,14 @@ import com.applock.R
 import com.applock.applocker.admin.UninstallProtectionReceiver
 import com.applock.applocker.session.RelockPolicy
 import com.applock.core.Graph
+import com.applock.privacy.IntruderPolicy
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onBack: () -> Unit) {
+fun SettingsScreen(
+    onBack: () -> Unit,
+    onOpenIntruderLog: () -> Unit,
+) {
     BackHandler(onBack = onBack)
 
     var selected by remember { mutableStateOf(Graph.settings.relockPolicy) }
@@ -68,7 +82,11 @@ fun SettingsScreen(onBack: () -> Unit) {
             )
         },
     ) { padding ->
-        Column(Modifier.padding(padding)) {
+        Column(
+            Modifier
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+        ) {
             Text(
                 text = stringResource(R.string.relock_policy_title),
                 style = MaterialTheme.typography.titleMedium,
@@ -145,7 +163,117 @@ fun SettingsScreen(onBack: () -> Unit) {
                     }
                 },
             )
+
+            IntruderSettings(onOpenIntruderLog = onOpenIntruderLog)
         }
+    }
+}
+
+/** FR-081: opt-in toggle (needs CAMERA), threshold choice, log entry point. */
+@Composable
+private fun IntruderSettings(onOpenIntruderLog: () -> Unit) {
+    val context = LocalContext.current
+    var enabled by remember { mutableStateOf(Graph.settings.intruderCaptureEnabled) }
+    var threshold by remember {
+        mutableStateOf(Graph.settings.intruderCaptureThreshold)
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            Graph.settings.intruderCaptureEnabled = true
+            enabled = true
+        } else {
+            Toast.makeText(
+                context,
+                context.getString(R.string.camera_permission_denied),
+                Toast.LENGTH_LONG,
+            ).show()
+        }
+    }
+
+    ToggleOption(
+        title = stringResource(R.string.settings_intruder_title),
+        description = stringResource(R.string.settings_intruder_desc),
+        checked = enabled,
+        onCheckedChange = { wanted ->
+            if (!wanted) {
+                Graph.settings.intruderCaptureEnabled = false
+                enabled = false
+            } else if (
+                ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                Graph.settings.intruderCaptureEnabled = true
+                enabled = true
+            } else {
+                permissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        },
+    )
+
+    if (enabled) {
+        Text(
+            text = stringResource(R.string.settings_intruder_threshold_title),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = 16.dp),
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectableGroup()
+                .padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IntruderPolicy.THRESHOLD_CHOICES.forEach { choice ->
+                Row(
+                    modifier = Modifier
+                        .selectable(
+                            selected = threshold == choice,
+                            onClick = {
+                                threshold = choice
+                                Graph.settings.intruderCaptureThreshold = choice
+                            },
+                            role = Role.RadioButton,
+                        )
+                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(selected = threshold == choice, onClick = null)
+                    Text(
+                        choice.toString(),
+                        modifier = Modifier.padding(start = 4.dp, end = 12.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onOpenIntruderLog)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                stringResource(R.string.settings_intruder_log_title),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                stringResource(R.string.settings_intruder_log_desc),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Icon(
+            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

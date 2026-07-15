@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -57,7 +58,9 @@ import com.applock.applocker.service.ProtectionWatchdogService
 import com.applock.authentication.ui.PinPad
 import com.applock.core.Graph
 import com.applock.core.security.LockoutState
+import com.applock.privacy.ui.IntruderLogScreen
 import com.applock.ui.theme.AppLockTheme
+import com.applock.vault.ui.VaultScreen
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -96,7 +99,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Screen { PIN_SETUP, SELF_GATE, APP_LIST, SETTINGS }
+private enum class Screen { PIN_SETUP, SELF_GATE, APP_LIST, SETTINGS, VAULT, INTRUDER_LOG }
 
 @Composable
 private fun AppLockNav() {
@@ -105,11 +108,45 @@ private fun AppLockNav() {
         mutableStateOf(if (pinSet) Screen.SELF_GATE else Screen.PIN_SETUP)
     }
 
+    // FR-108: re-gate when the app returns from the background so the vault /
+    // intruder log can't be resumed (from recents or relaunch) without the PIN.
+    // Skipped for config changes (rotation) and for the SAF picker round-trip.
+    if (pinSet) {
+        val lifecycleOwner = LocalLifecycleOwner.current
+        val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_STOP -> {
+                        val configChange = activity?.isChangingConfigurations == true
+                        if (!configChange && !SelfLock.suppressNextBackground &&
+                            screen != Screen.PIN_SETUP
+                        ) {
+                            screen = Screen.SELF_GATE
+                        }
+                    }
+                    Lifecycle.Event.ON_RESUME -> SelfLock.suppressNextBackground = false
+                    else -> Unit
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+    }
+
     when (screen) {
         Screen.PIN_SETUP -> PinSetupScreen(onDone = { screen = Screen.APP_LIST })
         Screen.SELF_GATE -> SelfGateScreen(onUnlocked = { screen = Screen.APP_LIST })
-        Screen.APP_LIST -> AppListScreen(onOpenSettings = { screen = Screen.SETTINGS })
-        Screen.SETTINGS -> SettingsScreen(onBack = { screen = Screen.APP_LIST })
+        Screen.APP_LIST -> AppListScreen(
+            onOpenSettings = { screen = Screen.SETTINGS },
+            onOpenVault = { screen = Screen.VAULT },
+        )
+        Screen.SETTINGS -> SettingsScreen(
+            onBack = { screen = Screen.APP_LIST },
+            onOpenIntruderLog = { screen = Screen.INTRUDER_LOG },
+        )
+        Screen.VAULT -> VaultScreen(onBack = { screen = Screen.APP_LIST })
+        Screen.INTRUDER_LOG -> IntruderLogScreen(onBack = { screen = Screen.SETTINGS })
     }
 }
 
@@ -167,6 +204,7 @@ private fun SelfGateScreen(onUnlocked: () -> Unit) {
         stringResource(R.string.enter_pin)
     }
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     PinEntryScaffold(
         title = stringResource(R.string.app_name),
         subtitle = subtitle,
@@ -177,12 +215,14 @@ private fun SelfGateScreen(onUnlocked: () -> Unit) {
             return@PinEntryScaffold true
         }
         if (Graph.credentialRepository.verifyPin(pin)) {
-            Graph.lockoutManager.recordSuccess()
+            Graph.lockEngine.onUnlockSuccess(context.packageName)
             onUnlocked()
             false
         } else {
             error = true
-            Graph.lockoutManager.recordFailure()
+            // Through the engine (not lockoutManager directly) so gate failures
+            // are audit-logged and count toward intruder capture (FR-081).
+            Graph.lockEngine.onUnlockFailure(context.packageName)
             true
         }
     }
@@ -215,6 +255,7 @@ private fun PinEntryScaffold(
 @Composable
 private fun AppListScreen(
     onOpenSettings: () -> Unit,
+    onOpenVault: () -> Unit,
     viewModel: AppListViewModel = viewModel(),
 ) {
     val apps by viewModel.apps.collectAsState()
@@ -238,6 +279,12 @@ private fun AppListScreen(
             TopAppBar(
                 title = { Text(stringResource(R.string.app_name)) },
                 actions = {
+                    IconButton(onClick = onOpenVault) {
+                        Icon(
+                            Icons.Filled.PhotoLibrary,
+                            contentDescription = stringResource(R.string.vault_open),
+                        )
+                    }
                     IconButton(onClick = onOpenSettings) {
                         Icon(
                             Icons.Filled.Settings,
