@@ -11,3 +11,6 @@ captures/
 *.keystore
 .claude/
 !debug.keystore
+# Microsoft Office lock files
+~$*
+**/~$*

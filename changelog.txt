@@ -4,6 +4,49 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M0 — New documentation baseline adopted; docs restructured   (2026-07-19)
+-------------------------------------------------------------------------
+The project was re-baselined onto a new authoritative documentation set
+("docs/New docs/", 59 documents) and the repository reorganized around it.
+No application code changed in this phase.
+
+Baseline adoption:
+- New SRS (18 sections, FR-001..375), NFR corpus (13 sections, 171 NFRs),
+  TAS (9 parts), SDS (17 sections incl. detailed component designs), and
+  Implementation Strategy v2.0 (7 gated phases) moved into docs/srs, docs/nfr,
+  docs/architecture/tas, docs/design/sds, docs/process.
+- Full transition analysis in docs/process/MIGRATION_ASSESSMENT.md: SRS
+  sections 1-12 are byte-identical to the old set (all implemented work keeps
+  its requirement basis); old section 13 (cloud/premium, FR-226..250) removed
+  and its FR numbers REUSED by the new Production Readiness section — see
+  docs/archive/FR-226-250-RENUMBERING-NOTICE.md. ~80-85% of existing work
+  carries forward; recommended path M0..M6 (foundation retrofit before new
+  features).
+
+Added:
+- docs/process/rtm/rtm.csv — Requirements Traceability Matrix, 546 rows
+  (375 FR + 171 NFR), statuses seeded from validation evidence (23
+  implemented-verified, 9 partial, 115 review, 399 not-started).
+- docs/architecture/adr/ — ADR-001..010 backfilled from TAS §71 plus
+  ADR-011 (single-module layout), ADR-012 (SQLCipher-as-Room-equivalent),
+  ADR-013 (accessibility detection), ADR-014 (API range: minSdk 26 /
+  targetSdk 35, forward-compatible; verification fleet incl. Moto G 2023 +
+  NucBox G5 + M1 CI matrix), ADR-015 (Hilt adoption plan; interim rule: no
+  new Graph.* lookup sites).
+- scripts/extract_docx.py — dependency-free .docx text extraction (used for
+  the byte-identity verification; docx stays authoritative, no md mirrors).
+- docs/archive/ — superseded docs (old TAS/SDS/diagrams/drafts/FRCS/old
+  section 13) with per-file supersession notes.
+
+Changed:
+- README rewritten for the new baseline (IS phase table, documentation map).
+- Old duplicate SRS sections 1-12 deleted (hash-verified identical; git
+  history retains them).
+- .gitignore now excludes Office lock files (~$*).
+- PHASE4_PLAN/PHASE4_TEST_PLAN relocated (docs/process, docs/testing) and
+  marked as M4 design inputs, superseded as the active plan.
+
+
 Phase 3 — Encrypted vault + intruder selfie   (2026-07-15, uncommitted)
 ----------------------------------------------------------------------
 Encrypted media vault and intruder-selfie capture, plus two security
