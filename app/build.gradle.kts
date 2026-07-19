@@ -40,6 +40,13 @@ android {
     buildFeatures {
         compose = true
     }
+
+    lint {
+        // WP1 (M1): pre-existing findings are frozen as accepted debt so only NEW
+        // issues fail CI. Burn the baseline down opportunistically (tracked at the
+        // M2/M3 gate reviews) — never regenerate it to silence a new finding.
+        baseline = file("lint-baseline.xml")
+    }
 }
 
 dependencies {

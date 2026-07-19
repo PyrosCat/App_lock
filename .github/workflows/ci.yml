@@ -1,0 +1,54 @@
+# WP1 (M1 foundation retrofit): baseline freeze.
+# Rebuilds and retests the app on every push/PR to main. Sequential tasks in one
+# Gradle invocation on one job — shares the daemon and dependency cache, which is
+# faster in total than parallel jobs at this project size.
+#
+# assembleRelease is deliberate: it exercises R8/minification (the step that broke
+# in Phase 2 via Tink's compile-only annotations, and the most likely tripwire for
+# the WP5 Hilt migration). The APK is unsigned — signing is out of scope until M6.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest # Android SDK preinstalled, licenses pre-accepted
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle (with caching)
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Unit tests, debug + release (R8) builds, lint
+        run: ./gradlew testDebugUnitTest assembleDebug assembleRelease lint --stacktrace
+
+      - name: Upload reports (tests + lint)
+        if: always() # evidence survives red runs — that's when it matters
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: app/build/reports/
+          retention-days: 14
+
+      - name: Upload APKs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apks
+          path: app/build/outputs/apk/**/*.apk
+          retention-days: 14

@@ -1,0 +1,7 @@
+# Line-ending policy for files where it matters functionally.
+# gradlew must stay LF — it runs on Linux CI runners; a CRLF copy breaks the shebang.
+gradlew         text eol=lf
+*.bat           text eol=crlf
+
+# Shell scripts (e2e harness etc.) run on Linux/Git Bash — keep LF.
+*.sh            text eol=lf

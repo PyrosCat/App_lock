@@ -4,6 +4,30 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M1/WP1 — CI baseline freeze   (2026-07-19)
+------------------------------------------
+First work package of the M1 foundation retrofit (plan: docs/process/M1_PLAN.md).
+Freezes the current green state in CI before any refactoring begins.
+
+- GitHub Actions workflow (.github/workflows/ci.yml): on every push/PR to main,
+  one ubuntu job runs testDebugUnitTest (67 tests) + assembleDebug +
+  assembleRelease (R8 smoke — the step that broke in Phase 2) + lint, with
+  Gradle caching; test/lint reports and APKs uploaded as artifacts.
+- Restored the missing Unix gradlew launcher (repo only had gradlew.bat;
+  Linux runners need the shell script), stored executable (100755).
+- .gitattributes pins gradlew/*.sh to LF and *.bat to CRLF so the CI runner
+  always gets a clean executable script.
+- Android lint wired with app/lint-baseline.xml: 55 pre-existing findings
+  frozen as accepted debt (39 dependency-version notices → Dependabot in WP4;
+  4 errors incl. the opt-in-guarded MissingPermission in
+  IntruderCaptureManager — burndown tracked at the M2/M3 gate reviews).
+  Only NEW findings fail CI.
+- CI badge in README.
+
+Exit criterion still open: two consecutive green runs on unmodified main
+(needs this commit pushed).
+
+
 M0 — New documentation baseline adopted; docs restructured   (2026-07-19)
 -------------------------------------------------------------------------
 The project was re-baselined onto a new authoritative documentation set

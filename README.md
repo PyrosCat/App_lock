@@ -1,5 +1,7 @@
 # App Lock (Android)
 
+[![CI](https://github.com/PyrosCat/App_lock/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PyrosCat/App_lock/actions/workflows/ci.yml)
+
 Android app locker: PIN/biometric gating of protected apps, encrypted media vault, and
 intruder-selfie capture — local-only, encrypted at rest.
 
