@@ -52,7 +52,8 @@ Script the checks that caught F3/F4, so the Hilt/package work can be verified me
 - Focus assertions via `dumpsys activity activities | grep mResumedActivity` (no screenshot
   parsing → runs headless); PIN taps at ≥0.8 s spacing per the known recipe; a11y
   delete-then-put rebind built into the reinstall helper.
-- **Record a baseline run against `f7ffe29`** (results file in `docs/testing/M1_REGRESSION.md`).
+- **Record a baseline run against the frozen main** (dated report in `docs/reports/campaigns/`,
+  naming per `docs/reports/README.md`).
 - Onboard the fleet: NucBox G5 as emulator host (faster, can run windowed x86_64 images the
   2012 machine cannot — revisit the x86-only constraint there); Moto G 2023 via adb (also the
   first real-hardware pass of the gating suite — record it).
@@ -153,7 +154,7 @@ RTM FR-228 → `implemented`, FR-229 → `partial`.
   whichever images run reliably on Actions runners (KVM enabled); the full matrix also runs
   locally on the NucBox. Moto G (API 33+) covers real-hardware manually via the WP2 scripts.
 - Close-out: final full harness run; RTM batch update (see §5); changelog entry; ADR-015
-  closed; **IS Phase-0 gate review recorded** in `docs/process/` (scope/exit-criteria
+  closed; **IS Phase-0 gate review recorded** in `docs/reports/gates/` (scope/exit-criteria
   checklist per Implementation Strategy §5).
 **Exit check:** all §Exit items in the M1 gate record checked, with evidence links.
 

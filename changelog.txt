@@ -4,6 +4,33 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs — documentation map, reports tree, fleet onboarding   (2026-07-20)
+-----------------------------------------------------------------------
+Multi-machine support: the verification fleet (2012 host, NucBox G5,
+Moto G 2025) shares state only through git, so placement rules and
+evidence records become committed documents.
+
+- docs/README.md — documentation map: what each area holds, where a new
+  document belongs, conventions (formats, naming, changelog/RTM duties),
+  and the git-is-the-only-shared-channel rule for fleet machines.
+- docs/reports/ — NEW top-level evidence tree, distinct from specs and
+  plans: dated, immutable, host-tagged records (YYYY-MM-DD_topic_host.md,
+  append-only so concurrent machines never merge-conflict). Categories:
+  fleet/, campaigns/, gates/, benchmarks/, security/, release/ — created
+  on first use; index + rules in docs/reports/README.md. Test PLANS stay
+  in docs/testing/; execution RESULTS now go to reports/campaigns/;
+  gate reviews to reports/gates/ (M1_PLAN references updated).
+- docs/process/DEV_ENVIRONMENT_SETUP.md — reproducible Windows host
+  setup (written for NucBox G5 onboarding): WHPX acceleration check
+  first, JDK/SDK, env vars, clone, build smoke, AVD matrix, shared
+  debug-keystore note for cross-machine upgrade tests.
+- ADR-014 fleet note updated: NucBox G5 arrived 2026-07-20 (Win 11,
+  N-series CPU — sequential matrix, WHPX check pending); Moto G 2023
+  order cancelled, replaced by Moto G 2025 arriving 2026-07-22.
+- WP1 exit criterion CLOSED: two consecutive green CI runs on main
+  (first attempt hit a GitHub-side Actions incident; re-run clean).
+
+
 M1/WP1 — CI baseline freeze   (2026-07-19)
 ------------------------------------------
 First work package of the M1 foundation retrofit (plan: docs/process/M1_PLAN.md).

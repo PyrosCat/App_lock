@@ -1,0 +1,90 @@
+# Documentation Map & Placement Guide
+
+Start here to understand how this project's documents are organized, why, and where a new
+document belongs. Written for contributors **and** AI assistants working across multiple
+machines (the ADR-014 verification fleet: 2012 host, NucBox G5, Moto G device).
+
+## The most important rule: git is the only shared channel
+
+Each machine's AI assistant has its **own local memory** that the other machines cannot see.
+The **git repository is the only shared state** between them. Therefore:
+
+- Anything one machine needs to communicate to another (status, results, decisions) must be a
+  **committed file**, not a chat note or a local memory entry.
+- Read the relevant doc before acting; write your outcome back as a doc so the next machine
+  (or a later session) inherits it.
+- Commit policy (M0 decision D4): **the user performs all commits.** Assistants stage/write
+  files and stop; they do not run `git commit`/`git push`.
+
+## The layout
+
+```
+docs/
+├── README.md            ← you are here: the map + placement rules
+├── srs/                 Software Requirements Specification — sections 1–18 (FR-001..375)
+├── nfr/                 Non-Functional Requirements — sections 0–13 (171 NFRs)
+├── architecture/
+│   ├── tas/             Technical Architecture Specification — parts 1–9
+│   └── adr/             Architecture Decision Records — ADR-001..NNN (+ README index)
+├── design/sds/          Software Design Specification — sections 1–17
+├── process/             How the project is run and evolves (plans, assessment, RTM, setup)
+├── testing/             Test PLANS (what we intend to verify and how)
+├── reports/             EVIDENCE: dated, immutable records of what actually happened
+│                        (fleet status, campaign results, gate reviews, benchmarks,
+│                        security reviews, release records — see reports/README.md)
+└── archive/             Superseded documents (do NOT use as current guidance)
+```
+
+Separately, `changelog.txt` (repo root) holds human-readable per-change detail; commit subjects
+stay one line. `scripts/` holds tooling (e.g. `extract_docx.py`). `app/` is the source.
+
+## What each area is for — and what belongs there
+
+| Area | Holds | Nature | Put a new doc here if… |
+|---|---|---|---|
+| `srs/` `nfr/` | The authoritative requirement baseline — *what* the app must do and *how well*. | Read-mostly spec. Authored as `.docx`. | …only when the requirement baseline itself changes (rare; governed). |
+| `architecture/tas/` | *How* the system is organized (layers, boundaries, runtime, data, ops). | Read-mostly spec (`.docx`). | …an architectural structure changes (via an ADR first). |
+| `architecture/adr/` | Individual **decisions** with rationale + consequences, numbered, dated. | Append-only; each is small (`.md`). | …you made or are recording a significant decision (tech choice, boundary, constraint). One file `ADR-NNN-<slug>.md`; add a row to `adr/README.md`. |
+| `design/sds/` | *How* components are designed internally (per-subsystem). | Read-mostly spec (`.docx`). | …component-level design is specified/changed. |
+| `process/` | **How the project is run and evolves**: Implementation Strategy, migration assessment, phase plans (M0/M1…), the RTM, environment setup, governance/gate records, **operational & machine/fleet status**. | Living working docs (`.md`). | …it's a plan, a process/governance record, a dev-environment or **fleet/machine status report**, or anything about *running the project* rather than the product spec. |
+| `testing/` | Test **plans**: what to verify, procedures, harness specs. | Living (`.md`). | …it defines how something will be tested. Results go to `reports/campaigns/`. |
+| `reports/` | **Evidence**: dated, immutable records — fleet/machine status, executed campaign results, gate reviews, benchmarks, security reviews, release records. | Append-only, never edited (`.md`). | …you are recording **what happened**: an observation, measurement, review, or test execution. See `reports/README.md` for categories + naming (`YYYY-MM-DD_topic_host.md`). |
+| `archive/` | Superseded docs, kept for history with supersession notes. | Frozen. | …never author new work here; only retire old docs (with a note). |
+
+## Where does the NucBox status report go?
+
+**`docs/reports/fleet/`**, as a dated file: `2026-07-20_fleet-nucbox-g5.md` (naming rules in
+`reports/README.md`). It records the *outcome* of following
+`docs/process/DEV_ENVIRONMENT_SETUP.md` — accel-check result, `assembleDebug` outcome,
+installed SDK/AVDs, readiness verdict — against the commit it was run on. Also update the
+one-line fleet index table in `reports/README.md` to link it.
+
+Why a dated file and not a shared living document: fleet machines write reports concurrently
+and git is the only channel between them — per-host, append-only files cannot merge-conflict,
+and immutable dated records preserve the evidence trail (each later change of state = a new
+report superseding the old).
+
+The general split: **plan** ("how we'll test/set up") → `process/` or `testing/`;
+**evidence** ("what happened when we did") → `reports/`.
+
+## Conventions to follow when adding a doc
+
+1. **Format:** specs (srs/nfr/tas/sds) are `.docx`; everything in `process/`, `testing/`,
+   `adr/`, and this map is Markdown.
+2. **Naming:** `UPPER_SNAKE_CASE.md` for process/testing docs (e.g. `M1_PLAN.md`,
+   `FLEET_STATUS.md`); `ADR-NNN-kebab-slug.md` for ADRs.
+3. **Changelog:** add an entry to `changelog.txt` describing the change (the commit subject
+   stays one line; detail goes in the changelog).
+4. **RTM:** if you implement or verify a requirement, update its row in
+   `process/rtm/rtm.csv` in the same change (see `process/rtm/RTM.md` for the vocabulary).
+5. **Dates:** absolute (`2026-07-22`), never "tomorrow"/"Wednesday".
+6. **Don't** put working reports, plans, or status into `srs/`/`nfr/`/`tas/`/`sds/` — those are
+   the governed baseline, not a scratchpad.
+
+## Orientation shortcuts (read these first on a new machine)
+
+- `docs/process/MIGRATION_ASSESSMENT.md` — the current state of the project and the migration plan.
+- `docs/process/M1_PLAN.md` — the active work (M1 foundation retrofit, work packages WP1–WP8).
+- `docs/architecture/adr/README.md` — the decisions already made (incl. ADR-014 fleet).
+- `docs/process/DEV_ENVIRONMENT_SETUP.md` — how to set up this machine.
+- `changelog.txt` — what changed most recently.
