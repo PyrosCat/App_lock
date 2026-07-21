@@ -4,6 +4,30 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Report — NucBox G5 fleet provisioning outcome   (2026-07-21)
+------------------------------------------------------------
+First fleet evidence record for the NucBox G5 (ADR-014 verification
+fleet). Host provisioned per docs/process/DEV_ENVIRONMENT_SETUP.md;
+outcome: fleet-ready.
+
+- docs/reports/fleet/2026-07-21_fleet-nucbox-g5.md — NEW immutable
+  report. WHPX acceleration usable (accel-check → accel 0);
+  assembleDebug green (8m56s → app-debug.apk 41.72 MB); x86_64
+  emulator boots (matrix_api33: sdk=33, abi=x86_64). AVDs
+  matrix_api26/29/33/35 created; API 26+29 google_apis x86_64 system
+  images installed.
+- docs/reports/README.md — fleet index row for NucBox G5 updated to
+  link the report (was "pending first fleet report").
+- Deviations noted for the setup guide: cmd.exe unreachable until a
+  reboot; cmdline-tools absent from the GUI SDK (added from the
+  official zip, SHA-256 verified; MAX_PATH extraction gotcha);
+  build-tools 36.0.0 vs the guide's 35.x. Build green regardless.
+- Scope note: matrix is now locally EXECUTABLE, not yet VERIFIED —
+  NFR-COMP-001 evidence still awaits the WP2 regression harness + CI
+  matrix. RTM rows left unchanged (status promotion deferred to the
+  gate/lead).
+
+
 Docs — documentation map, reports tree, fleet onboarding   (2026-07-20)
 -----------------------------------------------------------------------
 Multi-machine support: the verification fleet (2012 host, NucBox G5,

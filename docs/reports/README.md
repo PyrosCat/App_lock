@@ -40,7 +40,7 @@ measured, reviewed, or executed. Reports differ from the rest of `docs/` in natu
 | Host | Latest report | State |
 |---|---|---|
 | 2012 i7 (primary dev) | — | Pixel_5 API 30 x86 emulator; WP1 CI baseline produced here |
-| NucBox G5 (Win 11, N-series) | *(pending first fleet report)* | Setup in progress per `../process/DEV_ENVIRONMENT_SETUP.md` |
+| NucBox G5 (Win 11, N-series) | [2026-07-21](fleet/2026-07-21_fleet-nucbox-g5.md) | Fleet-ready — WHPX accel; x86_64 matrix (26/29/33/35) boots; `assembleDebug` green |
 | Moto G 2025 (physical) | — | Arriving 2026-07-22 |
 
 Keep this table to one line per host — details belong in the dated reports it links to.
