@@ -26,6 +26,11 @@ parallel — correctness over speed. RAM permitting, two concurrent is usually s
 On a CPU-limited host, an *unaccelerated* emulator is unusably slow, so confirm acceleration
 before installing anything heavy.
 
+> **Fresh-host gotcha (NucBox G5, 2026-07-20):** on a brand-new box, `cmd.exe` / `.bat`
+> launches (including `gradlew.bat`) can fail with *"The system cannot find the file
+> specified"* even though `cmd.exe` exists — a pending-servicing state. **Reboot once** before
+> troubleshooting anything else.
+
 1. **BIOS/UEFI:** ensure Intel Virtualization Technology (VT-x) is **Enabled** (usually default
    on mini PCs; reboot into UEFI to check if step 3 fails).
 2. **Windows features:** open "Turn Windows features on or off" → enable **Windows Hypervisor
@@ -46,6 +51,12 @@ the Android SDK, the emulator, and the AVD manager.
 
 - Download from https://developer.android.com/studio, install with defaults.
 - Let it install the latest **platform-tools** (adb), **emulator**, and a default platform.
+- **`cmdline-tools` may be missing** (the GUI SDK skipped it on the NucBox — no `sdkmanager`
+  / `avdmanager`). Add it via SDK Manager → *SDK Tools* → "Android SDK Command-line Tools", or
+  drop the official `commandlinetools-win` zip into `…\Sdk\cmdline-tools\latest\`. If you
+  extract the zip manually, **use a short destination path** — a deep jar inside overflows
+  Windows' 260-char `MAX_PATH` behind a long temp prefix and truncates silently. Verify the
+  zip's SHA-256 before extracting.
 
 ## 3. Environment variables (persist them once)
 
@@ -67,7 +78,8 @@ Via Android Studio's SDK Manager (or `sdkmanager` CLI), install:
 - **Platforms:** Android API **26, 29, 33, 35** (35 = compile/target level).
 - **System images** (x86_64, `google_apis` flavor — includes Play-services-free Google APIs
   needed for some tests): one per API level above.
-- **Build-tools** (latest 35.x), **platform-tools**, **emulator**.
+- **Build-tools** (35.x or newer — 36.0.0 verified green on the NucBox), **platform-tools**,
+  **emulator**.
 
 `sdkmanager` one-liner (from `%ANDROID_HOME%\cmdline-tools\latest\bin`):
 ```

@@ -4,6 +4,21 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs — fold NucBox provisioning deviations into setup guide   (2026-07-21)
+--------------------------------------------------------------------------
+Follow-up to the NucBox G5 fleet report (below): captured its three setup
+deviations in the reproducible guide and resolved the ADR-014 fleet note.
+
+- docs/process/DEV_ENVIRONMENT_SETUP.md: fresh-host reboot gotcha (batch
+  /gradle won't launch until a reboot), cmdline-tools may be missing from
+  the GUI SDK (add from official zip, short-path extraction to dodge
+  MAX_PATH truncation, verify SHA-256), build-tools "35.x or newer"
+  (36.0.0 verified green).
+- ADR-014 fleet note trimmed to point at the reports fleet index as the
+  live source of truth; records the resolved outcome (NucBox boots x86_64
+  under WHPX → full local matrix, no virtualization fallback).
+
+
 Report — NucBox G5 fleet provisioning outcome   (2026-07-21)
 ------------------------------------------------------------
 First fleet evidence record for the NucBox G5 (ADR-014 verification
