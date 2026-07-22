@@ -106,7 +106,7 @@ FR-104,Decoy Authentication,Privacy&Concealment,FR,Medium,not-started,,,
 FR-105,Privacy Feature Management,Privacy&Concealment,FR,Medium,review,,,
 FR-106,Secure Vault Creation,Vault,FR,Critical,implemented-verified,vault/,PHASE3 campaign,
 FR-107,Vault Encryption,Vault,FR,Critical,implemented-verified,vault/,PHASE3 campaign,
-FR-108,Vault Authentication,Vault,FR,Critical,implemented-verified,vault/,PHASE3 campaign,
+FR-108,Vault Authentication,Vault,FR,Critical,implemented-verified,vault/,PHASE3 campaign; WP2 baseline API33 (docs/reports/campaigns/2026-07-22_wp2-regression-baseline_nucbox-g5.md),F3 self-gate re-verified on API 33 only via the 2026-07-22 WP2 baseline — matrix API 26/29/35 not yet exercised; a pass on one API level does not guarantee the others.
 FR-109,Photo Import,Vault,FR,High,implemented-verified,vault/,PHASE3 campaign,
 FR-110,Video Import,Vault,FR,High,implemented-verified,vault/,PHASE3 campaign,
 FR-111,Document Import,Vault,FR,High,implemented-verified,vault/,PHASE3 campaign,

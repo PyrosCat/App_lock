@@ -4,6 +4,32 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Report — WP2 regression baseline on NucBox G5 (2/2 green)   (2026-07-22)
+-----------------------------------------------------------------------
+First WP2 device-regression baseline on a healthy host — the WP2 exit
+criterion. Run against ecec801 on AVD matrix_api33 (API 33, x86_64).
+
+- docs/reports/campaigns/2026-07-22_wp2-regression-baseline_nucbox-g5.md
+  — NEW immutable campaign record. run_all.sh --skip-setup -n 2:
+  smoke_core / ov3_fast_switch / ov4_rapid_relaunch / f3_self_gate all
+  PASS in both runs (VERDICT: PASS 2/2). Security assertions (IMMEDIATE
+  relock 10/10, F4 rapid-relaunch, F3/FR-108 self-gate) held in every run.
+- Three harness issues found on Windows paths the 2012 host never
+  exercised — worked around to get the baseline, fixes RECOMMENDED to the
+  harness owner (not applied; source changes escalate per GOVERNANCE §3.4):
+  (1) setup_device.sh install fails under MSYS_NO_PATHCONV (adb.exe can't
+  resolve the /c/ host path) → pre-installed APK via a Windows path;
+  (2) Clock-protection locate loop scans the self-gate instead of the App
+  List (no PIN re-entry after the probe) → provisioned Clock protection
+  manually; (3) cold-start OV-3 scaffolding-unlock flake (hardcoded 6s
+  wait_foreground; security relock held 10/10) → warm-up pass + TAP_GAP 1.6.
+- rtm.csv FR-108 (Vault Authentication / self-gate): appended the WP2
+  baseline as a verification pointer and added a coverage caveat —
+  re-verified on API 33 only; matrix API 26/29/35 not yet exercised, so a
+  single-API pass does not guarantee the others. Status stays
+  implemented-verified (Phase-3 evidence already backed it).
+
+
 Governance — binding rules for RTM, ADRs, git workflow, dates   (2026-07-22)
 ----------------------------------------------------------------------------
 docs/process/GOVERNANCE.md: authoritative, RFC-2119-style rules binding all
