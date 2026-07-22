@@ -4,6 +4,35 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M1/WP2 — device regression harness (built; baseline run pending)   (2026-07-21)
+-------------------------------------------------------------------------------
+The security freeze for M1: scripted, headless gating checks so the WP5/WP6
+engine refactors can be proven not to regress the two Phase-3 bypasses.
+
+- scripts/e2e/ — new harness:
+  - lib.sh: config + helpers (dumpsys resumed-activity focus detection,
+    fraction-based PIN-pad taps, uiautomator content-desc probing, a11y
+    rebind, Clock resolution). Parameterized by device serial + APP_ID
+    (ready for WP4 flavor suffixes).
+  - smoke_core / ov3_fast_switch / ov4_rapid_relaunch / f3_self_gate:
+    one check per gating property. OV-4 defends the F4 fast-relaunch
+    bypass; f3_self_gate defends the F3 resume/FR-108 bypass (asserted via
+    the "Open vault" content-desc that appears only in the unlocked App
+    List, since the self-gate and App List are the same MainActivity).
+  - setup_device.sh (provision: install, PIN, a11y, protect Clock via UI)
+    and run_all.sh (runs all checks N times, emits a markdown report block
+    for docs/reports/campaigns/).
+- Validation: deterministic helpers proven live on the 2012-host Pixel_5
+  API 30 emulator (screen size 1080x2340, dumpsys focus parse, clock
+  resolution, a11y read). Full interactive baseline run is PENDING on a
+  healthy host — the 2012 emulator SystemUI ANR-wedged this session
+  (bad color buffer handle / swiftshader on the old GPU). Run the first
+  baseline on the NucBox G5 and file it in docs/reports/campaigns/; that
+  run is the WP2 exit criterion.
+- All scripts pass bash -n; harness README documents assertion strategy,
+  validation status, and device/fleet notes.
+
+
 Docs — fold NucBox provisioning deviations into setup guide   (2026-07-21)
 --------------------------------------------------------------------------
 Follow-up to the NucBox G5 fleet report (below): captured its three setup

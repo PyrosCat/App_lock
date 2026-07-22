@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# WP2 regression harness — shared library.
+# Sourced by every check script. Encodes the app's identifiers and the hard-won
+# emulator/adb recipes from the Phase 3 campaign (PIN-pad geometry, a11y rebind,
+# tap timing, focus detection) so the OV-3 / OV-4 / F3 gating checks can run
+# headless and be asserted mechanically — no screenshot parsing.
+#
+# The gating semantics these checks defend (F3 self-gate resume, F4 fast-relaunch)
+# are exactly where the two Phase-3 security bypasses lived; run this before AND
+# after any change to the lock engine, session manager, or self-gate (M1 WP5/WP6).
+
+set -uo pipefail
+export MSYS_NO_PATHCONV=1   # Git Bash must not mangle device paths like /sdcard/...
+
+# ---- configuration (override via env) -------------------------------------
+: "${APP_ID:=com.applock}"                 # applicationId (WP4 adds .dev/.qa/... suffixes)
+: "${PIN:=1234}"                           # test PIN (campaign baseline)
+: "${A11Y_CLASS:=com.applock.applocker.service.AppDetectionService}"  # FQCN pinned (ADR-013)
+LOCK_ACTIVITY_MATCH="LockScreenActivity"   # substring identifying the lock screen activity
+MAIN_ACTIVITY="${APP_ID}/com.applock.ui.MainActivity"
+A11Y_COMPONENT="${APP_ID}/${A11Y_CLASS}"
+# UI text signals (from res/values/strings.xml):
+UI_APPLIST_SIGNAL="Open vault"             # content-desc present ONLY in the unlocked App List
+UI_PIN_SIGNAL="Enter your PIN"             # subtitle on the self-gate / lock screen
+UI_PIN_SETUP_SIGNAL="Create a PIN"         # first-run PIN setup
+
+SERIAL="${SERIAL:-}"                        # set by -s or auto-detected
+PROTECTED_PKG="${PROTECTED_PKG:-}"          # resolved to the Clock package
+NEUTRAL_PKG="${NEUTRAL_PKG:-com.android.settings}"  # an unprotected app to switch to
+
+# PIN-pad tap geometry as fractions of screen size (derived from the 1080x2340
+# campaign coords; portable across the pixel_5-profile matrix AVDs).
+PIN_COL_FRAC=(0.276 0.499 0.723)           # columns 1|2|3
+PIN_ROW_FRAC=(0.432 0.535 0.639 0.742)     # rows for 1-3 | 4-6 | 7-9 | 0
+TAP_GAP="${TAP_GAP:-0.9}"                   # seconds between PIN taps (>=0.8 on slow emu)
+LOCKSCREEN_WAIT="${LOCKSCREEN_WAIT:-6}"     # seconds to wait for the lock screen to appear
+
+# ---- counters / logging ---------------------------------------------------
+PASS_COUNT=0 FAIL_COUNT=0
+_c() { case "${1}" in green) printf '\033[32m';; red) printf '\033[31m';; yellow) printf '\033[33m';; *) printf '';; esac; }
+info() { printf '  %s\n' "$*"; }
+step() { printf '\n\033[1m» %s\033[0m\n' "$*"; }
+pass() { PASS_COUNT=$((PASS_COUNT+1)); printf '  %sPASS\033[0m %s\n' "$(_c green)" "$*"; }
+fail() { FAIL_COUNT=$((FAIL_COUNT+1)); printf '  %sFAIL\033[0m %s\n' "$(_c red)" "$*"; }
+
+# ---- adb plumbing ---------------------------------------------------------
+adbx() { adb -s "$SERIAL" "$@"; }
+sh_() { adb -s "$SERIAL" shell "$@" 2>/dev/null | tr -d '\r'; }
+
+detect_serial() {
+  [ -n "$SERIAL" ] && return 0
+  SERIAL="$(adb devices | awk '/\tdevice$/{print $1; exit}')"
+  [ -n "$SERIAL" ] || { fail "no online device (adb devices shows none 'device')"; return 1; }
+  info "device: $SERIAL"
+}
+
+require_device() {
+  detect_serial || return 1
+  local booted; booted="$(sh_ getprop sys.boot_completed)"
+  [ "$booted" = "1" ] || { fail "device $SERIAL not fully booted (sys.boot_completed=$booted)"; return 1; }
+}
+
+# ---- screen / input -------------------------------------------------------
+_screen_wh() {
+  local s; s="$(sh_ wm size | sed -n 's/.*: *\([0-9]*\)x\([0-9]*\).*/\1 \2/p' | tail -1)"
+  SCREEN_W="${s% *}"; SCREEN_H="${s#* }"
+  [ -n "${SCREEN_W:-}" ] && [ -n "${SCREEN_H:-}" ]
+}
+tap_frac() { # xfrac yfrac
+  local x y; x=$(awk "BEGIN{printf \"%d\", $1*$SCREEN_W}"); y=$(awk "BEGIN{printf \"%d\", $2*$SCREEN_H}")
+  sh_ input tap "$x" "$y"
+}
+_pin_digit() { # 0-9 -> col,row
+  local d="$1" col row
+  case "$d" in
+    1) col=0 row=0;; 2) col=1 row=0;; 3) col=2 row=0;;
+    4) col=0 row=1;; 5) col=1 row=1;; 6) col=2 row=1;;
+    7) col=0 row=2;; 8) col=1 row=2;; 9) col=2 row=2;;
+    0) col=1 row=3;;
+  esac
+  tap_frac "${PIN_COL_FRAC[$col]}" "${PIN_ROW_FRAC[$row]}"
+}
+enter_pin() { # pin-string ; taps digits with safe spacing
+  _screen_wh || { fail "could not read screen size"; return 1; }
+  local i ch
+  for (( i=0; i<${#1}; i++ )); do ch="${1:$i:1}"; _pin_digit "$ch"; sleep "$TAP_GAP"; done
+  sleep 1
+}
+home()    { sh_ input keyevent KEYCODE_HOME; }
+recents() { sh_ input keyevent KEYCODE_APP_SWITCH; }
+
+# ---- focus / state introspection ------------------------------------------
+top_component() { # -> pkg/activity of the resumed activity
+  local c
+  c="$(sh_ dumpsys activity activities | grep -Eo 'mResumedActivity[^}]*' | grep -Eo '[A-Za-z0-9_.]+/[A-Za-z0-9_.]+' | head -1)"
+  [ -n "$c" ] || c="$(sh_ dumpsys window | grep -Eo 'mCurrentFocus[^}]*' | grep -Eo '[A-Za-z0-9_.]+/[A-Za-z0-9_.]+' | head -1)"
+  printf '%s' "$c"
+}
+is_lockscreen()   { top_component | grep -q "$LOCK_ACTIVITY_MATCH"; }
+foreground_is()   { top_component | grep -q "^$1/"; }
+
+wait_lockscreen() { # timeout-seconds ; returns 0 when lock screen is up
+  local t="${1:-$LOCKSCREEN_WAIT}" i
+  for (( i=0; i<t*2; i++ )); do is_lockscreen && return 0; sleep 0.5; done
+  return 1
+}
+wait_foreground() { # pkg timeout
+  local pkg="$1" t="${2:-6}" i
+  for (( i=0; i<t*2; i++ )); do foreground_is "$pkg" && return 0; sleep 0.5; done
+  return 1
+}
+
+# ---- UI hierarchy (for in-MainActivity self-gate vs app-list distinction) --
+ui_xml() { # dump the current window hierarchy to stdout (one retry)
+  sh_ uiautomator dump /sdcard/e2e_ui.xml >/dev/null
+  local x; x="$(sh_ cat /sdcard/e2e_ui.xml)"
+  [ -n "$x" ] || { sh_ uiautomator dump /sdcard/e2e_ui.xml >/dev/null; x="$(sh_ cat /sdcard/e2e_ui.xml)"; }
+  printf '%s' "$x"
+}
+ui_has() { ui_xml | grep -qF "$1"; }
+
+# ---- app control ----------------------------------------------------------
+launch_pkg() { # resolve the launcher activity and am-start it (more reliable than monkey)
+  local comp; comp="$(sh_ cmd package resolve-activity --brief -c android.intent.category.LAUNCHER "$1" | tail -1)"
+  if [ -n "$comp" ] && printf '%s' "$comp" | grep -q '/'; then sh_ am start -n "$comp" >/dev/null
+  else sh_ monkey -p "$1" -c android.intent.category.LAUNCHER 1 >/dev/null; fi
+}
+launch_main() { sh_ am start -n "$MAIN_ACTIVITY" >/dev/null; }
+dismiss_anr() { # tap "Wait"/"Close app" ANR dialogs that this slow emulator throws
+  ui_has "isn't responding" && { sh_ input keyevent KEYCODE_BACK; sleep 1; }
+  return 0
+}
+
+resolve_clock() {
+  [ -n "$PROTECTED_PKG" ] && return 0
+  PROTECTED_PKG="$(sh_ pm list packages | sed 's/package://' \
+    | grep -iE 'deskclock|\.clock$' | grep -iE 'google' | head -1)"
+  [ -n "$PROTECTED_PKG" ] || PROTECTED_PKG="$(sh_ pm list packages | sed 's/package://' | grep -iE 'deskclock|\.clock$' | head -1)"
+  [ -n "$PROTECTED_PKG" ] || { fail "could not resolve a Clock package to use as the protected app"; return 1; }
+  info "protected app (Clock): $PROTECTED_PKG"
+}
+
+rebind_a11y() { # delete-then-put; binding completes on next app launch (see gotchas memo)
+  sh_ settings delete secure enabled_accessibility_services
+  sh_ settings put secure enabled_accessibility_services "$A11Y_COMPONENT"
+  sh_ settings put secure accessibility_enabled 1
+}
+
+# Bring App Lock to a known LOCKED-out state for a protected app, then unlock it.
+unlock_protected() { # launches Clock, expects lock screen, enters PIN, expects Clock fg
+  launch_pkg "$PROTECTED_PKG"
+  wait_lockscreen || { fail "expected lock screen after launching $PROTECTED_PKG"; return 1; }
+  enter_pin "$PIN"
+  wait_foreground "$PROTECTED_PKG" 6 || { fail "PIN unlock did not surface $PROTECTED_PKG"; return 1; }
+  return 0
+}
+
+summary() { # label
+  printf '\n\033[1m%s: %d passed, %d failed\033[0m\n' "${1:-Result}" "$PASS_COUNT" "$FAIL_COUNT"
+  [ "$FAIL_COUNT" -eq 0 ]
+}
