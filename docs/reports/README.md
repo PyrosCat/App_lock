@@ -30,7 +30,7 @@ measured, reviewed, or executed. Reports differ from the rest of `docs/` in natu
 |---|---|---|
 | `fleet/` | Machine/environment status & readiness (accel-check, build smoke, SDK/AVD inventory per host) | ADR-014 fleet; **first report: NucBox G5 setup outcome** |
 | `campaigns/` | Executed test-run records: WP2 regression-harness runs, API-matrix runs, E2E campaigns | M1/WP2; RTM evidence |
-| `gates/` | Phase-gate review records (M1..M6 / IS phase gates), architecture-conformance reviews | IS §5; first at M1/WP8 |
+| `gates/` | Phase-gate review records (M1..M6 / IS phase gates), architecture-conformance reviews | Implementation Strategy §5; first at M1/WP8 |
 | `benchmarks/` | Performance/resource measurements vs NFR targets (startup, lock latency, queries) | NFR-PERF-015; M5 |
 | `security/` | Security reviews, dependency reviews, threat-model reviews, vulnerability reports | IS Phase 5, FR-366; M2 onward |
 | `release/` | Release checklists, readiness verifications, the production acceptance report | FR-248/249/250; M6 |

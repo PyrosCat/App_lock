@@ -4,6 +4,11 @@ Template: ID, Title, Status, Context, Decision, Alternatives, Consequences, Rela
 (TAS §71.2). ADR-001..010 backfill the baseline decisions enumerated in TAS §71.3; ADR-011+ are
 project decisions. New ADRs are required for any change per ADR-010.
 
+**Lifecycle rules — when to create, what may be amended, and the supersession protocol — are
+governed by [`../../process/GOVERNANCE.md`](../../process/GOVERNANCE.md) §2.** Core rule: the
+decision content of an accepted ADR is immutable; decisions change only by superseding.
+This index is updated in the same commit as any ADR addition or status change.
+
 | ADR | Title | Status |
 |-----|-------|--------|
 | [ADR-001](ADR-001-layered-clean-architecture.md) | Adopt Layered Clean Architecture | Accepted (baseline) |

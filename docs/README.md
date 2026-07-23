@@ -15,6 +15,10 @@ The **git repository is the only shared state** between them. Therefore:
   (or a later session) inherits it.
 - Commit policy (M0 decision D4): **the user performs all commits.** Assistants stage/write
   files and stop; they do not run `git commit`/`git push`.
+- **Binding rules for the RTM, ADRs, git synchronization, and dates live in
+  [`process/GOVERNANCE.md`](process/GOVERNANCE.md)** — mandatory reading before editing
+  `rtm.csv`, any ADR, or starting a work session (the fetch/compare protocol in
+  GOVERNANCE.md §3.2).
 
 ## The layout
 
@@ -78,8 +82,14 @@ The general split: **plan** ("how we'll test/set up") → `process/` or `testing
 4. **RTM:** if you implement or verify a requirement, update its row in
    `process/rtm/rtm.csv` in the same change (see `process/rtm/RTM.md` for the vocabulary).
 5. **Dates:** absolute (`2026-07-22`), never "tomorrow"/"Wednesday".
-6. **Don't** put working reports, plans, or status into `srs/`/`nfr/`/`tas/`/`sds/` — those are
-   the governed baseline, not a scratchpad.
+6. **Cross-references:** a `§N` pointing at *another* document **must name that document**
+   (e.g. `GOVERNANCE.md §3.2`, `TAS §71`) — a bare `§3.2` is only acceptable when it refers
+   to a section of the same document it appears in.
+7. **Specs are client-received originals.** The `.docx` files under `srs/`, `nfr/`, `tas/`,
+   `sds/` (and the archived ones) are preserved verbatim — original content **and filename**.
+   Do **not** edit, rename, reformat, or drop working docs into these folders; they are the
+   governed baseline, not a scratchpad. *Planned (deferred, not now): convert these specs to
+   Markdown for in-project use; until then they stay exactly as received.*
 
 ## Orientation shortcuts (read these first on a new machine)
 

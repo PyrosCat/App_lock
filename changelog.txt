@@ -4,6 +4,38 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Governance — binding rules for RTM, ADRs, git workflow, dates   (2026-07-22)
+----------------------------------------------------------------------------
+docs/process/GOVERNANCE.md: authoritative, RFC-2119-style rules binding all
+contributors (human and AI, on every fleet machine). Consolidates and
+supersedes the scattered conventions in RTM.md / adr/README.md / docs/README.
+
+- RTM (§1): requirements are living artifacts. Closed status vocabulary
+  with exact definitions — adds `in-progress` and `invalidated` (a change
+  touching a verified requirement without re-verification evidence in the
+  same commit MUST downgrade it); `review` frozen as legacy-seed-only.
+  Update triggers (implementation/verification/invalidation/scope/gates/
+  baseline), prohibitions (no evidence → no implemented-verified; no
+  drive-by edits; no wholesale regeneration), wording rules (no hedging).
+- ADRs (§2): decision content of an accepted ADR is immutable; change =
+  supersession protocol (new ADR + Supersedes links + index update, same
+  commit). Amendable: status, implementation-status line, cross-links,
+  typos. Numbers never reused. Required metadata enumerated.
+- Git (§3): mandatory session-start fetch/compare protocol before any file
+  edit; ff-only when behind; STOP + escalate on divergence; force-push and
+  history rewrites prohibited; user performs all commits/pushes (D4);
+  per-file-class merge-conflict rules (reports keep both; changelog keeps
+  both entries; rtm.csv evidence wins; source logic → escalate); hand-off
+  rule: work moves between machines only as pushed commits.
+- Dates (§4): absolute ISO dates only, taken from the system clock at
+  writing time; filing vs capture date distinction; no back/future-dating.
+- RTM.md, adr/README.md, docs/README.md updated to defer to GOVERNANCE.md.
+- docs/README.md conventions: cross-references must name the target document
+  (bare §N only for same-document sections); specs recorded as client-received
+  originals (preserve content + filename, never edit/rename — Markdown
+  conversion is a deferred future task).
+
+
 M1/WP2 — device regression harness (built; baseline run pending)   (2026-07-21)
 -------------------------------------------------------------------------------
 The security freeze for M1: scripted, headless gating checks so the WP5/WP6
