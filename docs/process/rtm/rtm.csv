@@ -106,7 +106,7 @@ FR-104,Decoy Authentication,Privacy&Concealment,FR,Medium,not-started,,,
 FR-105,Privacy Feature Management,Privacy&Concealment,FR,Medium,review,,,
 FR-106,Secure Vault Creation,Vault,FR,Critical,implemented-verified,vault/,PHASE3 campaign,
 FR-107,Vault Encryption,Vault,FR,Critical,implemented-verified,vault/,PHASE3 campaign,
-FR-108,Vault Authentication,Vault,FR,Critical,implemented-verified,vault/,PHASE3 campaign; WP2 baseline API33 (docs/reports/campaigns/2026-07-22_wp2-regression-baseline_nucbox-g5.md),F3 self-gate re-verified on API 33 only via the 2026-07-22 WP2 baseline — matrix API 26/29/35 not yet exercised; a pass on one API level does not guarantee the others.
+FR-108,Vault Authentication,Vault,FR,Critical,implemented-verified,vault/,PHASE3 campaign; WP2 baseline API33 (docs/reports/campaigns/2026-07-22_wp2-regression-baseline_nucbox-g5.md); WP2 real-hardware API35 (docs/reports/campaigns/2026-07-23_wp2-regression_moto-g-2025.md),"F3 self-gate re-verified on API 33 (NucBox emulator) and API 35 (Moto G 2025, real hardware) via the WP2 gating checks; matrix API 26/29 not yet exercised. Note: real devices >=API13 require manual accessibility grant (Restricted Settings)."
 FR-109,Photo Import,Vault,FR,High,implemented-verified,vault/,PHASE3 campaign,
 FR-110,Video Import,Vault,FR,High,implemented-verified,vault/,PHASE3 campaign,
 FR-111,Document Import,Vault,FR,High,implemented-verified,vault/,PHASE3 campaign,

@@ -16,7 +16,7 @@ home; sleep 1
 
 for (( i=1; i<=BURST; i++ )); do sh_ am start -n "$comp" >/dev/null; sleep 0.2; done
 
-if wait_lockscreen 6; then
+if wait_lockscreen; then
   if foreground_is "$PROTECTED_PKG"; then
     fail "OV-4: lock screen present but $PROTECTED_PKG also foreground — inconsistent"
   else

@@ -4,6 +4,69 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M1/WP2 — real-hardware validation on Moto G 2025 / Android 15   (2026-07-23)
+---------------------------------------------------------------------------
+Validated the WP2 gating harness on a physical Moto G 2025 (Android 15,
+arm64, 720x1604) over USB adb — first real-hardware / ARM / non-1080x2340
+data point. All four checks green: smoke_core 3/3, ov4 (F4 defense), f3
+(F3/FR-108 defense), ov3 10/10 relock. Report:
+docs/reports/campaigns/2026-07-23_wp2-regression_moto-g-2025.md.
+
+Significant finding — accessibility Restricted Settings (Android 13+):
+- The app gates correctly on Android 15, but ONLY after accessibility is
+  granted via the real Settings UI. Enabling via adb settings put (works on
+  emulators) leaves the service "malfunctioning" — bound but delivering no
+  events (Restricted Settings hardening for sideloaded a11y services). On
+  the Moto G 2025 the "Allow restricted settings" three-dot menu is gone, so
+  the off/on toggle in Accessibility settings is the only grant path; no adb
+  workaround. Not an app defect (in-app onboarding deep-links there); it is
+  a harness/provisioning limitation for real devices >= API 13.
+
+Harness fixes (working tree; real-hardware issues emulators never surfaced):
+- lib.sh top_component(): match Android 15's topResumedActivity=/
+  ResumedActivity: (not just mResumedActivity), excluding *Last*/*Paused*.
+- setup_device.sh Clock locate: scroll to top then step down in small
+  increments (a single big swipe overshot Clock on a long app list);
+  PROTECTED_LABEL configurable. Compose Switch is a checkable
+  android.view.View at the row's right edge.
+- rebind_a11y()/a11y_working() + setup failure guidance + README
+  prerequisite documenting the manual-grant requirement on real devices.
+- PIN-pad fraction geometry validated unchanged on 720x1604.
+- rtm.csv FR-108: added the API 35 real-hardware verification pointer +
+  the manual-a11y caveat (stays implemented-verified).
+
+
+M1/WP2 — harness fixes from the NucBox baseline findings   (2026-07-23)
+----------------------------------------------------------------------
+Fixed the three harness issues the NucBox WP2 baseline surfaced (report
+below). All were interactive/Windows-path bugs the ANR-wedged 2012 host
+never exercised; the security assertions were never affected (they passed
+2/2). These make setup_device.sh turnkey so the harness needs no manual
+workarounds as the WP5/WP6 before/after gate.
+
+- scripts/e2e/lib.sh: host_path() (cygpath -w) so `adb install` gets a
+  native Windows path despite MSYS_NO_PATHCONV=1; open_app_list() clears
+  the self-gate (FR-108) before reaching the App List; FG_WAIT +
+  raised LOCKSCREEN_WAIT tunables replace hardcoded 6 s waits.
+- setup_device.sh: install now uses host_path and checks for "Success"
+  instead of masking failure; Clock-protection re-opens the App List
+  through the self-gate (was scanning the PIN pad); the "already
+  protected?" probe uses the full timeout (a false negative would have
+  toggled Clock protection OFF on a slow host).
+- ov3_fast_switch.sh: the between-cycle scaffolding unlock soft-warns; the
+  IMMEDIATE-relock security assertion still hard-fails. smoke_core / ov4 /
+  unlock_protected use the tunable waits.
+- PIN entry now locates each digit by its Compose button text (uiautomator)
+  and taps the node centre — resolution-independent, so it works on the AVD
+  matrix AND physical devices (Moto G 2025) without geometry tuning; falls
+  back to the 1080x2340 fraction taps if a device doesn't expose the text.
+  Enables local validation over adb against a USB phone (bypasses the 2012
+  host's broken emulator entirely).
+- Security-assertion logic unchanged. Re-run run_all.sh -n 2 WITH setup on
+  the NucBox to confirm turnkey operation; file a follow-up campaign note.
+  No RTM change (requirement status unaffected).
+
+
 Report — WP2 regression baseline on NucBox G5 (2/2 green)   (2026-07-22)
 -----------------------------------------------------------------------
 First WP2 device-regression baseline on a healthy host — the WP2 exit

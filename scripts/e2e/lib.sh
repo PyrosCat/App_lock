@@ -26,6 +26,7 @@ UI_PIN_SETUP_SIGNAL="Create a PIN"         # first-run PIN setup
 
 SERIAL="${SERIAL:-}"                        # set by -s or auto-detected
 PROTECTED_PKG="${PROTECTED_PKG:-}"          # resolved to the Clock package
+PROTECTED_LABEL="${PROTECTED_LABEL:-Clock}" # its display label in the app list (locale-specific)
 NEUTRAL_PKG="${NEUTRAL_PKG:-com.android.settings}"  # an unprotected app to switch to
 
 # PIN-pad tap geometry as fractions of screen size (derived from the 1080x2340
@@ -33,7 +34,9 @@ NEUTRAL_PKG="${NEUTRAL_PKG:-com.android.settings}"  # an unprotected app to swit
 PIN_COL_FRAC=(0.276 0.499 0.723)           # columns 1|2|3
 PIN_ROW_FRAC=(0.432 0.535 0.639 0.742)     # rows for 1-3 | 4-6 | 7-9 | 0
 TAP_GAP="${TAP_GAP:-0.9}"                   # seconds between PIN taps (>=0.8 on slow emu)
-LOCKSCREEN_WAIT="${LOCKSCREEN_WAIT:-6}"     # seconds to wait for the lock screen to appear
+LOCKSCREEN_WAIT="${LOCKSCREEN_WAIT:-8}"     # seconds to wait for the lock screen to appear
+FG_WAIT="${FG_WAIT:-10}"                    # seconds to wait for an app to surface foreground
+                                            # (cold slow hosts are sluggish — raise via env)
 
 # ---- counters / logging ---------------------------------------------------
 PASS_COUNT=0 FAIL_COUNT=0
@@ -80,20 +83,37 @@ _pin_digit() { # 0-9 -> col,row
   esac
   tap_frac "${PIN_COL_FRAC[$col]}" "${PIN_ROW_FRAC[$row]}"
 }
-enter_pin() { # pin-string ; taps digits with safe spacing
+# Center-of-node coords for a PIN digit, located by its Compose Text ("1".."0")
+# in the current uiautomator dump. Resolution-independent — works on any screen
+# where Compose exposes the button text (it does; PinKey renders Text(label)).
+_digit_xy() { # xml digit -> "x y" or empty
+  printf '%s' "$1" \
+    | grep -oE "text=\"$2\"[^>]*bounds=\"\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]\"" \
+    | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1 \
+    | sed -E 's/bounds="\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]"/\1 \2 \3 \4/' \
+    | awk 'NF==4{printf "%d %d",($1+$3)/2,($2+$4)/2}'
+}
+enter_pin() { # pin-string ; taps each digit at its located center, else by fraction
   _screen_wh || { fail "could not read screen size"; return 1; }
-  local i ch
-  for (( i=0; i<${#1}; i++ )); do ch="${1:$i:1}"; _pin_digit "$ch"; sleep "$TAP_GAP"; done
+  local xml; xml="$(ui_xml)"     # dump once; key positions are static during entry
+  local i ch xy
+  for (( i=0; i<${#1}; i++ )); do
+    ch="${1:$i:1}"; xy="$(_digit_xy "$xml" "$ch")"
+    if [ -n "$xy" ]; then sh_ input tap $xy; else _pin_digit "$ch"; fi   # by-text, else geometry
+    sleep "$TAP_GAP"
+  done
   sleep 1
 }
 home()    { sh_ input keyevent KEYCODE_HOME; }
 recents() { sh_ input keyevent KEYCODE_APP_SWITCH; }
 
 # ---- focus / state introspection ------------------------------------------
-top_component() { # -> pkg/activity of the resumed activity
+top_component() { # -> pkg/activity of the resumed activity (portable across API 26-35)
   local c
-  c="$(sh_ dumpsys activity activities | grep -Eo 'mResumedActivity[^}]*' | grep -Eo '[A-Za-z0-9_.]+/[A-Za-z0-9_.]+' | head -1)"
-  [ -n "$c" ] || c="$(sh_ dumpsys window | grep -Eo 'mCurrentFocus[^}]*' | grep -Eo '[A-Za-z0-9_.]+/[A-Za-z0-9_.]+' | head -1)"
+  # API 30/33 print "mResumedActivity:"; Android 15 prints "topResumedActivity="/
+  # "ResumedActivity:". Match any, excluding the *Last*/*Paused* history entries.
+  c="$(sh_ dumpsys activity activities | grep -iE 'ResumedActivity' | grep -ivE 'LastResumed|LastPaused|PausedActivity' | grep -Eo '[A-Za-z0-9_.]+/[A-Za-z0-9_.]+' | head -1)"
+  [ -n "$c" ] || c="$(sh_ dumpsys window | grep -iE 'mCurrentFocus|mFocusedApp' | grep -Eo '[A-Za-z0-9_.]+/[A-Za-z0-9_.]+' | head -1)"
   printf '%s' "$c"
 }
 is_lockscreen()   { top_component | grep -q "$LOCK_ACTIVITY_MATCH"; }
@@ -104,8 +124,8 @@ wait_lockscreen() { # timeout-seconds ; returns 0 when lock screen is up
   for (( i=0; i<t*2; i++ )); do is_lockscreen && return 0; sleep 0.5; done
   return 1
 }
-wait_foreground() { # pkg timeout
-  local pkg="$1" t="${2:-6}" i
+wait_foreground() { # pkg [timeout=$FG_WAIT]
+  local pkg="$1" t="${2:-$FG_WAIT}" i
   for (( i=0; i<t*2; i++ )); do foreground_is "$pkg" && return 0; sleep 0.5; done
   return 1
 }
@@ -131,6 +151,21 @@ dismiss_anr() { # tap "Wait"/"Close app" ANR dialogs that this slow emulator thr
   return 0
 }
 
+# Convert a host path for tools that need a native path (adb install takes a HOST
+# path, unlike shell/push which take device paths). cygpath on Git Bash; identity
+# elsewhere. Needed because MSYS_NO_PATHCONV=1 (set for device paths) would
+# otherwise hand adb.exe an unresolvable /c/... path.
+host_path() { cygpath -w "$1" 2>/dev/null || printf '%s' "$1"; }
+
+# Bring App Lock to the App List, clearing the self-gate (FR-108) if it is up.
+# Returns 1 if the app is still at first-run PIN setup (caller must set a PIN first).
+open_app_list() {
+  launch_main; sleep 2; dismiss_anr
+  ui_has "$UI_PIN_SETUP_SIGNAL" && return 1
+  if ui_has "$UI_PIN_SIGNAL"; then _screen_wh && enter_pin "$PIN"; sleep 2; dismiss_anr; fi
+  ui_has "$UI_APPLIST_SIGNAL"
+}
+
 resolve_clock() {
   [ -n "$PROTECTED_PKG" ] && return 0
   PROTECTED_PKG="$(sh_ pm list packages | sed 's/package://' \
@@ -141,9 +176,23 @@ resolve_clock() {
 }
 
 rebind_a11y() { # delete-then-put; binding completes on next app launch (see gotchas memo)
+  # NOTE: this adb path works on EMULATORS, but on real devices >= Android 13 the
+  # "Restricted Settings" hardening enables the service in a "malfunctioning" state
+  # that never delivers events (verified on Moto G 2025 / Android 15, where the
+  # "Allow restricted settings" escape hatch is also removed). On such devices the
+  # operator MUST grant accessibility via the real Settings UI (toggle off/on). See
+  # a11y_working() and the setup guidance.
   sh_ settings delete secure enabled_accessibility_services
   sh_ settings put secure enabled_accessibility_services "$A11Y_COMPONENT"
   sh_ settings put secure accessibility_enabled 1
+}
+
+# Behavioural test that accessibility events actually reach the engine: a protected
+# app must show the lock screen. Assumes $PROTECTED_PKG is protected. Returns 0 if
+# the lock screen appears (a11y is delivering), 1 otherwise (grant needed via UI).
+a11y_working() {
+  home; sleep 1; launch_pkg "$PROTECTED_PKG"
+  if wait_lockscreen; then enter_pin "$PIN"; home; return 0; else home; return 1; fi
 }
 
 # Bring App Lock to a known LOCKED-out state for a protected app, then unlock it.
@@ -151,7 +200,7 @@ unlock_protected() { # launches Clock, expects lock screen, enters PIN, expects 
   launch_pkg "$PROTECTED_PKG"
   wait_lockscreen || { fail "expected lock screen after launching $PROTECTED_PKG"; return 1; }
   enter_pin "$PIN"
-  wait_foreground "$PROTECTED_PKG" 6 || { fail "PIN unlock did not surface $PROTECTED_PKG"; return 1; }
+  wait_foreground "$PROTECTED_PKG" || { fail "PIN unlock did not surface $PROTECTED_PKG"; return 1; }
   return 0
 }
 

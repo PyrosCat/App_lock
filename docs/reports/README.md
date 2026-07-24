@@ -41,7 +41,7 @@ measured, reviewed, or executed. Reports differ from the rest of `docs/` in natu
 |---|---|---|
 | 2012 i7 (primary dev) | — | Pixel_5 API 30 x86 emulator; WP1 CI baseline produced here |
 | NucBox G5 (Win 11, N-series) | [2026-07-21](fleet/2026-07-21_fleet-nucbox-g5.md) | Fleet-ready — WHPX accel; x86_64 matrix (26/29/33/35) boots; `assembleDebug` green |
-| Moto G 2025 (physical) | — | Arriving 2026-07-22 |
+| Moto G 2025 (physical) | [2026-07-23](campaigns/2026-07-23_wp2-regression_moto-g-2025.md) | Connected (USB adb via 2012 host); WP2 gating all green on Android 15; a11y needs manual UI grant (Restricted Settings ≥ API 13) |
 
 Keep this table to one line per host — details belong in the dated reports it links to.
 

@@ -32,6 +32,15 @@ the refactor preserved the security-critical semantics.
 - The debug APK built at `app/build/outputs/apk/debug/app-debug.apk` (or set `APK=`).
 - `setup_device.sh` provisions the rest: install, PIN `1234`, bind the a11y service,
   protect Clock.
+- **Real devices ≥ Android 13 — accessibility must be granted by hand.** The adb
+  `settings put` enable that works on emulators leaves the service in the "Restricted
+  Settings" *malfunctioning* state that delivers no events (verified on Moto G 2025 /
+  Android 15, where the "Allow restricted settings" escape hatch is also removed).
+  Grant it via the phone once: **Settings → Accessibility → App Lock protection → toggle
+  OFF then ON**, then run with `--skip-setup`. `setup_device.sh` detects the failure and
+  prints this guidance. Emulators are unaffected (adb enable works there).
+- On a physical device the screen must be **unlocked** (past your own keyguard) and awake
+  (`adb shell svc power stayon true`) for the harness to drive it.
 
 ## Running
 
@@ -53,25 +62,34 @@ scripts/e2e/f3_self_gate.sh
 Overridable env: `SERIAL`, `APP_ID` (WP4 flavor suffixes), `PIN`, `PROTECTED_PKG`,
 `NEUTRAL_PKG`, `CYCLES`, `BURST`, `TAP_GAP`, `APK`.
 
-## Validation status (2026-07-21)
+## Validation status
 
-- **Deterministic helpers — validated live** on the 2012-host Pixel_5 API 30 emulator:
-  device/boot detection, screen-size parse (→ exactly 1080×2340), `dumpsys` resumed-activity
-  parsing (→ correctly identified the launcher and `com.applock/.ui.MainActivity`), Clock
-  resolution (→ `com.google.android.deskclock`), and the a11y-binding read.
-- **Interactive checks — baseline run PENDING on a healthy host.** The 2012 emulator's
-  SystemUI ANR-wedged this session (`bad color buffer handle` / swiftshader on that ancient
-  GPU — the documented fragility), so the tap/lock/self-gate flows could not be exercised
-  end-to-end here. Run the first baseline (`run_all.sh -n 2`) on the **NucBox G5** (healthy
-  WHPX emulators — its reason for joining the fleet) and file the result in
-  `docs/reports/campaigns/`. That baseline run is the WP2 exit criterion.
+- **Baseline achieved (2026-07-22, NucBox G5, API 33 x86_64):** `run_all.sh -n 2` → all four
+  checks PASS 2/2; the security assertions (IMMEDIATE relock 10/10, F4 rapid-relaunch,
+  F3/FR-108 self-gate) held in every run. WP2 exit criterion met for API 33. Report:
+  `docs/reports/campaigns/2026-07-22_wp2-regression-baseline_nucbox-g5.md`.
+- **Harness fixes (2026-07-22)** from three issues that baseline run surfaced on Windows/
+  Git Bash paths the 2012 host never exercised (the checks passed *with* manual workarounds;
+  these make setup turnkey): (1) `host_path()` converts the APK to a native Windows path for
+  `adb install` (MSYS_NO_PATHCONV mangled it); (2) `open_app_list()` clears the self-gate
+  before the Clock-protection locate loop; (3) wait timeouts are tunable (`FG_WAIT`,
+  `LOCKSCREEN_WAIT`) and OV-3's between-cycle unlock soft-warns (the relock security
+  assertion still hard-fails). **These fixes touch `setup_device.sh` and cold-start pacing,
+  not the security assertions — re-run `run_all.sh -n 2` (with setup, no `--skip-setup`) on
+  the NucBox to confirm turnkey operation and file a follow-up campaign note.**
+- **Deterministic helpers** were separately validated live on the 2012-host Pixel_5 API 30
+  emulator (screen parse → 1080×2340, `dumpsys` focus parse, Clock resolution, a11y read)
+  before that host's SystemUI ANR-wedged (`bad color buffer handle`/swiftshader).
+- **Coverage caveat:** the baseline exercised API 33 only. API 26/29/35 in the matrix are not
+  yet run — a single-API pass does not guarantee the others (tracked on the RTM FR-108 row).
 
 ## Device notes
 
-- **PIN-pad geometry** is fraction-based and exact for the pixel_5-profile matrix AVDs
-  (1080×2340). On a differently-shaped screen (e.g. the Moto G 2025), the fractions are
-  approximate; if a PIN tap misses, adjust `PIN_COL_FRAC`/`PIN_ROW_FRAC` in `lib.sh` or
-  add a per-device profile. A future hardening: locate PIN digits via `uiautomator` semantics.
+- **PIN entry** locates each digit by its Compose button text (`uiautomator`) and taps the
+  node centre — resolution-independent, so it works on any screen (the AVD matrix and physical
+  devices like the Moto G 2025) without geometry tuning. It falls back to fraction-based taps
+  (the 1080×2340 pixel_5 geometry) only if a device doesn't expose the digit text. If PIN entry
+  ever misses, that fallback is the suspect — adjust `PIN_COL_FRAC`/`PIN_ROW_FRAC` in `lib.sh`.
 - **Slow-emulator timing**: taps are spaced `TAP_GAP=0.9s`; raise it on a slower host.
 - **`dismiss_anr`** taps away the "System UI isn't responding" dialog this class of emulator
   throws; a *persistently* ANR-wedged SystemUI (as seen on the 2012 box) can't be worked

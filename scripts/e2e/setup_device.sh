@@ -15,11 +15,24 @@ require_device || exit 2
 resolve_clock || exit 2
 
 step "setup: install APK"
-if [ -f "$APK" ]; then adbx install -r -g "$APK" >/dev/null 2>&1 && info "installed $(basename "$APK")" || info "install returned nonzero (may already be current)"
+if [ -f "$APK" ]; then
+  out="$(adbx install -r -g "$(host_path "$APK")" 2>&1)"
+  if printf '%s' "$out" | grep -q 'Success'; then info "installed $(basename "$APK")"
+  else info "install did not report Success: $(printf '%s' "$out" | tr '\n' ' ' | tail -c 200)"; fi
 else info "APK not found at $APK — assuming already installed"; fi
 
 step "setup: bind accessibility service"
-rebind_a11y; info "a11y set to $A11Y_COMPONENT (binds on next launch)"
+# Non-destructive: if the service is already enabled (e.g. a working manual UI grant
+# on a real device), DON'T delete+re-put it — that would reset a real device back to
+# the broken "Restricted Settings" state. Only rebind when it isn't already enabled.
+if sh_ settings get secure enabled_accessibility_services | grep -q "$A11Y_CLASS"; then
+  sh_ settings put secure accessibility_enabled 1
+  info "a11y already enabled — preserved (not resetting; a real-device grant survives)"
+else
+  rebind_a11y
+  info "a11y enabled via adb ($A11Y_COMPONENT) — works on emulators; a real device >=API13"
+  info "  will still show it 'malfunctioning' until granted via the Settings UI (see below)"
+fi
 
 step "setup: grant CAMERA (intruder selfie, optional)"
 sh_ pm grant "$APP_ID" android.permission.CAMERA >/dev/null 2>&1 || true
@@ -36,33 +49,45 @@ else
 fi
 
 step "setup: protect Clock via the app list"
-if ! ui_has "$UI_APPLIST_SIGNAL"; then fail "not on the App List — cannot toggle Clock protection"; exit 1; fi
-# Verify by behaviour: is Clock already protected?
+# Is Clock already protected? Probe by behaviour — this backgrounds App Lock, so
+# the self-gate (FR-108) will be up afterwards and open_app_list must clear it.
 home; sleep 1; launch_pkg "$PROTECTED_PKG"
-if wait_lockscreen 5; then
+if wait_lockscreen; then   # full timeout: a false "not protected" here would toggle Clock OFF
   pass "Clock already protected (lock screen appeared)"; enter_pin "$PIN"; home; summary "setup"; exit 0
 fi
-info "Clock not yet protected — locating its switch in the app list"
-launch_main; sleep 2; dismiss_anr
+info "Clock not yet protected — opening the App List (through the self-gate) to toggle it"
+open_app_list || { fail "could not reach the App List to toggle Clock (PIN/self-gate not cleared)"; summary "setup"; exit 1; }
 _screen_wh
+# The app list is alphabetical and can be long on a real device; one big swipe
+# overshoots the target row (jumps clean past it). Scroll to the top, then step
+# down in small increments, checking for the label each time.
+info "locating the '$PROTECTED_LABEL' row (scroll to top, then step down)"
+for i in $(seq 1 6); do sh_ input swipe $((SCREEN_W/2)) $((SCREEN_H/4)) $((SCREEN_W/2)) $((SCREEN_H*3/4)) 200; done; sleep 1
+label_re="text=\"$PROTECTED_LABEL\"[^>]*bounds=\"\\[[0-9]+,[0-9]+\\]\\[[0-9]+,[0-9]+\\]\""
 found=""
-for attempt in 1 2 3 4 5; do
-  xml="$(ui_xml)"
-  # find a node whose text is exactly Clock; extract its bounds "[x1,y1][x2,y2]"
-  bounds="$(printf '%s' "$xml" | grep -oE 'text="Clock"[^>]*bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1)"
+for step in $(seq 1 20); do
+  bounds="$(ui_xml | grep -oE "$label_re" | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | head -1)"
   if [ -n "$bounds" ]; then
-    y1="$(printf '%s' "$bounds" | sed -E 's/.*\],\[[0-9]+,([0-9]+)\]"/x/; s/bounds="\[[0-9]+,([0-9]+)\].*/\1/')"
     yc="$(printf '%s' "$bounds" | sed -E 's/bounds="\[[0-9]+,([0-9]+)\]\[[0-9]+,([0-9]+)\]"/\1 \2/' | awk '{printf "%d",($1+$2)/2}')"
     sw_x=$(awk "BEGIN{printf \"%d\", 0.92*$SCREEN_W}")   # switch sits at the right edge of the row
-    info "tapping Clock switch at ($sw_x,$yc)"; sh_ input tap "$sw_x" "$yc"; sleep 1; found=1; break
+    info "tapping $PROTECTED_LABEL switch at ($sw_x,$yc) [step $step]"; sh_ input tap "$sw_x" "$yc"; sleep 1; found=1; break
   fi
-  sh_ input swipe $((SCREEN_W/2)) $((SCREEN_H*3/4)) $((SCREEN_W/2)) $((SCREEN_H/4)) 300; sleep 1   # scroll down
+  sh_ input swipe $((SCREEN_W/2)) $((SCREEN_H*55/100)) $((SCREEN_W/2)) $((SCREEN_H*40/100)) 250; sleep 0.7   # small scroll down
 done
-[ -n "$found" ] || { fail "could not locate the 'Clock' row (app list may render labels differently); toggle it manually"; summary "setup"; exit 1; }
+[ -n "$found" ] || { fail "could not locate the '$PROTECTED_LABEL' row after scrolling (locale? label mismatch?); toggle it manually"; summary "setup"; exit 1; }
 
-# Confirm protection took.
+# Confirm protection took AND accessibility is delivering events.
 home; sleep 1; launch_pkg "$PROTECTED_PKG"
-if wait_lockscreen 6; then pass "Clock now protected (lock screen appeared)"; enter_pin "$PIN"; home
-else fail "toggled a switch but Clock did not lock — verify the correct row was hit"; fi
+if wait_lockscreen; then pass "Clock now protected (lock screen appeared)"; enter_pin "$PIN"; home
+else
+  fail "Clock did not lock. Two possible causes:"
+  info "  1. The wrong switch row was toggled (re-run; the locate step is geometric)."
+  info "  2. Accessibility is enabled but NOT delivering events — the Android 13+"
+  info "     'Restricted Settings' state (App Info shows 'malfunctioning'). adb cannot"
+  info "     fix this on real devices. Grant it via the phone: Settings > Accessibility"
+  info "     Settings > Accessibility > App Lock protection > toggle OFF then ON"
+  info "     (on Android 15 the 'Allow restricted settings' menu may be gone — the"
+  info "     off/on toggle is the way). Then re-run with --skip-setup."
+fi
 
 summary "setup"
