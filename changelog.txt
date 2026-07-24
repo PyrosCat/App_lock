@@ -4,6 +4,31 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Risk R-001 — accessibility-detection production risk tracked   (2026-07-23)
+--------------------------------------------------------------------------
+Captured the accessibility-based-detection concerns surfaced by the Moto G
+2025 / Android 15 testing as a tracked, roadmap-shaping risk rather than
+leaving them in conversation.
+
+- docs/process/RISK_REGISTER.md — NEW living risk register (complements the
+  MIGRATION_ASSESSMENT Phase 11 snapshot; TAS §67). First entry R-001
+  (severity High): AccessibilityService detection has three compounding
+  sub-risks — (a) Android 13+ Restricted Settings blocks sideloaded grants,
+  escape hatch removed on newer devices; (b) Google Play policy scrutiny of
+  accessibility for app-lockers; (c) silent-failure gap — service can be
+  enabled-in-setting yet delivering no events, and the FR-179 watchdog
+  likely can't detect it. Play installs are unaffected by (a).
+- ADR-013 — dated "Discovered consequences" amendment (does NOT alter the
+  decision, per GOVERNANCE §2.3) linking R-001; notes the M2 evaluation may
+  confirm or supersede it.
+- MIGRATION_ASSESSMENT M2 row — folded in the detection-approach evaluation
+  (AccessibilityService vs UsageStatsManager vs hybrid, vs Play policy /
+  Restricted Settings / NFR-PERF-012) + accessibility-health self-test
+  design (FR-231/242/253); threat model must record the R-001 decision.
+- docs/README — process area now lists the risk register.
+- No RTM status change (no requirement implemented/verified here).
+
+
 M1/WP2 — real-hardware validation on Moto G 2025 / Android 15   (2026-07-23)
 ---------------------------------------------------------------------------
 Validated the WP2 gating harness on a physical Moto G 2025 (Android 15,
