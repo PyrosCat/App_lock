@@ -4,6 +4,35 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs — DDS + Test Spec filed; docx→md mirrors for active baseline   (2026-08-03)
+---------------------------------------------------------------------------
+Two new client-received document sets arrived (loose in "New docs/" at the
+repo root) plus SDS sections 18–20; filed them into the governed layout and
+executed the previously deferred docx→Markdown conversion.
+
+- docs/design/dds/ — NEW area: Database Design Specification Volumes I–IV
+  (4 docx, filenames verbatim).
+- docs/testing/tsp/ — NEW area: Test Specification V-I sections 1–15 and
+  V-II section 1 (16 docx, filenames verbatim). Test PLANS stay .md at the
+  testing/ root; tsp/ is for client-received spec revisions only.
+- docs/design/sds/ — sections 18–20 (Observability & Diagnostics,
+  Performance & Resource Optimization, Maintainability Testing & Design
+  Traceability) now tracked; SDS spans sections 1–20.
+- scripts/docx_to_md.py — NEW: converts the active baseline (srs, nfr,
+  tas, sds, dds, tsp, process docx; archive/ excluded) to GFM via pandoc
+  into per-area md/ subfolders with per-area MANIFEST.txt (sha256 of each
+  source). --check mode verifies mirrors are current. 82 files converted.
+- Decision (user-approved 2026-08-03): supersedes M0 decision D2 ("no
+  markdown mirrors"). The .docx files REMAIN authoritative client-received
+  originals; md/ mirrors are derived, regenerable, never hand-edited.
+  docs/README.md convention 7 rewritten accordingly; extract_docx.py
+  docstring updated; layout tree + area table gained dds/ and tsp/ rows.
+- Tooling: pandoc 3.10 installed on this machine (winget). Fleet machines
+  consuming committed md/ output do not need pandoc.
+- No RTM change (docs-only, GOVERNANCE §1.4). No ADR (documentation-format
+  convention, no architectural consequence).
+
+
 Risk R-001 — accessibility-detection production risk tracked   (2026-07-23)
 --------------------------------------------------------------------------
 Captured the accessibility-based-detection concerns surfaced by the Moto G
