@@ -4,6 +4,27 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Testing — TS Volume I gap analysis filed   (2026-08-03)
+---------------------------------------------------------------------------
+Full read of Test Specification Volume I (all 15 sections) completed and
+mapped against the project's actual verification state.
+
+- docs/testing/TS_GAP_ANALYSIS.md — NEW living gap analysis: TS delivery
+  state (V-I complete; V-II partial; V-III–VI missing — client dependency
+  G-12/P1), compliance map (governance layer largely aligned: continuous
+  verification = GOVERNANCE §1.3 invalidation rule; reports = evidence
+  conventions; M0–M6 = TS/IS phase gates), and a 12-entry gap register
+  with landing zones in M1 WPs and M2–M6 milestones. Highest-priority
+  findings: no defect-management process exists (G-04/P1, decision due at
+  the M1 gate) and TS volumes II–VI undelivered (G-12/P1). Plan-impact
+  note: M3's "author Test Specification v1" deliverable is superseded by
+  the client-delivered TS. Two TS document defects flagged for client
+  feedback (§5.3 lost role cells; §6.3 vs §11.7 phase numbering).
+- Standing rule: each phase-gate review re-walks the gap analysis; new TS
+  volume deliveries trigger an update.
+- No RTM change (docs-only, GOVERNANCE §1.4).
+
+
 Docs — DDS + Test Spec filed; docx→md mirrors for active baseline   (2026-08-03)
 ---------------------------------------------------------------------------
 Two new client-received document sets arrived (loose in "New docs/" at the
