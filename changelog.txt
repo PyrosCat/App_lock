@@ -4,6 +4,55 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Governance — ADR supersession numbering: suffix-lineage convention   (2026-08-04)
+---------------------------------------------------------------------------
+User-approved change to GOVERNANCE.md §2 (approval 2026-08-04): a superseding
+ADR is now numbered by lineage suffix rather than the next integer.
+
+- A 1-to-1 supersession takes the superseded ADR's lineage-root number + the
+  next unused letter (ADR-013 -> ADR-013A -> ADR-013B). A multi-parent
+  supersession and any new independent decision keep the next integer.
+  Lettered-suffix IDs are permanent and non-reusable like integers.
+- GOVERNANCE §2.3/§2.4 updated; docs/README naming convention (rule 2) updated;
+  the ADR index lists a superseding ADR directly beneath its lineage root.
+- First application: the two-tier-detection ADR (drafted in-session as ADR-016)
+  is renamed to ADR-013A before commit; integer 016 stays free (M1_PLAN D2
+  Konsist earmark unchanged).
+- Rationale: make supersession lineage visible in the identifier; Status and
+  Supersedes/Superseded-by links already carried the distinction.
+
+
+ADR-013A — two-tier detection; accessibility becomes optional   (2026-08-04)
+---------------------------------------------------------------------------
+Product decision: the app must function without accessibility to meet Google
+Play compliance. Recorded the architecture decision before any code moves
+(M1 is a freeze; the build itself lands in M2).
+
+- docs/architecture/adr/ADR-013A-two-tier-detection.md — NEW. Two-tier
+  foreground detection: UsageStatsManager + overlay (SYSTEM_ALERT_WINDOW) as
+  the Play-compliant BASELINE (default), AccessibilityService demoted to an
+  OPTIONAL opt-in enhancement for lower latency. App MUST lock protected apps
+  with accessibility off. Supersedes ADR-013. Additive per the SDS §8.4
+  Trigger Processor abstraction — the lock engine is unchanged.
+- ADR-013 — Status flipped to "Superseded by ADR-013A"; decision content left
+  immutable (GOVERNANCE §2.3). ADR index README updated for both rows.
+- RISK_REGISTER R-001 — updated in place: ADR-013A addresses R-001a/b as a
+  design matter and narrows R-001c to the optional path, but the risk stays
+  Open at High because the shipping build is still accessibility-only until
+  M2 implements the baseline. New consideration: baseline depends on Usage
+  Access + overlay (own health/permission-loss story, extends FR-179).
+- MIGRATION_ASSESSMENT M2 row — detection line reframed from "evaluate
+  approaches" to "build the two-tier model per ADR-013A" (scope increase:
+  a second detection source + overlay presentation).
+- Requirement impacts recorded in the ADR (NOT edited into the client specs):
+  NFR-PERF-012 needs a tiered detection-delay target; FR-179 extends to Usage
+  Access + overlay; likely new FR(s) for detection-source selection, optional-
+  accessibility onboarding, and overlay presentation. To action via a governed
+  baseline revision. Feeds Threat Model v1.
+- No RTM change (docs-only, no requirement state changed yet; GOVERNANCE §1.4).
+  No code changes; no client-spec (.docx) edits.
+
+
 Testing — TS Volume I gap analysis filed   (2026-08-03)
 ---------------------------------------------------------------------------
 Full read of Test Specification Volume I (all 15 sections) completed and

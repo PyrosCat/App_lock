@@ -86,7 +86,9 @@ The general split: **plan** ("how we'll test/set up") → `process/` or `testing
    mirrors under the area's `md/` subfolder (convention 7); working docs in `process/`,
    `testing/`, `adr/`, and this map are authored Markdown.
 2. **Naming:** `UPPER_SNAKE_CASE.md` for process/testing docs (e.g. `M1_PLAN.md`,
-   `FLEET_STATUS.md`); `ADR-NNN-kebab-slug.md` for ADRs.
+   `FLEET_STATUS.md`); `ADR-NNN-kebab-slug.md` for a new-decision ADR, and
+   `ADR-NNN<Letter>-kebab-slug.md` (e.g. `ADR-013A-…`) for one that supersedes ADR-NNN
+   (suffix-lineage, GOVERNANCE §2.4).
 3. **Changelog:** add an entry to `changelog.txt` describing the change (the commit subject
    stays one line; detail goes in the changelog).
 4. **RTM:** if you implement or verify a requirement, update its row in

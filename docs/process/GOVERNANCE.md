@@ -108,15 +108,25 @@ immutable** — architecture evolves by *superseding* decisions, never by rewrit
 | Update a separate **Implementation status** line (e.g. "executed in WP5, commit …") | **MAY**, dated |
 | Add cross-links (`Superseded-by`, `Related`), fix typos/formatting, correct factual errors that do not alter the decision | **MAY** |
 | Rewrite Context, Decision, Alternatives, or Consequences to say something **different** | **MUST NOT** — that is a supersession |
-| Delete an ADR or reuse its number | **MUST NOT** — numbers are permanent, even for Rejected ADRs |
+| Delete an ADR or reuse its number/suffix | **MUST NOT** — identifiers are permanent, even for Rejected ADRs |
 
 ### 2.4 Supersession protocol
 
-1. Write the new ADR with the next sequential number; include `Supersedes: ADR-NNN` and
-   state *why* the old decision no longer holds.
+1. **Number the superseding ADR by the lineage-suffix rule.** A supersession of exactly
+   **one** existing ADR takes that ADR's *lineage-root* number plus the next unused letter:
+   `ADR-013` → `ADR-013A` → `ADR-013B` … (letters always hang off the lineage root, never the
+   immediate parent — so a chain reads 013A, 013B, 013C, not 013A-A). A supersession of **more
+   than one** ADR instead takes the next integer and lists all parents. An ADR that supersedes
+   nothing is an ordinary new decision and takes the **next integer**. Include
+   `Supersedes: ADR-NNN` and state *why* the old decision no longer holds.
 2. Edit the old ADR's metadata only: `Status: Superseded by ADR-MMM` + date.
-3. Update the index (`adr/README.md`) for both rows, same commit.
+3. Update the index (`adr/README.md`) for both rows, same commit; list the superseding ADR
+   directly beneath its lineage root so the chain reads in order.
 4. If the superseded decision backed any RTM rows, re-evaluate them (§1.3 rule 3).
+
+Lettered-suffix identifiers are permanent and non-reusable exactly like integer identifiers
+(§2.3). Adopted 2026-08-04 (user-approved) to make supersession lineage visible in the
+identifier itself.
 
 ### 2.5 Required metadata (every ADR)
 
