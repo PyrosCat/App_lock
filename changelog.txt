@@ -4,6 +4,29 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs — TAS §↔part index; Secure Coding Standard skeleton   (2026-08-04)
+---------------------------------------------------------------------------
+Navigation + scaffold additions, plus a placement-map touch-up.
+
+- docs/architecture/tas/README.md — NEW part-to-section index. The TAS's nine
+  .docx parts carry contiguous sections §1–75 (3 parts/volume); the table maps
+  any §N to its part file, with an rg one-liner for ad-hoc lookup via the md
+  mirrors. Satisfies README cross-reference convention 6. Records the fix that
+  Cryptographic Architecture is §16 (part_3), not §5.2 (§5 = Assumptions).
+- docs/security/SECURE_CODING_STANDARD.md — NEW v0 SKELETON (clearly marked NOT
+  yet authoritative). 16 section headings tied to SRS §8 (FR-161..180), TAS
+  Part III, and the as-built security findings (PIN not bound to keys,
+  unhandled Keystore invalidation, missing anti-tapjacking, fail-open
+  detection). Normative rules are an M2 deliverable (MIGRATION_ASSESSMENT §12 /
+  TAS §72.2); companion to the pending Threat Model.
+- docs/README — tas tree line notes the index; NEW security/ area created for
+  the SCS (grouped with the pending Threat Model), distinct from srs §8 /
+  tas Part III / the process/ risk register.
+- No RTM change (docs-only, GOVERNANCE §1.4). No ADR (deliverable docs, no
+  architectural decision). Threat Model to be checked/consolidated against this
+  scaffold and the §16 citation fix when it arrives.
+
+
 Governance — ADR supersession numbering: suffix-lineage convention   (2026-08-04)
 ---------------------------------------------------------------------------
 User-approved change to GOVERNANCE.md §2 (approval 2026-08-04): a superseding
