@@ -356,111 +356,17 @@ The latter is the security boundary being verified.
 
 The project SHALL organize security verification around the established threat classes.
 
-**Authentication Bypass**
+**Authentication Bypass.** Tests SHALL attempt to bypass PIN authentication; exploit stale sessions; exploit rapid application switching or relaunch; exploit lifecycle transitions, reboot, Back/Recents behavior, or process death; and exploit authentication-state inconsistencies.
 
-Tests SHALL attempt to:
+**Authorization Bypass.** Tests SHALL attempt to access protected applications, the Vault, protected settings, or protected policies without authorization; and disable or weaken security controls without authorization.
 
-- bypass PIN authentication;
+**Storage and Cryptography.** Tests SHALL attempt to recover plaintext from private storage; recover Vault or database content from extracted ciphertext; recover filenames, sensitive metadata, or key material; and exploit backup, restore, corruption, or migration paths.
 
-- exploit stale sessions;
+**IPC and Component Abuse.** Tests SHALL attempt to invoke exported components unexpectedly; spoof framework broadcasts where applicable; launch protected activities or abuse service interfaces; inject malicious intents; and exploit exported receiver behavior.
 
-- exploit rapid app switching;
+**Detection and Enforcement Availability.** Tests SHALL attempt to revoke or disrupt the baseline Usage Access permission; terminate, delay, or starve the baseline foreground-detection service; cause UsageStats sampling or usage-event retrieval to become stale, incomplete, or delayed; cause detection-source selection or Trigger Processor routing to select an unhealthy source or lose a foreground transition; interfere with the lock-interface presentation mechanism or the permission on which it depends; disable or disrupt the optional Accessibility enhancement when enabled; force-stop the application, interfere with watchdog operation, reboot the device, induce process death, or exercise OEM/background restrictions; and cause silent loss of the required baseline enforcement path. Until the two-tier architecture is implemented, equivalent testing SHALL continue to cover the current Accessibility-only delivered build and SHALL NOT claim that the planned baseline tier is already effective.
 
-- exploit rapid relaunch;
-
-- exploit lifecycle transitions;
-
-- exploit reboot behavior;
-
-- exploit Back/Recents behavior;
-
-- exploit process death;
-
-- exploit authentication-state inconsistencies.
-
-**Authorization Bypass**
-
-Tests SHALL attempt to:
-
-- access protected applications without authorization;
-
-- access the vault without authorization;
-
-- access protected settings without authorization;
-
-- modify protected policies without authorization;
-
-- disable security controls without authorization.
-
-**Storage and Cryptography**
-
-Tests SHALL attempt to:
-
-- recover plaintext from private storage;
-
-- recover vault content from extracted ciphertext;
-
-- recover database content from extracted files;
-
-- recover filenames or sensitive metadata;
-
-- recover key material from persistent storage;
-
-- exploit backup or restore paths.
-
-**IPC and Component Abuse**
-
-Tests SHALL attempt to:
-
-- invoke exported components unexpectedly;
-
-- spoof system broadcasts where applicable;
-
-- launch protected activities;
-
-- abuse service interfaces;
-
-- inject malicious intents;
-
-- exploit exported receiver behavior.
-
-**Enforcement Availability**
-
-Tests SHALL attempt to:
-
-- interfere with accessibility service operation;
-
-- force-stop the application;
-
-- interfere with watchdog operation;
-
-- revoke required permissions;
-
-- reboot the device;
-
-- induce process death;
-
-- exploit OEM/background restrictions;
-
-- cause silent loss of enforcement.
-
-**UI and Interaction Abuse**
-
-Tests SHALL attempt to:
-
-- exploit malicious overlays;
-
-- obscure security UI;
-
-- exploit tapjacking;
-
-- inject touch events;
-
-- exploit peer accessibility services;
-
-- exploit lifecycle transitions;
-
-- capture authentication UI.
+**UI and Interaction Abuse.** Tests SHALL attempt to exploit malicious overlays, obscured security UI, tapjacking, or injected touch events; exploit peer Accessibility Services; exploit lifecycle transitions; and capture authentication UI.
 
 **11.11 Historical Bypass Tests**
 
@@ -486,37 +392,21 @@ The historical failure demonstrates that the threat is credible.
 
 **11.12 Security Test Preconditions**
 
-Each security test SHALL identify its required environment.
+Each security test SHALL identify its required environment. At minimum, where relevant, the evidence SHALL identify:
 
-At minimum, where relevant:
-
-- Android version;
-
-- device/model;
-
-- application version;
-
-- build type;
-
-- release/debug state;
-
-- security configuration;
-
-- permissions;
-
-- accessibility state;
-
-- device-admin state;
-
-- authentication configuration;
-
+- Android version and device/model;
+- application version and build type;
+- release/debug state and security configuration;
+- the active foreground-detection tier;
+- Usage Access state, baseline foreground-service state, sampling interval, and detector-health state;
+- the selected lock-interface presentation mechanism and its required permission/state;
+- Accessibility permission, binding, and event-delivery state when the optional enhancement is enabled;
+- detection-source selection configuration;
+- device-admin and authentication configuration;
 - network state where applicable;
+- test data and database state.
 
-- test data;
-
-- database state.
-
-A result without sufficient configuration information SHALL be considered incomplete evidence.
+A result without sufficient configuration information SHALL be considered incomplete evidence. The evidence SHALL also identify whether it applies to the current Accessibility-only implementation or the approved two-tier target architecture.
 
 **11.13 Configuration Identification**
 
@@ -756,75 +646,50 @@ The assessment SHALL therefore consider the complete threat path.
 
 **11.21 Device Coverage**
 
-Security verification SHALL account for Android platform and device variation where the control depends on platform behavior.
+Security verification SHALL account for Android platform and device variation where a control depends on platform behavior.
 
-The existing regression evidence includes testing on:
+The existing regression evidence includes testing on API 33, API 35, the established NucBox environment, and the established Moto G environment. This evidence establishes functional/regression coverage; it SHALL NOT automatically establish universal security assurance across Android devices.
 
-- API 33;
+Controls dependent upon the following SHALL receive platform-sensitive security testing where those differences materially affect the threat:
 
-- API 35;
+- UsageStatsManager and Usage Access behavior;
+- foreground-service execution and sampling behavior;
+- background-activity-launch restrictions and the selected lock-interface presentation mechanism;
+- overlay permission and overlay behavior where applicable;
+- optional Accessibility permission, binding, and event delivery;
+- detection-source selection and failover/degradation behavior;
+- boot behavior, permission enforcement, Keystore behavior, and device-admin behavior.
 
-- the established NucBox environment;
+Current Accessibility-only results SHALL remain identified as current-implementation evidence and SHALL NOT be generalized to the unimplemented baseline detector.
 
-- the established Moto G environment.
+**11.22 Security Verification of the Detection and Enforcement Boundaries**
 
-This evidence establishes functional/regression coverage.
+Foreground-detection and enforcement verification SHALL test the complete path from detection input to authorization enforcement, not merely the presence of a permission or service. Each step below is necessary but not sufficient for the next (`≠` denotes "does not by itself establish").
 
-It SHALL NOT automatically establish universal security assurance across Android devices.
+**Baseline Tier.** For the approved baseline tier, verification SHALL distinguish:
 
-Controls dependent upon:
+    Usage Access Granted
+      ≠ Baseline Service Running
+      ≠ Usage Events Available and Current
+      ≠ Protected App Detected
+      ≠ Detection Routed Through Trigger Processor
+      ≠ Lock Interface Successfully Presented
+      ≠ Unauthorized Use Prevented
 
-- Accessibility behavior;
+**Optional Accessibility Enhancement.** When the optional Accessibility enhancement is enabled, verification SHALL distinguish:
 
-- background execution;
+    Accessibility Permission Enabled
+      ≠ Service Bound and Responsive
+      ≠ Events Delivered
+      ≠ Protected App Detected
+      ≠ Detection Routed Through Trigger Processor
+      ≠ Lock Interface Successfully Presented
 
-- boot behavior;
+The security objective is not merely that a detector appears enabled. It is that a protected application cannot become usable without App Lock authorization under the tested operating conditions.
 
-- overlay behavior;
+Verification SHALL also demonstrate that loss or absence of the optional Accessibility enhancement degrades the target architecture to the healthy baseline tier rather than disabling protection. Conversely, loss of the required baseline detector or lock-presentation path SHALL be treated as a security-significant failure.
 
-- permission enforcement;
-
-- Keystore behavior;
-
-- device-admin behavior
-
-SHALL receive platform-sensitive security testing where those differences materially affect the threat.
-
-**11.22 Security Verification of the Accessibility Boundary**
-
-Because accessibility-based enforcement is security-critical, its verification SHALL test more than permission state.
-
-The verification model SHALL distinguish:
-
-Accessibility Enabled
-
-≠
-
-Service Bound
-
-≠
-
-Events Delivered
-
-≠
-
-Protected App Detected
-
-≠
-
-Lock Screen Successfully Presented
-
-A security test SHALL therefore exercise the complete enforcement path where practical.
-
-The test objective is not merely:
-
-"Accessibility is enabled."
-
-It is:
-
-"A protected application cannot become usable without App Lock authorization under the tested operating conditions."
-
-Known limitations such as silent event loss and OEM background restrictions SHALL remain explicit residual risks.
+Until the target architecture is implemented, the current delivered build SHALL continue to be verified as Accessibility-dependent, and the planned baseline path SHALL receive no verification credit.
 
 **11.23 Security Verification of Vault Protection**
 
@@ -1175,35 +1040,21 @@ A third invariant SHALL apply:
 Section 11 is complete only when:
 
 - the threat-to-control-to-evidence chain is defined;
-
 - functional verification is explicitly separated from security verification;
-
 - security status terminology is standardized;
-
 - adversarial testing requirements are defined;
-
 - historical bypasses are preserved as security evidence;
-
-- configuration identification is mandatory;
-
-- evidence sufficiency is defined;
-
+- configuration identification and evidence sufficiency are mandatory;
 - security-test failures have controlled disposition;
-
-- accessibility enforcement receives end-to-end security verification;
-
-- vault runtime authorization and offline confidentiality are separately verified;
-
+- the baseline UsageStatsManager/Usage Access path receives end-to-end security verification after implementation;
+- the optional Accessibility enhancement receives tier-specific verification when enabled;
+- degradation from the optional enhancement to the baseline tier is verified;
+- the current Accessibility-only implementation remains separately identified until superseded;
+- Vault runtime authorization and offline confidentiality are separately verified;
 - credential and key protection are separately verified;
-
-- change-triggered reverification is mandatory;
-
-- verification promotion and downgrade rules are explicit;
-
+- change-triggered reverification and verification downgrade rules are explicit;
 - security claims are limited to what evidence supports;
-
 - phase gates consume security evidence;
-
 - evidence cannot silently redefine architecture or requirements.
 
 **11.37 Boundary to Section 12**

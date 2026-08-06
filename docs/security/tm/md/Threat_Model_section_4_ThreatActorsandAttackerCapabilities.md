@@ -233,9 +233,13 @@ ADB-based interaction must not create a path to:
 
 - Permanently defeat lockout protections.
 
-Force-stop is treated separately as an **availability attack** because terminating the application can interrupt the accessibility-based enforcement mechanism.
+Force-stop is treated separately as an **availability attack** because terminating the application can interrupt the active enforcement architecture.
 
-The current architecture cannot guarantee continued enforcement after force-stop. This limitation is therefore a residual security concern rather than an attacker capability that can simply be declared impossible.
+Under the current delivered implementation, force-stop can interrupt the Accessibility-based enforcement path. Under the approved two-tier architecture, force-stop or equivalent process termination can interrupt the baseline detection service, the optional Accessibility enhancement, the watchdog, or other required enforcement components.
+
+The Threat Model SHALL therefore treat interruption of the **baseline enforcement path** as the security-critical condition. Loss of the optional Accessibility enhancement alone is not equivalent to loss of App Lock protection once the two-tier architecture is implemented.
+
+The current architecture cannot guarantee continued enforcement after force-stop, and this limitation remains a residual security concern until the applicable lifecycle and recovery controls are implemented and verified.
 
 **4.6 TA-ATK-004 — Production-Build Debugging and Instrumentation Attacker**
 
@@ -291,41 +295,37 @@ Debug/tamper protections that are currently specified but not implemented must n
 
 **Best effort.**
 
-A peer Accessibility Service represents a special Android attacker because Accessibility can legitimately observe UI information and inject user-interface events.
+A peer Accessibility Service represents a special Android attacker because Accessibility can legitimately observe UI information and inject user-interface events. This threat remains relevant even though Accessibility is optional for App Lock, because a peer Accessibility Service may interact with the authentication interface or observe application UI independently of whether App Lock uses Accessibility as its active foreground detector.
 
 **Capabilities**
 
 Where Android permits the service to operate, the attacker may attempt to:
 
-- Observe application UI events.
+- observe application UI events;
 
-- Observe text or accessibility nodes exposed by applications.
+- observe text or accessibility nodes exposed by applications;
 
-- Monitor application transitions.
+- monitor application transitions;
 
-- Inject interaction events.
+- inject interaction events;
 
-- Attempt to manipulate authentication UI.
+- manipulate authentication UI;
 
-- Attempt to interfere with user interaction.
+- interfere with user interaction;
 
-- Attempt to race App Lock's authentication flow.
+- race App Lock's authentication flow;
 
-- Attempt to exploit assumptions made by the App Lock lock engine.
+- exploit assumptions made by the App Lock lock engine.
 
 **Security Limitation**
 
-App Lock cannot claim absolute prevention against a malicious peer Accessibility Service while operating within the Android accessibility model.
-
-Detection and warning mechanisms may reduce the risk, but the presence of another privileged Accessibility Service remains a platform-level limitation.
+App Lock cannot claim absolute prevention against a malicious peer Accessibility Service while operating within the Android accessibility model. Detection and warning mechanisms may reduce the risk, but the presence of another privileged Accessibility Service remains a platform-level limitation.
 
 This attacker therefore remains a **best-effort** threat rather than an attacker against which App Lock claims absolute protection.
 
 **Security Significance**
 
-This attacker is particularly important because App Lock itself relies on Accessibility for protected-app foreground detection.
-
-The same platform mechanism that provides enforcement therefore creates an additional trust and attack boundary.
+The threat is no longer characterized by the assumption that App Lock itself must rely on Accessibility for enforcement. Instead, the security significance is that Android permits another Accessibility Service to possess capabilities that can affect UI observation and interaction. The optional Accessibility enhancement introduces an additional detection path, but compromise or failure of that enhancement does not by itself defeat the baseline App Lock enforcement architecture.
 
 The resulting risk must remain linked to the Accessibility availability and silent-failure concerns.
 
@@ -666,19 +666,27 @@ Prevent unauthorized modification of:
 
 **Availability goals**
 
-Maintain the security enforcement mechanisms necessary to prevent protected applications from becoming accessible without App Lock authorization.
+Maintain the security enforcement mechanisms necessary to prevent protected applications from becoming accessible without App Lock authorization. Under the approved architecture this includes:
 
-This includes the security significance of:
+- baseline Usage Access detection;
 
-- Accessibility detection.
+- the selected lock-interface presentation mechanism;
 
-- Lock-screen invocation.
+- optional Accessibility detection when enabled;
 
-- Watchdog operation.
+- detection-source selection;
 
-- Boot re-arm.
+- the Trigger Processor;
 
-- Device-admin uninstall protection where enabled.
+- lock-engine invocation;
+
+- watchdog operation;
+
+- boot re-arm;
+
+- device-admin uninstall protection where enabled.
+
+The baseline detection path is the mandatory enforcement dependency. Accessibility is an optional enhancement and SHALL NOT be treated as the sole availability dependency of the target architecture.
 
 Availability loss becomes a security failure when it causes App Lock to fail open.
 
@@ -695,6 +703,14 @@ The following actions are considered security-relevant regardless of whether the
 - Attempting to exploit lifecycle transitions.
 
 - Attempting to suppress or disable foreground detection.
+
+- Attempting to disable the baseline detection mechanism.
+
+- Attempting to disable the optional Accessibility enhancement.
+
+- Attempting to interfere with Usage Access.
+
+- Attempting to interfere with the lock-interface presentation mechanism.
 
 - Attempting to defeat lockout.
 
@@ -719,6 +735,8 @@ The following actions are considered security-relevant regardless of whether the
 - Attempting to exploit dependencies.
 
 - Attempting to obtain sensitive information through notifications or other externally visible channels.
+
+Disabling Accessibility alone SHALL NOT be classified as a complete enforcement bypass under the approved architecture.
 
 These actions become concrete threat records in Section 8.
 

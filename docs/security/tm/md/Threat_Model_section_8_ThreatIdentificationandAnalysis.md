@@ -70,9 +70,9 @@ An Android platform limitation must not be silently classified as either a guara
 
 **8.3 Threat Identification Matrix**
 
-The initial threat inventory is organized into the following security domains.
+The initial threat inventory is organized into the following security domains. All existing domains and threat-ID ranges are unchanged. Tiered detection-source availability is analyzed within Protected-App Enforcement (THR-ENF-001/006) and the tier-specific attack paths in §8.6, rather than as a separate domain.
 
-| **Domain** | **Threat IDs** | **Primary Properties** |
+| Domain | Threat IDs | Primary Properties |
 |----|----|----|
 | Credential | THR-CRED-001–004 | Confidentiality, authentication, integrity |
 | Authentication | THR-AUTH-001–004 | Authentication, authorization |
@@ -91,9 +91,7 @@ The initial threat inventory is organized into the following security domains.
 | Platform / Root | THR-PLAT-001–004 | Confidentiality, integrity |
 | Supply Chain | THR-SUP-001–003 | Integrity |
 
-The identifiers are stable identifiers.
-
-Threats must not be renumbered merely because their ordering or priority changes.
+The identifiers are stable identifiers. Threats must not be renumbered merely because their ordering or priority changes.
 
 **8.4 Credential Threats**
 
@@ -439,165 +437,19 @@ The security test must explicitly include:
 
 **8.6 Protected-App Enforcement Threats**
 
-**THR-ENF-001 — Foreground Detection Failure**
+THR-ENF-001 through THR-ENF-006 keep their identifiers. THR-ENF-002/003/005 are generalized from "Accessibility" to "Detection" to reflect the two-tier architecture; the historical Accessibility silent-failure content is preserved within THR-ENF-003.
 
-**Description**
+**THR-ENF-001 — Foreground Detection Failure.** App Lock fails to detect that a protected application has become the foreground application. *Attackers:* A-002, A-003, A-005. *Security property:* authorization and availability. *Attack surface (approved target detection path):* UsageStatsManager and Usage Access baseline (AS-019); the lock-interface presentation mechanism required by the platform (AS-020); optional Accessibility enhancement (AS-003/AS-007); detection-source selection / Trigger Processor (AS-021). *Impact:* a protected application may become usable without App Lock authentication if the effective detection path fails. *Current state:* the final architecture is designed to remain operational without Accessibility; however, the current delivered build is still Accessibility-only, so the present implementation remains exposed to the existing Accessibility availability risk until the baseline is implemented.
 
-App Lock fails to detect that a protected application has become the foreground application.
+**THR-ENF-002 — Deliberate Detection Disruption.** An attacker deliberately interferes with a foreground-detection mechanism or its required permission state so that protected applications are not detected and locked. *Attackers:* A-002, A-003, A-005, A-006. *Attack paths:* removing Usage Access; interfering with the lock-interface presentation permission or mechanism; revoking optional Accessibility permission; causing a detection service to terminate; force-stopping App Lock; exploiting platform/OEM restrictions; causing the watchdog to terminate or become ineffective. The security impact of each path depends on whether it removes the mandatory baseline or only the optional enhancement.
 
-**Attacker**
+**THR-ENF-003 — Silent Detection Failure.** A configured detection source appears enabled but no longer produces reliable foreground triggers. This includes the existing Accessibility silent-event failure and any equivalent silent failure of the UsageStats sampling path. *Security significance:* silent failure is more severe than an obvious permission revocation because configuration state may appear healthy while the effective detection path is not functioning. *Impact:* protected applications may open without authentication while App Lock reports apparently normal configuration. *Status:* open threat requiring explicit Core Security analysis and tier-specific health testing.
 
-- A-002.
+**THR-ENF-004 — Enforcement Race During Application Switching.** An attacker rapidly switches applications or relaunches a protected application during the transition between detection, lock-screen presentation, and authentication. *Historical evidence:* fast-switch relock defects; fast-relaunch bypass; historical lock-screen lifecycle failures. *Current mitigation:* the enforcement engine evaluates protected-app foreground triggers rather than relying solely on a prior package state; the approved detection architecture must preserve that behavior regardless of which detection tier generated the trigger. *Security significance:* the historical defect remains a required regression/security scenario.
 
-- A-003.
+**THR-ENF-005 — Enforcement Bypass Through Detection-Service Restart State.** An attacker manipulates detection-source or process lifecycle so that a stale authorization or incomplete detection state remains active after enforcement components restart. *Attack surface:* baseline detection path (AS-019); AppDetectionService where the optional enhancement is enabled (AS-003); ProtectionWatchdogService; LockSessionManager; process lifecycle. *Security property:* authorization integrity. *Required invariant:* detection-source restart must not create or restore unauthorized authorization state.
 
-- A-005.
-
-**Security Property**
-
-Authorization and availability.
-
-**Attack Surface**
-
-Accessibility framework and AppDetectionService.
-
-**Impact**
-
-A protected application may become usable without App Lock authentication.
-
-**Current State**
-
-This is the principal registered security risk.
-
-The architecture is fail-open with monitoring rather than fail-closed.
-
-**THR-ENF-002 — Deliberate Accessibility Disruption**
-
-**Description**
-
-An attacker deliberately interferes with the Accessibility enforcement mechanism so that protected applications can be opened without detection.
-
-**Attackers**
-
-- A-002.
-
-- A-003.
-
-- A-005.
-
-- A-006.
-
-**Attack Paths**
-
-Potential paths include:
-
-- Revoking accessibility permission.
-
-- Causing service termination.
-
-- Force-stopping App Lock.
-
-- Exploiting platform/OEM restrictions.
-
-- Causing the watchdog to terminate or become ineffective.
-
-**Impact**
-
-Loss of protected-app enforcement.
-
-**Current Control**
-
-Protection monitoring and notification.
-
-**Limitation**
-
-Monitoring does not prevent the underlying failure.
-
-**THR-ENF-003 — Silent Accessibility Failure**
-
-**Description**
-
-The Accessibility service appears enabled but no longer delivers the events required for reliable foreground detection.
-
-**Security Significance**
-
-This is more severe than an obvious permission revocation because the current health check may be unable to distinguish a healthy binding from a non-functional event stream.
-
-**Impact**
-
-Protected applications may open without authentication while the system reports apparently normal configuration.
-
-**Status**
-
-Open threat requiring explicit Core Security analysis.
-
-**THR-ENF-004 — Enforcement Race During Application Switching**
-
-**Description**
-
-An attacker rapidly switches applications or relaunches a protected application during the transition between detection, lock-screen display, and authentication.
-
-**Historical Evidence**
-
-This threat is directly associated with:
-
-- Fast-switch relock defects.
-
-- Fast-relaunch bypass.
-
-- Historical lock-screen lifecycle failures.
-
-**Current Mitigation**
-
-The enforcement engine evaluates protected-app foreground events rather than relying solely on a prior package state.
-
-**Security Significance**
-
-The historical defect remains a required regression/security scenario.
-
-**THR-ENF-005 — Enforcement Bypass Through Service Restart State**
-
-**Description**
-
-An attacker manipulates service/process lifecycle so that a stale authorization or incomplete detection state remains active after enforcement components restart.
-
-**Attack Surface**
-
-- AppDetectionService.
-
-- ProtectionWatchdogService.
-
-- LockSessionManager.
-
-- Process lifecycle.
-
-**Security Property**
-
-Authorization integrity.
-
-**Required Invariant**
-
-Service restart must not create or restore unauthorized authorization state.
-
-**THR-ENF-006 — Enforcement Availability Failure**
-
-**Description**
-
-App Lock loses the ability to continuously enforce protected-app authentication because a required security component is unavailable.
-
-**Relevant Components**
-
-- Accessibility service.
-
-- Watchdog.
-
-- Boot receiver.
-
-- Device Admin protection where enabled.
-
-**Security Significance**
-
-Availability is itself a security property because enforcement failure may result in unauthorized application access.
+**THR-ENF-006 — Enforcement Availability Failure.** App Lock loses the ability to continuously enforce protected-app authentication because the mandatory baseline, required lock-interface presentation path, or another common security component is unavailable. *Relevant components:* Usage Access baseline (AS-019); lock-interface presentation mechanism (AS-020); watchdog; boot receiver; Device Admin protection where enabled; optional Accessibility enhancement where enabled. *Security significance:* availability is itself a security property because enforcement failure may result in unauthorized application access; the threat must distinguish complete loss of the mandatory baseline from degradation of the optional Accessibility enhancement.
 
 **8.7 Session Threats**
 
@@ -1049,129 +901,29 @@ Android Device Admin framework.
 
 **8.12 Accessibility Threats**
 
-**THR-ACC-001 — Accessibility Permission Revocation**
+Accessibility threats remain part of the Threat Model because Accessibility is an optional enhancement and a platform trust boundary. They must no longer be modeled as the sole enforcement dependency of the final architecture. THR-ACC-001/002/003 are prefixed "Optional"; identifiers and count are unchanged.
 
-An attacker causes the App Lock Accessibility permission to be removed.
+**THR-ACC-001 — Optional Accessibility Permission Revocation.** An attacker or platform condition causes the optional App Lock Accessibility permission to be removed. *Impact:* the event-driven enhancement becomes unavailable. *Security consequence:* in the approved final architecture, the baseline Usage Access path remains responsible for core enforcement, so Accessibility loss alone does not constitute total App Lock protection loss; in the current delivered build, where Accessibility remains the sole detection source, the same condition remains a total enforcement availability risk.
 
-**Impact**
+**THR-ACC-002 — Optional Accessibility Service Unbind.** An attacker or platform event causes AppDetectionService to become unbound. *Impact:* the optional event-driven foreground detector stops producing events. *Recovery:* health monitoring and user recovery guidance where available.
 
-Foreground detection stops.
+**THR-ACC-003 — Optional Accessibility Silent Failure.** The service remains nominally enabled but fails to deliver usable events. *Security significance:* this remains an important enhancement-tier threat and a historical current-build risk; it must not be allowed to masquerade as healthy optional detection.
 
-**Security Consequence**
+**THR-ACC-004 — Malicious Peer Accessibility Service.** A malicious Accessibility Service observes or manipulates the App Lock authentication UI or injects accessibility actions. *Security property:* authentication and confidentiality. *Current position:* best-effort defense; complete prevention is not guaranteed against an Android-granted peer Accessibility Service. This threat remains relevant even though App Lock does not require Accessibility for the baseline architecture, because a hostile peer service can still attack the authentication UI when the optional enhancement is enabled and can interact with other UI surfaces independently.
 
-Protected-app enforcement may fail open.
-
-**THR-ACC-002 — Accessibility Service Unbind**
-
-An attacker or platform event causes AppDetectionService to become unbound.
-
-**Impact**
-
-Foreground application events are no longer processed.
-
-**Recovery**
-
-Watchdog monitoring where available.
-
-**THR-ACC-003 — Accessibility Silent Failure**
-
-The service remains nominally enabled but fails to deliver usable events.
-
-**Security Significance**
-
-This is the most important current Accessibility threat because ordinary permission-state monitoring may not detect it.
-
-**THR-ACC-004 — Malicious Peer Accessibility Service**
-
-A malicious Accessibility Service observes or manipulates the App Lock authentication UI.
-
-**Security Property**
-
-Authentication and confidentiality.
-
-**Current Position**
-
-Best-effort defense.
-
-Complete prevention is not guaranteed against an Android-granted peer Accessibility Service.
-
-**THR-ACC-005 — Restricted Settings / Platform Enforcement**
-
-Android platform restrictions prevent the user from enabling or restoring App Lock Accessibility functionality under certain installation conditions.
-
-**Impact**
-
-Security-function availability.
-
-**Classification**
-
-Platform limitation and deployment risk.
-
-**Security Significance**
-
-The application cannot independently override Android's permission policy.
+**THR-ACC-005 — Restricted Settings / Platform Enforcement.** Android platform restrictions prevent the user from enabling or restoring the optional App Lock Accessibility enhancement under certain installation conditions. *Impact:* loss of the enhancement capability. *Classification:* platform limitation and deployment risk. *Security significance:* the baseline architecture is specifically intended to prevent this condition from making Accessibility a prerequisite for using App Lock.
 
 **8.13 Lifecycle and Boot Threats**
 
-**THR-LIFE-001 — Force-Stop Enforcement Loss**
+**THR-LIFE-001 — Force-Stop Enforcement Loss.** An attacker with sufficient device control force-stops App Lock. *Impact:* the application process, watchdog, and any in-process detection components stop. *Current security behavior:* the current delivered build cannot guarantee continued enforcement after force-stop because it remains Accessibility-only; the approved target architecture must separately assess restoration of the mandatory baseline and must not imply that a force-stop can be silently defeated by the application. *Classification:* known fail-open availability threat.
 
-An attacker with sufficient device control force-stops App Lock.
+**THR-LIFE-002 — Process Death With Authorization Confusion.** The process dies and restarts with inconsistent security state. *Required property:* authorization sessions must not be restored automatically. *Current architecture:* sessions are volatile.
 
-**Impact**
+**THR-LIFE-003 — OEM Background Restriction.** An OEM or system policy terminates or prevents restart of a security-critical background component. *Impact:* potential loss of baseline detection, optional enhancement detection, watchdog monitoring, or the required presentation path. *Classification:* platform-dependent availability threat.
 
-The Accessibility service and watchdog stop.
+**THR-LIFE-004 — Boot Re-Arm Failure.** After reboot, App Lock fails to restore the mandatory baseline enforcement path. *Impact:* protected applications may remain unprotected. *Required property:* reboot must clear authorization but restore the required enforcement infrastructure.
 
-**Current Security Behavior**
-
-The architecture does not guarantee continued enforcement after force-stop.
-
-**Classification**
-
-Known fail-open availability threat.
-
-**THR-LIFE-002 — Process Death With Authorization Confusion**
-
-The process dies and restarts with inconsistent security state.
-
-**Required Property**
-
-Authorization sessions must not be restored automatically.
-
-**Current Architecture**
-
-Sessions are volatile.
-
-**THR-LIFE-003 — OEM Background Restriction**
-
-An OEM or system policy terminates or prevents restart of a security-critical background component.
-
-**Impact**
-
-Potential loss of watchdog or enforcement monitoring.
-
-**Classification**
-
-Platform-dependent availability threat.
-
-**THR-LIFE-004 — Boot Re-Arm Failure**
-
-After reboot, App Lock fails to restore the enforcement path.
-
-**Impact**
-
-Protected applications may remain unprotected.
-
-**Required Property**
-
-Reboot must clear authorization but restore enforcement.
-
-**THR-LIFE-005 — Startup Security Race**
-
-The system reaches a usable state before App Lock has re-established required protection.
-
-**Security Significance**
-
-Startup ordering must not create an unrecognized window in which protected applications can be accessed without the intended security state.
+**THR-LIFE-005 — Startup Security Race.** The system reaches a usable state before App Lock has re-established required protection. *Security significance:* startup ordering must not create an unrecognized window in which protected applications can be accessed without the intended security state; the analysis must include both baseline detection initialization and optional Accessibility initialization when enabled.
 
 **8.14 Device Admin Threats**
 
@@ -1548,33 +1300,24 @@ Several attack chains are particularly important.
 
 **8.21.1 Enforcement-Availability Chain**
 
-Force-Stop / Permission Loss
+The final architecture distinguishes loss of the mandatory baseline from loss of the optional enhancement.
 
-│
+**Baseline failure chain:**
 
-▼
+    Usage Access / Baseline Detection Loss
+      -> Foreground Detection Degraded or Silent
+      -> Protected App Not Triggering Lock Evaluation
+      -> Protected App May Open
+      -> Authorization Boundary Bypassed
 
-Accessibility Unavailable
+**Optional enhancement failure chain:**
 
-│
+    Accessibility Loss
+      -> Optional Enhancement Unavailable
+      -> Baseline Remains Active
+      -> Core Enforcement Continues
 
-▼
-
-Foreground Detection Stops
-
-│
-
-▼
-
-Protected App Opens
-
-│
-
-▼
-
-Authorization Boundary Bypassed
-
-This chain demonstrates why an availability failure becomes an authorization threat.
+The second chain is the architectural reason Accessibility is no longer a single point of failure in the approved target design; in the current build (baseline not yet implemented) Accessibility remains the sole detector and follows the first chain.
 
 **8.21.2 Credential-Authorization Chain**
 
@@ -1658,31 +1401,20 @@ This chain remains open where current controls do not fully mitigate overlay or 
 
 **8.22 Highest-Priority Current Threats**
 
-Based on the current architecture and implementation state, the Threat Model identifies the following as requiring particular attention:
+Based on the current architecture and implementation state, the Threat Model identifies the following as requiring particular attention. (Ordering reflects the two-tier architecture — foreground-detection failure leads — and applies the THR-ENF-002/003 retitles; per §7.31, priority is not itself a final risk rating.)
 
-1.  **THR-ENF-003 — Silent Accessibility Failure**
+1.  THR-ENF-001 — Foreground Detection Failure
+2.  THR-ENF-003 — Silent Detection Failure
+3.  THR-ENF-002 — Deliberate Detection Disruption
+4.  THR-UI-001 — Tapjacking / Obscured Authentication Input
+5.  THR-CRYPTO-005 — Keystore Invalidation
+6.  THR-VAULT-005 — In-Process Vault Decryption Without PIN
+7.  THR-AUTH-004 — Brute-Force Lockout Bypass
+8.  THR-SES-002 — Session Extension Beyond Policy
+9.  THR-INT-002 — Runtime Instrumentation
+10. THR-REC-001 — Database Corruption Causing Security Degradation
 
-2.  **THR-ENF-001 — Foreground Detection Failure**
-
-3.  **THR-ENF-002 — Deliberate Accessibility Disruption**
-
-4.  **THR-UI-001 — Tapjacking / Obscured Authentication Input**
-
-5.  **THR-CRYPTO-005 — Keystore Invalidation**
-
-6.  **THR-VAULT-005 — In-Process Vault Decryption Without PIN**
-
-7.  **THR-AUTH-004 — Brute-Force Lockout Bypass**
-
-8.  **THR-SES-002 — Session Extension Beyond Policy**
-
-9.  **THR-INT-002 — Runtime Instrumentation**
-
-10. **THR-REC-001 — Database Corruption Causing Security Degradation**
-
-Priority does not itself constitute a final risk rating.
-
-Final risk ratings must follow the likelihood × impact methodology and include documented reasoning.
+Priority does not itself constitute a final risk rating. Final risk ratings must follow the likelihood × impact methodology and include documented reasoning.
 
 **8.23 Threats That Are Not Current Mitigations**
 

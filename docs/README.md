@@ -35,7 +35,7 @@ docs/
 │   └── dds/             Database Design Specification — volumes I–IV
 ├── process/             How the project is run and evolves (plans, assessment, RTM, setup)
 ├── security/            Security governance & analysis — Threat Model + Secure Coding Standard
-│   └── tm/              Threat Model — client-received spec (16 sections)
+│   └── tm/              Threat Model — v2, 16 sections (fully two-tier reconciled; see VERSION.md)
 ├── testing/             Test PLANS (what we intend to verify and how)
 │   └── tsp/             Test Specification — client-received spec (V-I sections 1–15, V-II)
 ├── reports/             EVIDENCE: dated, immutable records of what actually happened
@@ -62,7 +62,7 @@ stay one line. `scripts/` holds tooling (e.g. `extract_docx.py`). `app/` is the 
 | `design/sds/` | *How* components are designed internally (per-subsystem). | Read-mostly spec (`.docx`). | …component-level design is specified/changed. |
 | `design/dds/` | *How* the database is designed — architecture, logical, physical, operations volumes. | Read-mostly spec (`.docx`). | …database design is specified/changed. |
 | `process/` | **How the project is run and evolves**: Implementation Strategy, migration assessment, phase plans (M0/M1…), the RTM, the risk register, environment setup, governance/gate records, **operational & machine/fleet status**. | Living working docs (`.md`). | …it's a plan, a process/governance record, a tracked risk, a dev-environment or **fleet/machine status report**, or anything about *running the project* rather than the product spec. |
-| `security/` | **Security governance & analysis**: the client-received **Threat Model** (`tm/`, 16 sections — *what we defend against*) and the authored **Secure Coding Standard** (*how we write secure code*). | `tm/`: read-mostly spec (`.docx` + `md/`). SCS: living (`.md`). | …it's a security governance/analysis doc: client-received Threat Model revisions in `tm/`; the authored SCS at the area root. Security *requirements* stay in `srs/` §8, security *architecture* in `tas/` Part III, the risk register in `process/`. |
+| `security/` | **Security governance & analysis**: the **Threat Model** (`tm/`, 16 sections — *what we defend against*; **v2**, fully reconciled to the two-tier model, see `tm/VERSION.md`) and the authored **Secure Coding Standard** (*how we write secure code*). | `tm/`: read-mostly spec (`.docx` + `md/`). SCS: living (`.md`). | …it's a security governance/analysis doc: Threat Model in `tm/`; the authored SCS at the area root. Security *requirements* stay in `srs/` §8, security *architecture* in `tas/` Part III, the risk register in `process/`. |
 | `testing/` | Test **plans** (`.md`, area root): what to verify, procedures, harness specs. `tsp/`: the client-received **Test Specification** volumes. | Plans: living (`.md`). `tsp/`: read-mostly spec (`.docx`). | …it defines how something will be tested (plans at root; only client-received Test Spec revisions go in `tsp/`). Results go to `reports/campaigns/`. |
 | `reports/` | **Evidence**: dated, immutable records — fleet/machine status, executed campaign results, gate reviews, benchmarks, security reviews, release records. | Append-only, never edited (`.md`). | …you are recording **what happened**: an observation, measurement, review, or test execution. See `reports/README.md` for categories + naming (`YYYY-MM-DD_topic_host.md`). |
 | `archive/` | Superseded docs, kept for history with supersession notes. | Frozen. | …never author new work here; only retire old docs (with a note). |

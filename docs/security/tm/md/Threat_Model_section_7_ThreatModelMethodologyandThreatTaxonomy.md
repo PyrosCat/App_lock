@@ -511,7 +511,11 @@ Includes:
 
 Includes:
 
-- Accessibility.
+- UsageStatsManager and Usage Access.
+
+- Display-over-other-apps / system-alert-window, or the approved background-activity presentation mechanism.
+
+- Accessibility as an optional enhancement.
 
 - Device Admin.
 
@@ -655,7 +659,9 @@ Interference with security enforcement.
 
 Examples:
 
-- Accessibility disruption.
+- Mandatory baseline detection disruption.
+
+- Optional Accessibility enhancement disruption.
 
 - Watchdog disruption.
 
@@ -1221,47 +1227,44 @@ Threat analysis must therefore identify the specific layer being attacked.
 
 **7.29 Single-Point-of-Failure Analysis**
 
-A security control that is required for enforcement but has no effective independent fallback must be treated as a potential single point of failure.
+A security control that is required for enforcement but has no effective independent fallback must be treated as a potential single point of failure. Under the approved architecture, the analysis distinguishes the two detection tiers.
 
-The Accessibility detection path is the principal current example.
+**Mandatory baseline:** UsageStatsManager + Usage Access, together with the required lock-interface presentation mechanism, is the baseline enforcement path. Until another effective baseline exists, loss of this path is a single-point-of-failure condition for foreground detection.
 
-The Threat Model must ask:
+**Optional enhancement:** Accessibility is not a single point of failure for the final architecture because the application must remain usable and capable of protected-app enforcement without it. Its loss is a degraded enhancement condition when the baseline remains healthy.
+
+The Threat Model must ask, for each tier:
 
 1.  What happens if the mechanism stops?
-
 2.  How quickly is failure detected?
-
 3.  Can detection itself fail?
-
 4.  Does the system fail open or fail closed?
-
 5.  What security exposure results?
-
 6.  What recovery is available?
+7.  Can an attacker deliberately induce the failure?
+8.  Does loss of the mechanism remove the only effective enforcement path?
 
-7.  Can the attacker deliberately induce the failure?
-
-This analysis is particularly important for availability-critical security mechanisms.
+The baseline tier is not yet built, so in the current build Accessibility remains this single point of failure until it is implemented.
 
 **7.30 Fail-Open and Fail-Closed Classification**
 
-Every security-critical enforcement path must explicitly identify its failure behavior.
+Every security-critical enforcement path must explicitly identify its failure behavior. The approved target architecture is **fail-open with detection/recovery assistance** at the detection layer; it does not guarantee fail-closed enforcement against loss of all detection capability.
 
-The current Accessibility enforcement path is recognized as **fail-open with detection/recovery assistance**.
+For the mandatory baseline:
 
-This means:
+- loss of Usage Access, baseline detection, or the required presentation mechanism can prevent timely lock enforcement;
+- the watchdog is expected to detect certain classes of loss;
+- detection is not instantaneous;
+- recovery requires user/platform action where Android controls the permission;
+- the final architecture must not represent the protection state as healthy when the baseline is unavailable.
 
-- Loss of detection can permit protected applications to open.
+For the optional Accessibility enhancement:
 
-- The watchdog can detect certain classes of loss.
+- loss of Accessibility reduces the enhancement capability;
+- the baseline remains the required protection path;
+- Accessibility loss alone must not be classified as total enforcement loss after the two-tier architecture is implemented.
 
-- Detection is not instantaneous.
-
-- Recovery requires user/platform action.
-
-- The current architecture does not provide guaranteed fail-closed enforcement.
-
-This is a known security property and must remain visible throughout threat analysis.
+In the current build (baseline not yet implemented), Accessibility loss remains a total enforcement-availability risk; this current-state distinction must remain visible in risk analysis.
 
 **7.31 Threat Prioritization**
 
@@ -1483,55 +1486,32 @@ Changes to the control, architecture, dependency, platform, or attack surface ma
 
 **7.35 Threat Reassessment Triggers**
 
-Threat Model reassessment is required when any of the following occurs:
+Threat Model reassessment is required when any of the following occurs (the foreground-detection triggers are expanded for the two-tier architecture; all other triggers unchanged):
 
 - A security control changes.
-
 - A security-relevant architectural decision changes.
-
 - The authentication mechanism changes.
-
 - Credential handling changes.
-
 - Cryptographic algorithms or key handling change.
-
 - Storage architecture changes.
-
 - The foreground-detection mechanism changes.
-
-- Accessibility enforcement changes.
-
+- Usage Access, baseline sampling, or lock-interface presentation changes.
+- Accessibility enhancement behavior or availability changes.
 - Watchdog architecture changes.
-
 - Boot persistence changes.
-
 - A security requirement is added.
-
 - A security requirement is removed.
-
 - A security boundary changes.
-
 - A previously trusted platform assumption changes.
-
 - A new externally reachable component is introduced.
-
 - An existing externally reachable component becomes exported.
-
 - A new permission affects the security model.
-
 - Backup/restore is introduced.
-
 - Cloud/network functionality is introduced.
-
 - A major Android platform version materially changes a relevant security mechanism.
-
 - A phase/security gate requires reassessment.
-
 - A newly discovered vulnerability invalidates an existing assumption.
-
 - Penetration testing identifies a previously unmodeled attack path.
-
-These triggers establish Threat Model reassessment as a controlled lifecycle activity rather than an ad-hoc review.
 
 **7.36 Baseline Drift Prevention**
 

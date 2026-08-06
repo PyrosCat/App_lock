@@ -260,47 +260,77 @@ Consequently, confidentiality of the encrypted database itself is a security req
 
 **Description**
 
-The continuous operation of the App Lock enforcement mechanism is a security asset.
+The continuous operation of the App Lock enforcement mechanism is a security asset. The enforcement path includes the mechanisms responsible for:
 
-The enforcement path includes the Android mechanisms responsible for detecting protected applications, presenting authentication when required, maintaining protection across lifecycle events, and restoring protection after reboot.
+- detecting protected applications;
+
+- determining whether authentication is required;
+
+- presenting the authentication interface;
+
+- maintaining authorization state;
+
+- enforcing relock policy;
+
+- monitoring protection health;
+
+- restoring protection across supported lifecycle events.
+
+The approved detection architecture contains two tiers:
+
+1.  **Baseline tier:** UsageStatsManager with Usage Access, providing the required detection path without Accessibility.
+
+2.  **Enhancement tier:** Accessibility-based event detection, enabled voluntarily by the user for faster detection.
+
+Both tiers converge on the same Trigger Processor and lock-enforcement path.
 
 Security-relevant components include:
 
-- AppDetectionService.
+- AppDetectionService (the current Accessibility implementation and approved optional enhancement);
 
-- ApplicationLockEngine.
+- the baseline UsageStats-based detection implementation when introduced;
 
-- LockPolicyManager.
+- the detection-source selection layer;
 
-- LockSessionManager.
+- ApplicationLockEngine;
 
-- LockScreenActivity.
+- LockPolicyManager;
 
-- ProtectionWatchdogService.
+- LockSessionManager;
 
-- BootReceiver.
+- LockScreenActivity;
 
-- Device-admin uninstall protection where enabled.
+- ProtectionWatchdogService;
+
+- BootReceiver;
+
+- device-admin uninstall protection where enabled;
+
+- the lock-interface presentation mechanism required by the baseline detector.
 
 **Security Requirements**
 
 The enforcement mechanism requires:
 
-- **Availability:** Protection must remain operational under supported conditions.
+- **Availability:** the required baseline protection path must remain operational under supported conditions.
 
-- **Integrity:** An attacker must not weaken or disable security enforcement without authorization.
+- **Integrity:** an attacker must not weaken or disable security enforcement without authorization.
 
-- **Authorization integrity:** Security policy must not be modified to remove protection without authorization.
+- **Authorization integrity:** security policy must not be modified to remove protection without authorization.
 
-- **Persistence:** Security-critical protection state must not be bypassable through application restart or device reboot where persistence is required.
+- **Persistence:** security-critical protection state must not be bypassable through application restart or device reboot where persistence is required.
 
-- **Fail-safe behavior:** Loss of a security mechanism must not silently be represented as successful protection.
+- **Fail-safe health reporting:** loss or failure of a required detection mechanism must not silently be represented as healthy protection.
+
+- **Tier independence:** loss of the optional Accessibility enhancement must not, by itself, disable core protected-application enforcement.
 
 **Security Significance**
 
-The enforcement mechanism is a security asset because protected applications are only protected while App Lock can observe application transitions and enforce its authorization boundary.
+The enforcement mechanism is a security asset because protected applications are only protected while App Lock can detect relevant foreground transitions and enforce its authorization boundary.
 
-The current architecture contains a known limitation: loss of accessibility-based detection can cause protected applications to open without the App Lock gate. This is therefore treated as a security exposure rather than an ordinary availability defect.
+The approved architecture deliberately separates the enforcement boundary from the Accessibility framework. Under the target architecture, Accessibility is an optional detection enhancement; the mandatory enforcement dependency is the baseline detection path and its associated permission and lock-interface presentation mechanisms.
+
+The current delivered implementation remains Accessibility-dependent until the approved two-tier architecture is implemented and verified. The distinction between current and target architecture is security-critical and SHALL be preserved throughout the Threat Model.
 
 The detailed analysis of this failure mode belongs in the threat, risk, and control sections.
 

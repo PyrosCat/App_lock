@@ -14,6 +14,7 @@ Full transition analysis: `docs/process/MIGRATION_ASSESSMENT.md`.
 | `Draft_design_App_Lock.docx` | Early high-level design draft | Entire new baseline | Historical only |
 | `app lock.docx` | Initial feature brainstorm/notes | SRS | Historical only |
 | `Functional Requirements Completion Summary.docx` | "250/250 requirements complete" tracker | `docs/process/rtm/rtm.csv` | Was about *specification* completion, not implementation; counts now wrong (375 FRs) |
+| `threat-model-v1-2026-08-05/` | Threat Model **v1** — 16 client-received sections (2026-08-05); §1–5 model Accessibility as the single/mandatory enforcement mechanism | Threat Model **v2** at `docs/security/tm/` (§1–5 reconciled to the two-tier model per ADR-013A) | v2 §6–16 are byte-identical to v1 §6–16; folder also holds the approved §1–5 reconciliation record. See its `README.md` |
 
 Old SRS sections 1–12 are **not** archived: their content is byte-identical to the new
 `docs/srs/` sections 1–12 (hash-verified during migration, see MIGRATION_ASSESSMENT.md Phase 5),

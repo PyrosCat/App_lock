@@ -86,6 +86,18 @@ The security-relevant system scope includes, but is not limited to:
 
 - Security-relevant dependencies and build integrity where they affect the application security boundary.
 
+The security-relevant system scope includes both the current delivered implementation and approved security-architecture changes that materially affect the Threat Model. Foreground-application detection is within scope because it is the trigger for protected-application enforcement.
+
+The current delivered implementation uses the Android Accessibility framework for foreground detection. The approved target architecture replaces Accessibility as the mandatory detection dependency with a two-tier detection model:
+
+- **Baseline detection:** Android UsageStatsManager using the Usage Access special permission.
+
+- **Optional enhancement:** Android Accessibility-based event detection, enabled by the user for faster, more responsive detection.
+
+The lock-enforcement engine remains common to both detection paths.
+
+The Threat Model SHALL distinguish the current implementation from the approved target architecture. The approved target architecture SHALL NOT be represented as implemented or security-verified before the corresponding implementation and verification activities are complete.
+
 The Threat Model addresses these elements only to the extent necessary to analyze security properties, threats, controls, risks, and verification.
 
 It does not replace the detailed architecture, software design, implementation, testing, deployment, or operational documentation maintained elsewhere in the project.
@@ -131,6 +143,26 @@ In particular, the Threat Model addresses attempts to:
 - Exploit weaknesses in key handling or encrypted storage.
 
 - Exploit security-relevant implementation or dependency weaknesses.
+
+Because foreground detection is the trigger that allows App Lock to determine when authentication must be presented, the Threat Model additionally covers the security-relevant detection and enforcement path, including:
+
+- Usage Access and UsageStatsManager detection;
+
+- optional Accessibility-based detection;
+
+- detection-source selection;
+
+- the Trigger Processor;
+
+- lock-engine invocation;
+
+- lock-screen presentation;
+
+- permission and detection-health monitoring;
+
+- lifecycle and recovery behavior affecting the active detection path.
+
+Accessibility remains within security scope even though it is optional in the approved architecture, because the optional enhancement can influence detection latency and because peer Accessibility Services remain a relevant attacker and platform boundary.
 
 The Threat Model treats continuous enforcement as a security concern where loss of enforcement could allow protected applications to become accessible without App Lock authorization.
 
@@ -192,7 +224,11 @@ Unauthorized actors must not obtain usable key material or equivalent means of d
 
 The security enforcement mechanism must remain operational to the extent supported by the Android platform and the application's defined security guarantees.
 
-Unexpected loss of enforcement must not be treated merely as an ordinary availability problem when that loss permits protected applications to become accessible without authorization.
+The approved architecture SHALL maintain a baseline enforcement path that does not require Accessibility to be enabled. Accessibility loss alone must therefore not constitute loss of App Lock protection once the two-tier architecture is implemented.
+
+Loss or failure of the baseline detection path — including loss of the required Usage Access permission or of the required lock-interface presentation capability — remains security-relevant when it permits protected applications to become accessible without App Lock authorization.
+
+The optional Accessibility enhancement may improve detection responsiveness but is not itself a prerequisite for the core enforcement guarantee.
 
 **SO-09 — Security-State Persistence**
 

@@ -381,39 +381,25 @@ A component whose failure allows protected applications to open without authenti
 
 **14.16 Attack Preconditions**
 
-Each threat SHALL identify meaningful prerequisites.
-
-Examples include:
+Each threat SHALL identify meaningful prerequisites. Examples include:
 
 - device already unlocked;
-
 - physical access;
-
 - application installed;
-
 - adb access;
-
 - malicious application installed;
-
 - overlay permission;
-
 - peer Accessibility Service;
-
-- accessibility permission revoked;
-
-- process killed;
-
-- reboot;
-
+- Usage Access revoked, unavailable, or returning stale/incomplete data;
+- baseline foreground-detection service stopped or restricted;
+- required lock-interface presentation permission or launch capability unavailable;
+- optional Accessibility permission revoked or enhancement service unhealthy;
+- process killed or device rebooted;
 - OEM background restriction;
-
 - root/system privileges;
-
 - compromised application process.
 
-Prerequisites SHALL be explicit.
-
-The Threat Model SHALL NOT artificially inflate or reduce risk by silently assuming away relevant attack conditions.
+Prerequisites SHALL be explicit. The Threat Model SHALL NOT inflate or reduce risk by silently assuming away conditions specific to the baseline tier, the optional enhancement, or the current delivered implementation.
 
 **14.17 Trust-Boundary Adjustment**
 
@@ -533,95 +519,46 @@ The exact risk-reduction treatment SHALL be documented rather than assumed.
 
 **14.20 Compensating Controls**
 
-A compensating control MAY reduce residual risk when the primary control is absent or incomplete.
-
-A compensating control SHALL identify:
-
-- the threat it addresses;
-
-- the security property protected;
-
-- the limitation of the primary control;
-
-- how the compensating control reduces exposure;
-
-- what conditions can defeat it;
-
-- whether it has been security-verified.
+A compensating control MAY reduce residual risk when the primary control is absent or incomplete. A compensating control SHALL identify: the threat it addresses; the security property protected; the limitation of the primary control; how it reduces exposure; what conditions can defeat it; and whether it has been security-verified.
 
 Examples include:
 
-- watchdog monitoring when accessibility enforcement cannot be automatically restored;
-
-- lifecycle self-gating when process/session transitions threaten vault authorization;
-
+- watchdog and source-health monitoring when the active foreground detector cannot be automatically restored;
+- degradation from an unhealthy optional Accessibility enhancement to a healthy baseline detector;
+- lifecycle self-gating when process/session transitions threaten Vault authorization;
 - persisted lockout state when process restart could otherwise reset the counter.
 
-A notification alone SHALL NOT be considered an equivalent compensating control for prevention unless the threat is inherently dependent on user response.
+Degradation to the baseline tier SHALL only receive compensating-control credit after the baseline and source-selection behavior are implemented and security-verified. A notification alone SHALL NOT be considered equivalent to prevention unless the threat is inherently dependent on user response.
 
 **14.21 Availability Risk as Security Risk**
 
-The enforcement mechanism's availability SHALL be explicitly assessed.
+The availability of the required enforcement path SHALL be explicitly assessed. Threats affecting the following may create direct confidentiality or authorization consequences:
 
-Threats affecting:
+- Usage Access and UsageStatsManager data availability;
 
-- Accessibility service binding;
+- baseline foreground-service execution and sampling;
 
-- foreground-event delivery;
+- detection-source selection and Trigger Processor routing;
 
-- watchdog operation;
+- the selected lock-interface presentation mechanism and its required permission;
 
-- boot re-arm;
+- optional Accessibility binding or event delivery when the enhancement is enabled;
 
-- required permissions;
+- watchdog operation, boot re-arm, required permissions, and device-admin protection.
 
-- device-admin protection;
+<!-- -->
 
-may create direct confidentiality or authorization consequences.
+- Availability Failure → Detection or Presentation Failure → Enforcement Failure → Authentication Bypass → Protected Asset Exposure
 
-The risk model SHALL therefore consider the chain:
-
-Availability Failure
-
-↓
-
-Detection Failure
-
-↓
-
-Enforcement Failure
-
-↓
-
-Authentication Bypass
-
-↓
-
-Protected Asset Exposure
-
-The severity of such a threat SHALL be based on the final realistic consequence, not merely the initial component failure.
+The severity SHALL be based on the final realistic consequence, not merely the initial component failure. Loss of the optional Accessibility enhancement alone SHALL NOT be assessed as total enforcement loss after a healthy baseline is implemented and verified.
 
 **14.22 Platform-Dependent Risk**
 
-Where security depends on Android behavior outside the application's direct control, the Threat Model SHALL document:
+Where security depends on Android behavior outside the application's direct control, the Threat Model SHALL document: the assumed platform behavior; known platform limitations; affected Android versions; OEM-dependent behavior where known; detection mechanisms; recovery behavior; and remaining exposure.
 
-- the assumed platform behavior;
+For the approved target architecture, primary examples include UsageStatsManager and Usage Access behavior, foreground-service restrictions, background-activity-launch restrictions, overlay/presentation permission behavior, and the optional Accessibility framework. For the current delivered build, Accessibility remains the sole implemented detector and its platform dependency remains open.
 
-- known platform limitations;
-
-- affected Android versions;
-
-- OEM-dependent behavior where known;
-
-- detection mechanisms;
-
-- recovery behavior;
-
-- remaining exposure.
-
-The Accessibility Service dependency is the primary example.
-
-Platform dependence SHALL not automatically classify a threat as low risk.
+Platform dependence SHALL NOT automatically classify a threat as low risk.
 
 **14.23 Root/System Risk**
 
@@ -715,45 +652,20 @@ Mandatory gate-blocking risks SHALL NOT be accepted merely to permit phase progr
 
 **14.26 Risk Reassessment**
 
-Risk SHALL be reassessed when material conditions change.
+Risk SHALL be reassessed when material conditions change. Triggers include:
 
-Triggers include:
-
-- security-control changes;
-
-- architecture changes;
-
-- new attack surfaces;
-
-- new sensitive assets;
-
-- cryptographic changes;
-
-- key-management changes;
-
-- authentication changes;
-
-- authorization changes;
-
-- accessibility architecture changes;
-
-- major Android-version changes;
-
-- new security requirements;
-
-- removed security requirements;
-
-- dependency changes with security impact;
-
-- historical vulnerability rediscovery;
-
-- penetration-test findings;
-
-- security incidents;
-
+- security-control or architecture changes;
+- new attack surfaces or sensitive assets;
+- cryptographic, key-management, authentication, authorization, or storage changes;
+- changes to the foreground-detection architecture, Usage Access baseline, detection-source selection, Trigger Processor, or lock-interface presentation mechanism;
+- changes to the optional Accessibility enhancement;
+- major Android-version or OEM behavior changes;
+- new or removed security requirements;
+- security-relevant dependency changes;
+- historical vulnerability rediscovery, penetration-test findings, or security incidents;
 - phase-gate reviews.
 
-Risk SHALL NOT be assumed unchanged merely because the threat identifier remains the same.
+Risk SHALL NOT be assumed unchanged merely because the threat identifier remains the same or because a target-architecture control has been approved but not implemented.
 
 **14.27 Historical Failure Influence**
 
@@ -986,8 +898,6 @@ Section 14 is complete when:
 
 **14.35 Boundary to Section 15**
 
-Section 14 defines **how security risk is assessed and prioritized**.
+Section 14 defines **how security risk is assessed and prioritized**. It does not define how the Threat Model is kept current as the system evolves.
 
-It does not define the detailed mechanics of proving that a control works.
-
-Section 15 therefore establishes the **Security Verification and Evidence Traceability Model**, connecting threats, requirements, controls, security tests, configurations, execution evidence, and formal verification status.
+Section 15 therefore establishes the **Continuous Threat Modeling and Change Management** model — the reassessment triggers, change classification, cross-document synchronization, ADR and traceability impact, and Threat Model versioning through which the security analysis is maintained as requirements, architecture, controls, dependencies, and Android platform behavior change.

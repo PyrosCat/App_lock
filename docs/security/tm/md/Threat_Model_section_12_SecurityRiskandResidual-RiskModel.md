@@ -613,75 +613,52 @@ A risk SHALL be reassessed when:
 
 - the acceptance period or review condition is reached.
 
-**12.25 Accessibility Enforcement Risk**
+**12.25 Detection Architecture and Accessibility Enhancement Risk**
 
-The existing accessibility risk SHALL remain a first-class risk.
+The foreground-detection architecture SHALL remain a first-class security risk until the approved two-tier design is implemented and security-verified.
 
-The risk includes:
+The current delivered implementation remains Accessibility-only. Its open risk includes:
 
-1.  Android Restricted Settings limiting accessibility grants;
+- Android Restricted Settings limiting Accessibility grants;
+- store-policy scrutiny affecting distribution;
+- Accessibility appearing enabled while event delivery is impaired;
+- force-stop and OEM behavior interrupting detection;
+- protection gaps caused by loss of the only implemented detection source.
 
-2.  store-policy restrictions affecting distribution;
+The approved target architecture changes, but does not eliminate, the risk. It removes Accessibility as a mandatory dependency by introducing a UsageStatsManager/Usage Access baseline. Under that architecture:
 
-3.  accessibility service state appearing enabled while event delivery is impaired;
+- store-policy and Restricted Settings risks are removed from the mandatory baseline path;
+- silent Accessibility failure is narrowed to the optional enhancement when the baseline remains healthy;
+- new baseline risks arise from Usage Access loss, stale or delayed usage-event sampling, foreground-service interruption, detector-health ambiguity, detection-source selection, and failure of the selected lock-interface presentation mechanism.
 
-4.  force-stop and OEM behavior affecting enforcement;
-
-5.  potential protection gaps caused by loss of detection.
-
-The risk SHALL not be represented as merely a reliability concern.
-
-Because the accessibility service is part of the enforcement path, loss of reliable detection can become a security failure.
+The target architecture SHALL NOT reduce current residual risk until the baseline tier is implemented and security-verified.
 
 **12.26 Enforcement Availability Risk**
 
-The application treats continuous enforcement as a security asset.
+The application treats continuous operation of the required enforcement path as a security asset. The following SHALL be assessed as security-relevant:
 
-Therefore, the following SHALL be assessed as security-relevant:
+- loss or revocation of Usage Access;
+- baseline foreground-detection service loss or starvation;
+- stale, incomplete, or delayed UsageStats data;
+- detection-source selection or Trigger Processor failure;
+- failure of the selected lock-interface presentation mechanism or its required permission;
+- optional Accessibility enhancement loss when enabled;
+- watchdog loss, boot re-arm failure, process death, force-stop, or OEM background restrictions;
+- overlay/UI failure or failure to present the authentication screen.
 
-- accessibility service loss;
-
-- watchdog loss;
-
-- boot re-arm failure;
-
-- permission revocation;
-
-- process death;
-
-- force-stop;
-
-- OEM background restrictions;
-
-- overlay/UI failure;
-
-- failure to present the authentication screen.
-
-A control that detects failure after protected content has already become accessible SHALL be treated as **detection**, not **prevention**.
+Loss of the optional Accessibility enhancement alone SHALL NOT be rated as total enforcement loss after the baseline tier is implemented and healthy. A control that detects failure only after protected content has become accessible SHALL be treated as detection, not prevention.
 
 **12.27 Fail-Open Risk**
 
-The current architecture contains an important accepted limitation:
+Fail-open risk SHALL be represented according to implementation state.
 
-Loss of the AppDetectionService can cause protected applications to become accessible without App Lock authentication.
+**Current Delivered Implementation.** Loss of AppDetectionService or effective Accessibility event delivery can cause protected applications to become accessible without App Lock authentication. The watchdog and notification mechanism may reduce detection time but do not eliminate the exposure.
 
-The watchdog and notification mechanism reduces detection time but does not eliminate the exposure.
+**Approved Target Architecture.** Loss of the optional Accessibility enhancement SHALL degrade detection to the healthy UsageStatsManager baseline and SHALL NOT, by itself, disable App Lock. Fail-open exposure remains possible if the required baseline detector, Usage Access, detection-source selection, Trigger Processor path, or lock-interface presentation mechanism becomes unavailable or ineffective.
 
-Therefore:
+    Detection ≠ Prevention ≠ Fail-Closed Enforcement
 
-Detection
-
-≠
-
-Prevention
-
-≠
-
-Fail-Closed Enforcement
-
-The Threat Model SHALL preserve this distinction.
-
-The exposure window SHALL be treated as residual risk until the architecture changes.
+The Threat Model SHALL preserve this distinction. The approved architecture SHALL receive no risk-reduction credit until implemented and security-verified, and any remaining baseline exposure window SHALL be treated as residual risk.
 
 **12.28 Vault Key / PIN Separation Risk**
 
@@ -976,24 +953,27 @@ Risk closure SHALL therefore never be treated as permanent immunity.
 
 **12.41 Residual-Risk Register**
 
-The Threat Model SHALL maintain visibility into unresolved material residual risks.
+The residual-risk register SHALL include, at minimum, the following current and target-architecture risk areas:
 
-At minimum, the current model SHALL preserve visibility of:
-
-| **Risk Area** | **Current Treatment** |
+| Risk Area | Current Treatment |
 |----|----|
-| Accessibility enforcement reliability | Mitigate / Monitor |
-| Fail-open enforcement | Known residual exposure |
-| Peer accessibility interference | Best-effort |
+| Current Accessibility-only enforcement reliability | Open; mitigate and monitor until the baseline tier is implemented and verified |
+| Baseline UsageStatsManager / Usage Access detection reliability | Approved target control; implementation and security verification required |
+| Baseline detection latency and battery trade-off | Measure, tune, and verify against tier-specific requirements |
+| Lock-interface presentation availability and permission dependency | Open design/implementation risk; resolve and verify in Phase 1 |
+| Detection-source selection and health-state accuracy | Planned control; implementation and end-to-end verification required |
+| Optional Accessibility enhancement reliability | Monitor as an enhancement-tier risk; loss must degrade to the baseline |
+| Fail-open baseline enforcement | Known residual exposure until prevention or bounded exposure is demonstrated |
+| Peer Accessibility interference | Best effort |
 | Malicious overlays / tapjacking | Remediation required |
 | Keystore invalidation | Remediation required |
 | PIN-independent cryptographic keys | Accepted architectural property; evaluate by attacker boundary |
-| Root/system compromise | Out of guaranteed boundary; best-effort |
+| Root/system compromise | Out of guaranteed boundary; best effort |
 | Missing security verification | Phase 1 remediation |
-| Root/tamper/debug controls | Deferred defense-in-depth |
+| Root/tamper/debug controls | Deferred defense in depth |
 | Security debt | Track and reassess |
 
-The exact severity of each entry SHALL be determined through the approved risk methodology and evidence, rather than assumed solely from this table.
+The register SHALL distinguish current delivered-build risks from target-architecture risks and SHALL NOT mark the target baseline as an effective mitigation before implementation and verification.
 
 **12.42 Risk Model Invariants**
 
@@ -1035,48 +1015,25 @@ Attacks outside the guaranteed trust boundary SHALL remain explicitly classified
 
 Section 12 is complete only when:
 
-- the approved likelihood × impact model is preserved;
-
-- Critical/High/Medium/Low levels are standardized;
-
+- the approved likelihood × impact model and Critical/High/Medium/Low levels are preserved;
 - inherent and residual risk are separated;
-
 - control effectiveness depends on actual verification state;
-
-- compensating controls are explicitly identified;
-
-- risk treatment categories are standardized;
-
-- material risks have owners;
-
-- acceptance is separated from closure;
-
+- compensating controls and treatment categories are explicit;
+- material risks have owners and acceptance is separated from closure;
 - mandatory requirements cannot be bypassed through informal risk acceptance;
-
-- accessibility enforcement remains a security risk;
-
-- fail-open enforcement remains explicitly represented;
-
+- current Accessibility-only enforcement risk remains represented until superseded;
+- baseline Usage Access, detector-health, presentation, and source-selection risks are represented;
+- optional Accessibility risk is distinguished from required baseline risk;
+- fail-open baseline enforcement remains explicitly represented;
 - PIN/UI authorization and cryptographic key protection remain distinct;
-
-- Keystore invalidation remains represented;
-
-- overlay/tapjacking remains represented;
-
+- Keystore invalidation, overlay/tapjacking, and security debt remain represented;
 - root/system compromise remains outside the guaranteed application boundary;
-
-- security debt remains visible;
-
 - phase advancement considers residual risk;
-
-- risk closure requires evidence;
-
-- closed risks can be reopened;
-
+- risk closure requires evidence and closed risks can be reopened;
 - risk and verification remain separate but traceable dimensions.
 
 **12.44 Boundary to Section 13**
 
-Section 12 defines **how security risk is assessed, treated, accepted, monitored, and closed**.
+Section 12 defines how security risk is assessed, treated, accepted, monitored, and closed.
 
-Section 13 defines the **Security Assumptions, Trust Boundaries, and Explicit Non-Goals**, establishing exactly what the Threat Model trusts, what it does not trust, what the application guarantees, and where the security claims deliberately stop.
+Section 13 preserves historical security failures and findings, including previously observed bypasses, platform limitations, architectural findings, remediation status, and the evidence that must remain available for regression and future security analysis.

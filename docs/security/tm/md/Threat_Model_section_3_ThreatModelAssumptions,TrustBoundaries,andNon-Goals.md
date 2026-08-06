@@ -232,37 +232,39 @@ This distinction is security-critical and must remain consistent throughout the 
 
 **3.11 Accessibility Trust Boundary**
 
-App Lock relies on Android's Accessibility framework to detect foreground application transitions used by the protected-application enforcement mechanism.
+App Lock includes Android's Accessibility framework as an optional foreground-detection mechanism in the approved architecture. Accessibility is therefore:
 
-The Accessibility framework is therefore both:
+- a trusted Android platform interface when enabled;
 
-- A trusted platform dependency.
+- an optional detection enhancement;
 
-- A known-fragility boundary.
+- a known-fragility boundary;
 
-The application assumes that an enabled Accessibility Service can receive the events required for foreground-app detection under supported platform conditions.
+- a security-relevant interface, because peer Accessibility Services may observe or inject UI interactions.
 
-However, the Threat Model explicitly recognizes that:
+The approved architecture does **not** assume that Accessibility must be enabled for App Lock to provide its core protected-application enforcement function. The baseline enforcement path uses Android UsageStatsManager together with the Usage Access special permission. When the Accessibility enhancement is enabled, the application may use its event-driven detection path to obtain faster foreground-transition detection.
 
-- The service can become unbound.
+The Threat Model recognizes that the Accessibility enhancement may:
 
-- Accessibility permission can be revoked.
+- become unbound;
 
-- Android restrictions can prevent or complicate granting the service.
+- have its permission revoked;
 
-- OEM behavior can interfere with service persistence.
+- be blocked or complicated by Android restrictions;
 
-- A service may appear enabled while failing to provide the expected events.
+- be affected by OEM lifecycle behavior;
 
-- Another Accessibility Service may observe UI activity and inject events.
+- appear enabled while failing to deliver expected events;
 
-The Accessibility framework is therefore not treated as an unconditional security guarantee.
+- coexist with another Accessibility Service capable of observing or injecting UI interactions.
 
-Its reliability and security limitations are analyzed as threats and risks in later sections.
+These conditions remain security-relevant, but their consequences differ from the previous Accessibility-only architecture. Loss of Accessibility SHALL be treated as loss of the optional enhancement once the two-tier architecture is implemented, not as automatic loss of App Lock's core enforcement capability.
+
+The baseline Usage Access path has its own permission, health, latency, and lifecycle dependencies and therefore constitutes the mandatory detection trust boundary for the target architecture.
 
 **3.12 Boot and Lifecycle Trust Boundary**
 
-App Lock relies on Android lifecycle and boot mechanisms to restore security enforcement after system restart and application lifecycle events.
+App Lock relies on Android lifecycle and boot mechanisms to maintain and restore the active enforcement architecture after system restart and application lifecycle events.
 
 The application assumes that supported Android lifecycle mechanisms will provide the necessary opportunities for:
 
@@ -270,9 +272,13 @@ The application assumes that supported Android lifecycle mechanisms will provide
 
 - Watchdog startup or restart.
 
-- Accessibility-service restoration where supported.
+- Baseline Usage Access detection operation where implemented.
+
+- Optional Accessibility-service restoration where enabled.
 
 - Application process recovery where supported.
+
+- Restoration of the lock-enforcement path.
 
 These mechanisms are not guaranteed to survive every OEM or operating-system intervention.
 
@@ -285,6 +291,8 @@ The Threat Model therefore distinguishes:
 - Platform-dependent behavior.
 
 - Conditions under which App Lock cannot guarantee continued enforcement.
+
+The Threat Model SHALL distinguish between the required baseline detection mechanism and the optional Accessibility enhancement. A failure to restore Accessibility does not necessarily represent loss of App Lock enforcement when the baseline detection path remains healthy. A failure to restore the baseline detection path is security-relevant when it permits protected applications to become accessible without App Lock authorization. OEM and operating-system behavior may prevent guaranteed recovery in all circumstances.
 
 Loss of enforcement is security-relevant when it permits protected applications to become accessible without App Lock authorization.
 
@@ -502,11 +510,11 @@ Network authentication, transport security, and remote service compromise are no
 
 **NG-006 — Absolute Accessibility availability**
 
-App Lock cannot guarantee continuous Accessibility Service operation against all Android, OEM, administrative, or system-level interventions.
+App Lock does not guarantee continuous availability of the optional Accessibility enhancement against all Android, OEM, administrative, or system-level interventions. The approved architecture does not require Accessibility to remain enabled for core App Lock enforcement.
 
 **NG-007 — Absolute protection against peer Accessibility Services**
 
-A malicious Accessibility Service operating within the Android platform's permitted security model may observe or inject UI interactions. App Lock may provide detection or mitigation but does not claim absolute prevention.
+A malicious Accessibility Service operating within the Android platform's permitted security model may observe or inject UI interactions. App Lock may provide detection or mitigation but does not claim absolute prevention. The presence of a peer Accessibility Service remains relevant to authentication-UI integrity and interaction security regardless of whether App Lock is using Accessibility as its active detection source.
 
 **NG-008 — Absolute protection against root**
 
@@ -531,13 +539,15 @@ The following assumptions are considered foundational to the current Threat Mode
 | TA-003 | Package Manager maintains application identity and component boundaries. | Application integrity |
 | TA-004 | Device Admin enforces its privileged framework boundary. | Uninstall protection |
 | TA-005 | Android authentication and BiometricPrompt provide their defined platform guarantees. | Authentication |
-| TA-006 | Accessibility operates sufficiently for supported foreground detection. | Enforcement |
-| TA-007 | Supported Android boot/lifecycle mechanisms provide expected recovery opportunities. | Persistence |
+| TA-006 | The approved baseline foreground-detection mechanism operates sufficiently for supported protected-application enforcement. Accessibility is optional and may provide an enhancement when enabled. | Enforcement |
+| TA-007 | Supported Android boot/lifecycle mechanisms provide expected recovery opportunities for the active detection and enforcement mechanisms. | Persistence |
 | TA-008 | The legitimate owner who knows the current App Lock credential is authorized. | Authorization |
 | TA-009 | The current architecture has no network dependency for core security. | Local-only boundary |
 | TA-010 | Backup extraction remains disabled unless a new security-reviewed mechanism is introduced. | Data protection |
 | TA-011 | A fully compromised OS is below the App Lock trust boundary. | Security guarantee |
 | TA-012 | No forgotten-PIN recovery exists in the current security model. | Credential integrity |
+
+This assumption SHALL NOT be interpreted as claiming that the baseline mechanism is already implemented. Until the Core Security Platform implementation is complete and security-verified, the current build remains subject to its existing Accessibility-only enforcement limitation.
 
 These assumptions are not permanent truths. A change to any foundational assumption requires Threat Model reassessment.
 
@@ -561,13 +571,23 @@ Examples include:
 
 - Adding a backup provider.
 
-- Changing the Accessibility enforcement mechanism.
+- Changing the foreground-detection architecture, including replacing, adding, or removing a detection source.
+
+- Changing the required status of Accessibility.
+
+- Introducing Usage Access as a required security permission.
+
+- Changing the lock-interface presentation mechanism.
+
+- Changing the relationship between detection sources and the Trigger Processor.
 
 - Introducing a new privileged Android capability.
 
 - Changing the application's process or storage architecture.
 
 - Introducing a new third-party service that handles sensitive data.
+
+The previously Accessibility-only detection boundary is therefore superseded by the approved two-tier detection architecture.
 
 A trust-boundary change must not be treated as an ordinary implementation detail.
 

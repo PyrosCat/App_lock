@@ -272,73 +272,52 @@ Persistent authentication sessions are prohibited unless separately approved thr
 
 **9.6 Protected-App Enforcement Controls**
 
-**9.6.1 Accessibility Detection**
+**9.6.1 Two-Tier Foreground Detection**
 
-AppDetectionService provides the primary foreground-application detection mechanism.
+The approved architecture separates foreground detection from the lock engine and provides two detection tiers.
 
-The service receives Android accessibility events and passes relevant package transitions to the lock engine.
+**Baseline Tier — UsageStatsManager + Usage Access.** The baseline tier is mandatory and is designed to keep App Lock functional with Accessibility disabled. The baseline control SHALL:
 
-The control SHALL:
+1.  obtain foreground-application information through UsageStatsManager and the Usage Access special permission;
+2.  sample usage events through the approved foreground service;
+3.  identify the current foreground package with the required detection-latency characteristics;
+4.  exclude App Lock's own package where appropriate, and exclude explicitly ignored system packages;
+5.  pass the resulting trigger to the Trigger Processor / detection-source selection layer;
+6.  cause the common lock engine to evaluate protected-app policy and current authorization state;
+7.  use the approved lock-interface presentation mechanism subject to Android background-activity-launch restrictions.
 
-1.  identify the foreground application;
+The baseline tier introduces a sampling latency and battery-cost trade-off. These characteristics SHALL be measured, documented, and security-tested rather than assumed to be negligible. The baseline may require the display-over-other-apps / system-alert-window permission or an applicable platform background-activity-launch exemption, depending on the final lock-interface presentation design.
 
-2.  exclude App Lock's own package where appropriate;
+**Enhancement Tier — Accessibility.** The existing Accessibility-based detector is retained as an optional, user-enabled enhancement. The enhancement SHALL:
 
-3.  exclude explicitly ignored system packages;
+1.  use the Android Accessibility framework to receive event-driven foreground information;
+2.  apply the same package-exclusion rules (App Lock's own package and ignored system packages);
+3.  feed the same Trigger Processor / lock-engine path used by the baseline;
+4.  provide improved responsiveness where enabled;
+5.  remain optional for normal App Lock operation;
+6.  never be required as the sole mechanism for protected-app enforcement in the final architecture.
 
-4.  evaluate the target package against the protected-app policy;
+**Detection-Source Selection.** The detection-source selection layer determines which available source supplies triggers. The baseline is the required foundation; Accessibility may be enabled as an enhancement. The lock engine SHALL remain independent of the detection source: detection identifies a candidate foreground transition; authentication and authorization determine whether access is permitted.
 
-5.  evaluate the current authorization session;
-
-6.  launch the authentication boundary when authorization is absent.
-
-The accessibility framework is a trusted platform dependency but is classified as a fragile security dependency.
+**Current Implementation Status.** The delivered build has not yet implemented the two-tier architecture and continues to rely on Accessibility-only detection. Therefore the baseline control described here is **planned**, not an effective current mitigation. The existing Accessibility availability risk remains open until the Phase 1 implementation is completed and verified.
 
 **9.6.2 Enforcement Health Monitoring**
 
-ProtectionWatchdogService provides monitoring of the enforcement mechanism.
+ProtectionWatchdogService provides monitoring of the enforcement architecture. The watchdog SHALL distinguish, where technically possible, between:
 
-The watchdog SHALL monitor whether the expected accessibility protection remains available and SHALL generate an appropriate security event and user notification when protection is detected as unavailable.
+- mandatory baseline healthy;
+- mandatory baseline missing or degraded;
+- optional Accessibility enhancement healthy when enabled;
+- optional Accessibility enhancement missing or degraded;
+- common enforcement/presentation-path failure.
 
-This is a **detection and response control**, not a complete preventive control.
+A loss of the optional Accessibility enhancement must not be reported as total App Lock protection loss when the mandatory baseline is healthy. A loss or silent degradation of the mandatory baseline is a security-critical condition: the watchdog SHALL generate an appropriate security event and user notification where technically possible and SHALL NOT falsely report healthy protection.
 
-The current implementation cannot independently restore the accessibility grant.
-
-Therefore:
-
-Accessibility Lost
-
-│
-
-▼
-
-Watchdog Detection
-
-│
-
-├── Security Event
-
-│
-
-└── User Notification
-
-│
-
-▼
-
-User Re-enables Protection
-
-The exposure created between accessibility loss and recovery SHALL remain a documented residual risk.
+Monitoring is a **detection and response control**, not a complete preventive control. The application cannot independently grant Usage Access or Accessibility permission. The exposure created between loss of a required mechanism and its recovery SHALL remain a documented residual risk — for the baseline path as a security-critical exposure, and for the optional enhancement as an enhancement-degradation exposure.
 
 **9.6.3 Startup and Boot Recovery**
 
-BootReceiver SHALL initiate the protection recovery path following device boot.
-
-The objective is to ensure that application enforcement infrastructure is re-established without restoring stale authentication sessions.
-
-Boot recovery SHALL therefore preserve the following invariant:
-
-Reboot may restore enforcement infrastructure, but SHALL NOT restore an authenticated App Lock session.
+BootReceiver SHALL initiate the protection recovery path following device boot. The target recovery path SHALL restore the mandatory baseline enforcement infrastructure without restoring stale authentication sessions. If the optional Accessibility enhancement is enabled, its restoration state SHALL be evaluated separately from the baseline. Reboot may restore enforcement infrastructure, but SHALL NOT restore an authenticated App Lock session.
 
 **9.7 Vault Security Controls**
 
@@ -507,43 +486,21 @@ No sensitive functionality SHALL be exposed through an exported component withou
 
 **9.10 UI and Authentication-Surface Controls**
 
-The authentication interface SHALL be treated as a security boundary rather than an ordinary application screen.
-
-Existing controls include:
+The authentication interface SHALL be treated as a security boundary rather than an ordinary application screen. Existing controls include:
 
 - self-gating of protected application functionality;
-
 - lifecycle-based re-gating;
-
 - Back handling;
-
 - Recents exclusion;
-
 - noHistory behavior where applicable;
-
 - completion of unauthenticated lock screens when backgrounded;
-
 - FLAG_SECURE in release builds;
-
 - biometric-dialog lifecycle handling;
+- repeated foreground enforcement regardless of detection source.
 
-- repeated foreground enforcement.
+These controls address historical navigation and screen-capture bypasses. The approved two-tier architecture also requires the lock-interface presentation path to be compatible with the mandatory Usage Access baseline; the final choice between a drawn overlay and an activity launched through the applicable background-activity-launch mechanism remains an implementation decision.
 
-These controls address historical navigation and screen-capture bypasses.
-
-However, the current implementation does **not** fully address:
-
-- malicious overlay obscuring;
-
-- tapjacking;
-
-- obscured-touch acceptance;
-
-- malicious accessibility event injection;
-
-- UI spoofing by a hostile peer accessibility service.
-
-These SHALL remain explicit threats and SHALL NOT be marked mitigated merely because FLAG_SECURE is enabled.
+The current implementation does **not** fully address: malicious overlay obscuring; tapjacking; obscured-touch acceptance; malicious accessibility event injection; UI spoofing by a hostile peer accessibility service. These SHALL remain explicit threats and SHALL NOT be marked mitigated merely because FLAG_SECURE is enabled.
 
 **9.11 Brute-Force and Authentication-Abuse Controls**
 
@@ -573,23 +530,15 @@ Lockout controls SHALL be tested against:
 
 **9.12 Permission and Security-State Monitoring**
 
-The application SHALL monitor security-relevant permission state changes.
+The application SHALL monitor security-relevant permission state changes for every permission that forms part of the approved enforcement architecture. At minimum, this includes:
 
-At minimum, this includes the state required for enforcement through the accessibility framework and other security-critical grants.
+- Usage Access for the mandatory baseline;
+- the permission required by the final lock-interface presentation mechanism, where applicable;
+- Accessibility permission when the optional enhancement is enabled;
+- Device Admin where uninstall protection is enabled;
+- other security-critical grants identified by the implementation.
 
-When a security-critical permission is removed or protection becomes unavailable, the application SHALL:
-
-1.  detect the condition where technically possible;
-
-2.  record a security event;
-
-3.  notify the user;
-
-4.  provide an appropriate recovery path;
-
-5.  avoid falsely representing the protection state as healthy.
-
-Detection SHALL NOT be treated as equivalent to prevention.
+When a security-critical permission is removed or protection becomes unavailable, the application SHALL: (1) detect the condition where technically possible; (2) record a security event; (3) notify the user; (4) provide an appropriate recovery path; (5) avoid falsely representing the protection state as healthy. Permission monitoring SHALL distinguish optional enhancement loss from mandatory baseline loss. Detection SHALL NOT be treated as equivalent to prevention.
 
 **9.13 Tamper, Root, and Debugging Controls**
 
@@ -634,37 +583,28 @@ Where secure recovery cannot be implemented, destructive failure is preferable t
 
 **9.15 Controls for Historical Vulnerabilities**
 
-Historical failures SHALL be treated as permanent security regression targets.
+Historical failures SHALL be treated as permanent security regression targets. The following controls are therefore mandatory regression/security-test candidates:
 
-The following controls are therefore mandatory regression/security-test candidates:
-
-| **Historical Failure** | **Required Control** |
+| Historical Failure | Required Control |
 |----|----|
 | Self-gate resume bypass | Lifecycle self-gating |
-| Fast relaunch bypass | Re-evaluate authorization on foreground |
-| Fast-switch relock defect | Per-event enforcement |
+| Fast relaunch bypass | Re-evaluate authorization on every protected-app foreground trigger |
+| Fast-switch relock defect | Per-trigger enforcement independent of detection source |
 | Plaintext database | SQLCipher migration and encrypted persistence |
 | Release cryptographic build failure | Minified release-build validation |
-| Accessibility loss | Protection health monitoring |
+| Accessibility loss | Optional-enhancement health monitoring and baseline-continuity verification |
+| Detection-source substitution/race | Common Trigger Processor and lock-engine regression coverage |
 
-The existence of a historical fix SHALL NOT by itself establish security verification.
-
-The corresponding threat, control, and test evidence SHALL remain traceable.
+The existence of a historical fix SHALL NOT by itself establish security verification. The corresponding threat, control, and test evidence SHALL remain traceable.
 
 **9.16 Compensating Controls**
 
-Where a primary security mechanism cannot provide complete prevention, a compensating control SHALL be documented.
+Where a primary security mechanism cannot provide complete prevention, a compensating control SHALL be documented. Examples include:
 
-Examples include:
-
-- accessibility health notification compensating for inability to self-grant accessibility;
-
-- watchdog monitoring compensating for service fragility;
-
+- accessibility health notification compensating for the inability to self-grant the optional Accessibility enhancement;
+- baseline and enhancement health monitoring compensating for the inability to self-grant platform permissions, and watchdog monitoring compensating for detection-service fragility;
 - process-lifetime sessions compensating for the inability to guarantee secure session persistence;
-
 - destructive reset compensating for the absence of secure PIN recovery;
-
 - encrypted storage compensating for the inability to guarantee confidentiality against a compromised application process.
 
 Compensating controls SHALL NOT be described as equivalent to the primary control.
@@ -737,89 +677,13 @@ In particular:
 
 At the time of Threat Model authoring, the security posture SHALL be represented conservatively.
 
-**Implemented and Functionally Regression-Verified**
+**Implemented and Functionally Regression-Verified** (existing functional/regression evidence): PIN authentication; biometric authentication; intruder capture; vault core functionality; vault UI self-gating; encrypted persistence; database encryption; encrypted vault payloads; screen-capture prevention; persistent brute-force lockout; permission-change detection; per-application authorization/session behavior; historical self-gate and rapid-relaunch defenses; existing Accessibility-based detection behavior in the current delivered build. These controls SHALL NOT yet be labeled **security-verified** solely on the basis of the existing regression campaigns.
 
-The following controls have existing functional/regression evidence:
+**Implemented but Pending Security Classification or Verification** (as applicable): Keystore usage; detailed authentication-session controls; device-credential handling; key-management architecture; secure-memory handling; clipboard protection; emergency-lock behavior; audit-log protection; privacy controls; backup/security-recovery behavior; existing Accessibility health monitoring as a security control.
 
-- PIN authentication;
+**Planned or Not Yet Effective** (approved target-architecture and other controls not yet effective in the delivered build): UsageStatsManager + Usage Access baseline detection; detection-source selection / Trigger Processor integration for the two-tier architecture; baseline-compatible lock-interface presentation path; tier-specific enforcement health monitoring; root detection; root response; tamper detection; production debug/instrumentation resistance; anti-tapjacking and obscured-touch defense; Keystore-invalidation recovery; formal secure backup; key rotation; security-health scoring; penetration testing; Threat-Model-driven security-test suite.
 
-- biometric authentication;
-
-- intruder capture;
-
-- vault core functionality;
-
-- vault UI self-gating;
-
-- encrypted persistence;
-
-- database encryption;
-
-- encrypted vault payloads;
-
-- screen-capture prevention;
-
-- persistent brute-force lockout;
-
-- permission-change detection;
-
-- per-application authorization/session behavior;
-
-- historical self-gate and rapid-relaunch defenses.
-
-These controls SHALL NOT yet be labeled **security-verified** solely on the basis of the existing regression campaigns.
-
-**Implemented but Pending Security Classification or Verification**
-
-These include, as applicable:
-
-- Keystore usage;
-
-- detailed authentication-session controls;
-
-- device-credential handling;
-
-- key-management architecture;
-
-- secure-memory handling;
-
-- clipboard protection;
-
-- emergency-lock behavior;
-
-- audit-log protection;
-
-- privacy controls;
-
-- backup/security-recovery behavior.
-
-**Planned or Not Yet Effective**
-
-These include:
-
-- root detection;
-
-- root response;
-
-- tamper detection;
-
-- production debug/instrumentation resistance;
-
-- anti-tapjacking and obscured-touch defense;
-
-- Keystore-invalidation recovery;
-
-- formal secure backup;
-
-- key rotation;
-
-- security-health scoring;
-
-- penetration testing;
-
-- Threat-Model-driven security-test suite.
-
-Planned controls SHALL NOT be cited elsewhere in the Threat Model as existing mitigations.
+The optional Accessibility enhancement is architecturally approved, but its optional status does not make its current implementation security-verified. Planned controls SHALL NOT be cited elsewhere in the Threat Model as existing mitigations.
 
 **9.19 Security Control Invariants**
 
@@ -894,27 +758,17 @@ No implementation change SHALL silently preserve a previous security-verificatio
 Section 9 is complete only when:
 
 - every material threat identified in Section 8 has at least one documented control, accepted limitation, or explicit statement of why no control is feasible;
-
 - each control has a defined implementation state;
-
 - implemented controls are not incorrectly represented as security-verified;
-
 - preventive, detective, and responsive controls are distinguished;
-
 - compensating controls are explicitly identified;
-
 - historical vulnerabilities remain mapped to their controls;
-
 - authentication, authorization, vault, cryptographic, IPC, enforcement, recovery, and platform controls are represented;
-
 - root/system compromise remains outside the guaranteed application trust boundary;
-
-- known anti-tapjacking, overlay, accessibility, and Keystore-invalidation gaps remain visible;
-
+- known anti-tapjacking, overlay, detection-source, Accessibility, Usage Access, and Keystore-invalidation gaps remain visible;
+- the current Accessibility-only implementation is not confused with the approved two-tier target architecture;
 - control invariants are established;
-
 - control changes are subject to impact assessment and verification-state review;
-
 - Section 12 will provide the authoritative evidence criteria for promoting a control to **security-verified** status.
 
 **9.22 Boundary to Section 10**

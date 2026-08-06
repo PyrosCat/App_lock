@@ -4,6 +4,115 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Security — Threat Model v2: §10-16 landed — full §1-16 reconciled   (2026-08-06)
+---------------------------------------------------------------------------
+Landed the approved §10-16 reconciliation into docs/security/tm/ (v2), same
+superset method as §1-9. This COMPLETES the full §1-16 two-tier reconciliation:
+the entire Threat Model no longer models Accessibility as the single/mandatory
+enforcement mechanism. Docs-only: no RTM, ADR, or code change.
+
+- v1 §10-16 already archived verbatim (done at the §1-5 landing; confirmed tm/
+  §10-16 byte-identical before swap). Approved §10-16 reconciliation record
+  (PROPOSAL .md/.docx) filed into docs/archive/threat-model-v1-2026-08-05/.
+- v2 §10-16 .docx rebuilt by merging the 36 approved subsections into the v1
+  section text (scripts merge → pandoc gfm→docx); md/ mirrors regenerated
+  (--check green). Section header counts unchanged (§10=32, §11=37, §12=44,
+  §13=21, §14=35, §15=35, §16=61) — no subsection added/dropped.
+- Two headline fixes: (1) **§16.34.4 vs §16.32.15 CONTRADICTION RESOLVED** —
+  orig §16.34.4 said "continuous Accessibility-based detection is a security-
+  critical availability dependency" (contradicting the two-tier §16.32.15);
+  v2 §16.34.4 makes the baseline the mandatory dependency, Accessibility
+  optional. (2) BOTH stale forward-refs fixed: §12.44 (orig said §13 =
+  "Assumptions/Trust Boundaries"; it's Historical Failures) and **§14.35**
+  (orig said §15 = "Security Verification/Evidence Traceability"; it's
+  Continuous Threat Modeling & Change Mgmt). §14.35 was MISSING from the client
+  draft (its preamble falsely claimed "two forward references" fixed but only
+  did §12.44); I supplied the §14.35 correction.
+- Superset preserved (verified no drops): §12.41 residual register (10 orig +
+  baseline entries), §16.25/26/27 (all orig + two-tier), §10.19/§11.10
+  (consolidated not dropped), §13.8/13.9 findings intact.
+- HF-006/HF-007 status reclassified: "Accepted platform limitation" -> "Open,
+  with the two-tier baseline as planned mitigation" (correct under reconciliation;
+  consistent with R-001 Open). Retitles: §11.22, §12.25, §15.14.
+- Diagram notation cleaned (draft's !=/\|/v -> ≠ chains / → flows). Draft meta
+  preambles+footer stripped. tm/VERSION.md now = "full §1-16 reconciled".
+  docs/README tm line + archive README + this changelog updated.
+
+
+Security — Threat Model v2: §6-9 two-tier reconciliation landed   (2026-08-06)
+---------------------------------------------------------------------------
+Landed the approved §6-9 reconciliation into docs/security/tm/ (v2), same
+superset method as §1-5. Resolves the accessibility-as-mandatory framing in
+§6-9 (security architecture, methodology, threat identification, controls).
+Docs-only: no RTM, ADR, or code change.
+
+- v1 §6-9 already archived verbatim in docs/archive/threat-model-v1-2026-08-05/
+  (done at the §1-5 landing; confirmed tm/ §6-9 were byte-identical before swap).
+  The approved §6-9 reconciliation record (PROPOSAL .md/.docx) added there too.
+- v2 §6-9 .docx rebuilt by merging the approved subsections into the v1 section
+  text (scripts merge → pandoc gfm→docx); §10-16 .docx UNCHANGED. md/ mirrors
+  regenerated via scripts/docx_to_md.py (--check green). 26 subsections full-
+  replaced + 2 partial (§7.10 AS-002, §7.11 T-A); 9 draft subsections were no-ops
+  (already tier-neutral) and landed unchanged. Section header counts unchanged
+  (§6=36, §7=50, §8=30, §9=37) — no subsection added/dropped.
+- Client "6-9 draft" was high quality but had defects I corrected before landing:
+  (1) **§6.32 INV stable-ID COLLISION** — draft reused INV-011/012 for new
+  detection invariants, dropping original INV-011 "Loss of Enforcement Is a
+  Security Condition"; fixed = original INV-011/012 kept, new added as INV-013/014.
+  (2) **§6.14 added** (draft omitted the primary enforcement-path subsection,
+  left a11y-only). (3) **§6.28 added** (draft omitted overlay boundary; now notes
+  approved baseline overlay presentation AS-020). (4) superset restores: §6.15/
+  §9.6.1 engine exclude-own/system-package behaviors, §9.6.2 residual-risk-between-
+  loss-and-recovery, §9.16 watchdog-fragility control. (5) AS-019/020/021
+  traceability alignment (§6.34/§8.6). (6) stripped draft meta preamble+footer,
+  normalized markdown-as-literal-text + U+2011->ASCII. Then a tightening pass:
+  collapsed repeated current-vs-target caveats in §7.29/§7.30/§8.21.1, dropped an
+  §8.3 phantom "Detection-Source Availability" domain row, trimmed §6.28/§6.34.
+- Retitles (intentional, in v2): §9.6.1 "Accessibility Detection"->"Two-Tier
+  Foreground Detection"; THR-ENF-002/003/005 "Accessibility"->"Detection";
+  THR-ACC-001/002/003 prefixed "Optional"; §8.22 reordered ENF-001 first.
+- tm/VERSION.md updated to "§1-9 reconciled; §10-16 pending" (client §10-15 + §16
+  drafts have arrived in New docs/, not yet reviewed). docs/README tm line + this
+  changelog updated. Framing preserved: two-tier APPROVED-but-unbuilt (M2);
+  current build still a11y-only; R-001 stays Open.
+
+
+Security — Threat Model v2: §1-5 two-tier reconciliation landed   (2026-08-06)
+---------------------------------------------------------------------------
+Built Threat Model v2. The approved §1-5 reconciliation (approved 2026-08-05)
+is now incorporated into docs/security/tm/, resolving the primary internal
+conflict in §1-5 (accessibility-only body vs the two-tier §16.32/ADR-013A).
+Docs-only: no RTM, ADR, or code change.
+
+- v1 archived VERBATIM -> docs/archive/threat-model-v1-2026-08-05/ (16 .docx
+  section files + the approved reconciliation record .md/.docx + README).
+  This is the frozen client-received v1 (§1-5 accessibility-only).
+- v2 = docs/security/tm/. §1-5 .docx rebuilt to incorporate the approved
+  reconciliation; §6-16 .docx UNCHANGED (byte-identical to v1; their
+  reconciliation is still owed from the client). md/ mirrors regenerated via
+  scripts/docx_to_md.py (only tm §1-5 md + MANIFEST changed). NEW tm/VERSION.md
+  records the versioning, the reconciled-subsection list, and what's still owed.
+- Merge method = SUPERSET, not literal drop-in. Every approved two-tier
+  revision was incorporated AND every still-valid original threat/scope/control
+  item that the approved focused-rewrite blocks happened to omit was preserved,
+  so v2 §1-5 lose no coverage. Preserved items include: §1.2 two security
+  functions + full system-scope list; §1.3 primary-boundary + 14-item attempts
+  list; §3.12 4-item distinguish list; §3.23 cloud/remote-auth/Keystore/backup
+  change triggers; §4.17 fail-open closing; §4.18 exported-component/dependency/
+  notification actions + Section-8 pointer; §5.6 10-item attack-surface list;
+  §5.7 exposure + 7-item list + polling note; §5.27 root/tamper/debug planned-
+  controls list. Preservation manifest reviewed and approved before the build.
+- Reconciled subsections: §1.2, §1.3, §1.4(SO-08), §2.8, §3.11, §3.12,
+  §3.21(NG-006/007), §3.22(TA-006/007), §3.23, §4.5, §4.7, §4.17, §4.18,
+  §5.2(+AS-019/020/021), §5.6, §5.7, §5.10, §5.25, §5.26, §5.27, §5.28.
+- Framing kept throughout: two-tier is APPROVED-but-unbuilt (M2). v2 separates
+  the current delivered (accessibility-only) implementation from the approved
+  target architecture; no target capability is shown as implemented or
+  security-verified. R-001 stays Open until the baseline is built + verified.
+- docs/README.md + docs/archive/README.md updated (tm now "v2", archive index
+  row for the v1 folder).
+
+
 Security — Threat Model (client, 16 sections) filed + converted   (2026-08-05)
 ---------------------------------------------------------------------------
 The client-delivered Threat Model arrived as 16 .docx sections in "New docs/".

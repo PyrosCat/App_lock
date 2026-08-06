@@ -353,123 +353,39 @@ Testing SHALL verify that:
 
 **13.8 Historical Finding HF-006 — Force-Stop / Accessibility Enforcement Limitation**
 
-**Description**
+**Description.** The current delivered application relies on the Android Accessibility framework as its only implemented foreground-detection source. Force-stopping the application can terminate the process, watchdog, and current detection path and may affect the Accessibility service state. The application cannot silently restore an Accessibility grant without user/system participation.
 
-The application relies on Android's Accessibility framework for foreground-app detection.
+**Affected Boundary (current delivered build).**
 
-Force-stopping the application can terminate the enforcement process and, depending on platform behavior, remove the accessibility service state.
+    Android Accessibility Framework
+      → AppDetectionService
+      → ApplicationLockEngine
+      → Protected-App Gate
 
-The application cannot silently restore the accessibility grant without user/system participation.
+**Security Impact.** In the current build, loss of effective Accessibility detection can allow protected applications to become accessible without App Lock authentication. This is an availability failure with direct authorization consequences.
 
-**Affected Boundary**
+**Approved Architectural Treatment.** ADR-013A introduces a mandatory UsageStatsManager/Usage Access baseline and retains Accessibility as an optional enhancement. After implementation, loss of Accessibility alone SHALL degrade the application to the healthy baseline rather than disable protection. Force-stop remains security-relevant because it may terminate the required baseline service, watchdog, or presentation path.
 
-Android Accessibility Framework
+**Current Mitigation.** Protection-state monitoring; watchdog behavior; permission-state checks; security-event logging; user notification; recovery guidance. These mechanisms are detective and responsive; they do not guarantee continuous enforcement after the active required detection path has been terminated.
 
-│
-
-▼
-
-AppDetectionService
-
-│
-
-▼
-
-ApplicationLockEngine
-
-│
-
-▼
-
-Protected-App Gate
-
-**Security Impact**
-
-If the detection mechanism is unavailable, protected applications may become accessible without App Lock authentication.
-
-This is therefore an availability failure with direct security consequences.
-
-**Remediation / Mitigation**
-
-The application includes:
-
-- protection-state monitoring;
-
-- watchdog behavior;
-
-- permission-state checks;
-
-- security-event logging;
-
-- user notification;
-
-- recovery guidance.
-
-However, these mechanisms do not guarantee continuous enforcement when Android has removed or disabled the underlying accessibility service.
-
-**Current Status**
-
-**Accepted platform limitation / residual security concern.**
-
-The limitation SHALL remain explicitly represented in the Threat Model.
-
-It SHALL NOT be described as a fully remediated bypass.
+**Current Status.** Open for the current Accessibility-only implementation. The approved two-tier architecture is a planned mitigation and SHALL NOT be described as remediation until its baseline tier, health monitoring, source selection, and presentation path are implemented and security-verified.
 
 **13.9 Historical Finding HF-007 — Accessibility Silent-Failure Risk**
 
-**Description**
+**Description.** In the current delivered build, the Accessibility service may appear enabled while failing to deliver the foreground events required for enforcement. This is more severe than an obvious revocation because permission-state monitoring may incorrectly report that protection is available.
 
-The accessibility service may appear enabled from the platform's permission state while failing to deliver the expected foreground events.
+**Security Impact (current build).**
 
-This is more severe than a straightforward permission revocation because the application may incorrectly conclude that enforcement remains operational.
+    Accessibility Enabled
+      → AppDetectionService Appears Healthy
+      → No Foreground Events Delivered
+      → Protected App Opens Without Enforcement
 
-**Security Impact**
+Under the approved target architecture, this failure is narrowed to the optional enhancement when the baseline UsageStats detector remains healthy. The baseline tier introduces a corresponding need to detect stale or unavailable UsageStats data, sampling-service failure, and incorrect source-health selection.
 
-A silent failure can create a period during which:
+**Current Status.** Open for the current delivered build. Enhancement-tier silent failure remains security-relevant after migration but SHALL NOT be classified as total enforcement loss when the verified baseline remains operational.
 
-Accessibility = Enabled
-
-│
-
-▼
-
-AppDetectionService appears healthy
-
-│
-
-▼
-
-No foreground events delivered
-
-│
-
-▼
-
-Protected app opens without enforcement
-
-The existing watchdog and permission-state monitoring cannot guarantee detection of every such failure.
-
-**Current Status**
-
-**Open security concern.**
-
-This finding is directly related to the tracked accessibility-detection risk and SHALL remain a first-class Threat Model input.
-
-**Required Security Treatment**
-
-The Core Security Platform SHALL evaluate whether health verification can distinguish:
-
-- permission enabled;
-
-- service bound;
-
-- service responsive;
-
-- events actually being received;
-
-- enforcement actually occurring.
-
-A permission-state check alone SHALL NOT be treated as proof of enforcement health.
+**Required Security Treatment.** The Core Security Platform SHALL implement health verification that can distinguish: permission granted; detector service running; source responsive; events or usage data current and being received; protected-app transition detected; detection routed through the Trigger Processor; lock interface presented; enforcement actually occurring. A permission-state check alone SHALL NOT be treated as proof of detector or enforcement health for either tier.
 
 **13.10 Historical Finding HF-008 — Credential/UI and Data-Key Independence**
 

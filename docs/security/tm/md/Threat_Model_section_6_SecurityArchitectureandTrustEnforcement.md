@@ -464,95 +464,47 @@ The lack of persistent authorization sessions prevents a previously established 
 
 **6.14 Protected-App Enforcement Path**
 
-The primary protected-app path is:
+The primary protected-app enforcement path is common to both approved detection tiers. Detection identifies a candidate foreground transition; authentication and authorization determine whether access is permitted.
 
-Protected App Launched
+    Protected App Launched
+      -> Foreground Detection
+           - Baseline: UsageStatsManager / Usage Access (mandatory)
+           - Optional: Accessibility / AppDetectionService (enhancement)
+      -> Detection-Source Selection / Trigger Processor
+      -> ApplicationLockEngine
+      -> LockSessionManager / LockPolicyManager
+           - Valid Session -> Allow
+           - No Valid Session -> LockScreenActivity -> Authentication
+                - Failure -> Lockout
+                - Success -> Session State -> Protected App
 
-│
+The enforcement decision therefore depends on the complete path rather than on any individual component or detection source. The lock engine SHALL NOT treat the identity of a detection source as proof of authorization.
 
-▼
-
-Android Accessibility Event
-
-│
-
-▼
-
-AppDetectionService
-
-│
-
-▼
-
-ApplicationLockEngine
-
-│
-
-▼
-
-LockSessionManager / LockPolicyManager
-
-│
-
-├── Valid Session ──► Allow
-
-│
-
-└── No Valid Session
-
-│
-
-▼
-
-LockScreenActivity
-
-│
-
-▼
-
-Authentication
-
-│
-
-┌──────┴──────┐
-
-▼ ▼
-
-Failure Success
-
-│ │
-
-▼ ▼
-
-Lockout Session State
-
-│
-
-▼
-
-Protected App
-
-The enforcement decision therefore depends on the complete path rather than on any individual component.
+The current delivered implementation differs from this target: it currently relies on Accessibility as the sole detection source. Until the baseline tier is implemented, the diagram's baseline branch is **planned** and the existing Accessibility availability risk remains open.
 
 **6.15 Foreground Detection Boundary**
 
-AppDetectionService receives foreground application information from Android's Accessibility framework.
+Foreground detection is a security trigger boundary. The approved target architecture does not equate that boundary with the Accessibility framework.
 
-The application lock engine evaluates the resulting package information.
+**Baseline Detection Tier.** UsageStatsManager, together with the Android **Usage Access** special permission, provides the mandatory foreground-detection mechanism. A foreground service samples usage events to identify the current foreground application. Sampling introduces a detection-latency and battery-cost trade-off that must be measured and controlled during implementation and security verification.
 
-The engine:
+Because background activity-launch restrictions may prevent a background service from directly presenting the lock interface, the baseline tier also depends on the approved presentation mechanism and, where required by that mechanism, the **display-over-other-apps / system-alert-window** permission or the applicable platform background-activity-launch exemption. The precise presentation choice remains an implementation decision within the approved architecture.
 
-- Ignores App Lock's own package where appropriate.
+**Optional Enhancement Tier.** The existing Accessibility-based detection mechanism is retained as an optional user-enabled enhancement. It is event-driven and is intended to provide faster foreground detection than the sampled baseline. Accessibility is therefore a performance/responsiveness enhancement, not a mandatory prerequisite for App Lock use.
 
-- Ignores designated system packages.
+**Detection-Source Selection.** A detection-source selection layer determines which available source supplies triggers to the Trigger Processor. The baseline source remains the required foundation; the Accessibility source may be enabled as an enhancement.
 
-- Processes protected applications.
+Whichever tier supplies the trigger, the application lock engine evaluates the resulting package information and:
 
-- Applies the relevant session/relock policy.
+- ignores App Lock's own package where appropriate;
+- ignores designated system packages;
+- processes protected applications;
+- applies the relevant session/relock policy;
+- starts the authentication path when authorization is absent.
 
-- Starts the authentication path when authorization is absent.
+The security significance of this boundary is twofold. First, a correct authentication implementation is insufficient if the foreground application cannot reliably be detected. Second, the authorization engine must not trust the identity of a detection source as proof of authorization: a detection event only causes App Lock to evaluate policy and session state; authentication remains the authority for access.
 
-The security significance of this path is that a correct authentication implementation is insufficient if the foreground application cannot reliably be detected.
+The current implementation state must be distinguished from the approved architecture: the delivered build currently relies on Accessibility alone. Until the baseline tier is implemented, the existing Accessibility availability risk remains open.
 
 **6.16 Re-Entry Enforcement**
 
@@ -734,97 +686,43 @@ A restart or ordinary process death must not provide an alternate path around th
 
 **6.22 Watchdog Architecture**
 
-The watchdog provides a secondary security-monitoring path around the primary Accessibility enforcement mechanism.
+The watchdog provides security-health monitoring for the protected-app enforcement architecture rather than acting as a second authorization engine.
 
-Conceptually:
+In the approved target architecture it must be capable of assessing the health of the mandatory baseline path and, separately, the optional Accessibility enhancement when that enhancement is enabled.
 
-Accessibility Enforcement
+    Detection Configuration
+      -> Expected Protection State
+      -> ProtectionWatchdogService
+      -> Health Evaluation
+           - Baseline Healthy
+           - Baseline Missing / Degraded
+           - Optional Accessibility Healthy
+           - Optional Accessibility Missing / Degraded
 
-│
+A loss of the optional Accessibility enhancement must not be reported as total loss of App Lock protection when the baseline path is healthy.
 
-▼
+A loss or degradation of the mandatory baseline path is a security-critical condition. The watchdog SHALL detect and report it where technically possible and SHALL NOT represent the protection state as healthy when the required baseline is unavailable.
 
-Protection Expected
-
-│
-
-▼
-
-ProtectionWatchdogService
-
-│
-
-▼
-
-Health Evaluation
-
-│
-
-┌────┴────┐
-
-▼ ▼
-
-Healthy Missing
-
-│
-
-▼
-
-Security Event +
-
-Notification
-
-The watchdog does not independently recreate Android's Accessibility permission.
-
-It detects and reports loss of protection where it can.
-
-This distinction must remain explicit.
+The watchdog cannot independently grant Usage Access or Accessibility permission. It therefore remains a detection and response mechanism, not a complete preventive control.
 
 **6.23 Protection Availability Boundary**
 
-The protection architecture depends on multiple platform-controlled mechanisms:
+The approved target protection architecture is:
 
-Boot
+    Boot / Application Startup
+      -> ProtectionWatchdogService
+      -> Detection Configuration
+           - Mandatory Usage Access Baseline
+           - Optional Accessibility Enhancement
+      -> Detection-Source Selection / Trigger Processor
+      -> Foreground Detection
+      -> Lock Enforcement
 
-│
+Failure of the mandatory baseline, the presentation mechanism required to display the lock interface, or another required security component can interrupt enforcement and is therefore a security condition.
 
-▼
+Failure of the optional Accessibility enhancement is a degraded enhancement state. It becomes a total enforcement failure only if the mandatory baseline is also unavailable or the common enforcement path is otherwise unable to operate.
 
-BootReceiver
-
-│
-
-▼
-
-Watchdog
-
-│
-
-▼
-
-Accessibility Availability
-
-│
-
-▼
-
-AppDetectionService
-
-│
-
-▼
-
-Foreground Detection
-
-│
-
-▼
-
-Lock Enforcement
-
-Failure at any critical point can interrupt enforcement.
-
-The architecture therefore treats availability of the enforcement chain as a security property.
+The current implementation differs from this target: Accessibility is currently the sole detection source. That difference remains an open implementation risk until the two-tier architecture is delivered.
 
 **6.24 Boot Security Architecture**
 
@@ -942,37 +840,13 @@ The exported status of a component is therefore not itself an authorization gran
 
 **6.28 Overlay and UI Trust Boundary**
 
-The current architecture does not use a system overlay as the primary lock-screen mechanism.
+The current delivered architecture does not use a system overlay as the primary lock-screen mechanism; LockScreenActivity is an Activity-based authentication surface. This subsection therefore contains an **inbound UI trust problem**: another application may attempt to place an overlay above the authentication interface where Android permits it.
 
-LockScreenActivity is an Activity-based authentication surface.
+    Untrusted Application -> System Overlay -> LockScreenActivity -> User Interaction
 
-However, another application may attempt to place an overlay above the authentication interface where Android permits it.
+The current implementation does not yet establish a complete anti-tapjacking / obscured-touch defense. This remains an identified security gap and must not be treated as implemented protection.
 
-The architecture therefore contains an **inbound UI trust problem**:
-
-Untrusted Application
-
-│
-
-▼
-
-System Overlay
-
-│
-
-▼
-
-LockScreenActivity
-
-│
-
-▼
-
-User Interaction
-
-The current implementation does not yet establish a complete anti-tapjacking/obscured-touch defense.
-
-This remains an identified security gap and must not be treated as implemented protection.
+The approved target architecture may additionally present the baseline lock interface via an App-Lock-owned overlay (AS-020; display-over-other-apps / system-alert-window) rather than an Activity; if that mechanism is chosen it adds an outbound overlay boundary to analyze when designed, and SHALL NOT be represented as implemented until built and security-verified.
 
 **6.29 Accessibility Peer-Service Boundary**
 
@@ -1032,55 +906,22 @@ Accordingly:
 
 **6.32 Security-Critical Invariants**
 
-The architecture must preserve the following invariants.
+The architecture must preserve the following invariants. INV-001 through INV-010 are unchanged; INV-011 and INV-012 retain their existing identifiers and meaning (INV-011 reworded to be tier-aware); INV-013 and INV-014 are new detection invariants.
 
-**INV-001 — No Protected-App Access Without Authorization**
-
-A protected application must not become usable through App Lock's enforcement path without valid App Lock authorization.
-
-**INV-002 — Device Unlock Does Not Authorize App Lock**
-
-Android device authentication must never implicitly establish an App Lock session.
-
-**INV-003 — PIN Cannot Be Reset Without Authorization**
-
-Changing the credential requires knowledge of the current credential.
-
-**INV-004 — Authentication Sessions Are Volatile**
-
-App Lock authorization must not survive reboot or process death.
-
-**INV-005 — Lockout Survives Process Restart**
-
-Authentication failure state must not be reset by ordinary process restart.
-
-**INV-006 — Vault UI Requires App Lock Authorization**
-
-Returning to App Lock must not bypass its self-gate.
-
-**INV-007 — Vault Storage Does Not Depend on Plaintext PIN Persistence**
-
-The plaintext PIN must never be stored as an encryption key or persistent secret.
-
-**INV-008 — Sensitive Storage Remains Encrypted**
-
-Vault data, intruder photographs, credential material, and database contents must remain behind their defined encryption boundaries.
-
-**INV-009 — Exported Components Cannot Grant Sensitive Authorization**
-
-External invocation of an exported component must not establish App Lock authorization.
-
-**INV-010 — Reboot Does Not Create Access**
-
-Reboot must clear authorization sessions without weakening persistent protection.
-
-**INV-011 — Loss of Enforcement Is a Security Condition**
-
-Loss of Accessibility enforcement, watchdog operation, or equivalent required security mechanisms must be treated as a security-relevant condition.
-
-**INV-012 — Planned Controls Are Not Effective Controls**
-
-A specified but unimplemented security mechanism must never be represented as providing current protection.
+- **INV-001 — No Protected-App Access Without Authorization.** A protected application must not become usable through App Lock's enforcement path without valid App Lock authorization.
+- **INV-002 — Device Unlock Does Not Authorize App Lock.** Android device authentication must never implicitly establish an App Lock session.
+- **INV-003 — PIN Cannot Be Reset Without Authorization.** Changing the credential requires knowledge of the current credential.
+- **INV-004 — Authentication Sessions Are Volatile.** App Lock authorization must not survive reboot or process death.
+- **INV-005 — Lockout Survives Process Restart.** Authentication failure state must not be reset by ordinary process restart.
+- **INV-006 — Vault UI Requires App Lock Authorization.** Returning to App Lock must not bypass its self-gate.
+- **INV-007 — Vault Storage Does Not Depend on Plaintext PIN Persistence.** The plaintext PIN must never be stored as an encryption key or persistent secret.
+- **INV-008 — Sensitive Storage Remains Encrypted.** Vault data, intruder photographs, credential material, and database contents must remain behind their defined encryption boundaries.
+- **INV-009 — Exported Components Cannot Grant Sensitive Authorization.** External invocation of an exported component must not establish App Lock authorization.
+- **INV-010 — Reboot Does Not Create Access.** Reboot must clear authorization sessions without weakening persistent protection.
+- **INV-011 — Loss of Enforcement Is a Security Condition.** Loss or degradation of a required enforcement mechanism — the mandatory baseline detection path, the required lock-interface presentation capability, watchdog operation, or equivalent — must be treated as a security-relevant condition, not merely a reliability event.
+- **INV-012 — Planned Controls Are Not Effective Controls.** A specified but unimplemented security mechanism must never be represented as providing current protection.
+- **INV-013 — Mandatory Detection Does Not Depend on Accessibility.** The approved protected-app enforcement architecture must remain operational with Accessibility disabled. Accessibility may enhance detection responsiveness but must not be the sole required foreground-detection mechanism.
+- **INV-014 — Detection Failure Is Classified by Tier.** Loss of the mandatory baseline is an enforcement-security failure. Loss of the optional Accessibility enhancement is an enhancement degradation unless the baseline is also unavailable.
 
 **6.33 Security Architecture Failure Conditions**
 
@@ -1112,28 +953,30 @@ These conditions will serve as architectural predicates for later threat and sec
 
 **6.34 Architecture-to-Attack-Surface Relationship**
 
-The relationship between Sections 5 and 6 is intentionally one-to-one at the architectural level.
+The relationship between Sections 5 and 6 is intentionally one-to-one at the architectural level, with the detection attack surface explicitly separated into its baseline and optional tiers. Attack-surface identifiers are those established in TM v2 §5.2.
 
-| **Attack Surface**          | **Primary Security Boundary**      |
-|-----------------------------|------------------------------------|
-| MainActivity                | Application self-gate              |
-| LockScreenActivity          | Authentication boundary            |
-| AppDetectionService         | Foreground enforcement             |
-| ProtectionWatchdogService   | Protection-health monitoring       |
-| BootReceiver                | Reboot persistence                 |
-| UninstallProtectionReceiver | Device Admin                       |
-| Accessibility framework     | Foreground detection               |
-| Android Keystore            | Cryptographic root of trust        |
-| Private storage             | Sandbox + encryption               |
-| SQLCipher database          | Database confidentiality/integrity |
-| Encrypted file store        | Payload confidentiality/integrity  |
-| Authentication UI           | Credential authorization           |
-| Session state               | Runtime authorization              |
-| Lifecycle                   | Session/enforcement continuity     |
-| Notifications               | Information-disclosure boundary    |
-| Installation/update         | Software integrity                 |
+| Attack Surface | Primary Security Boundary |
+|----|----|
+| MainActivity | Application self-gate |
+| LockScreenActivity | Authentication boundary |
+| AppDetectionService (AS-003) | Optional Accessibility detection enhancement |
+| ProtectionWatchdogService | Protection-health monitoring |
+| BootReceiver | Reboot persistence |
+| UninstallProtectionReceiver | Device Admin |
+| UsageStatsManager / Usage Access (AS-019) | Mandatory baseline foreground detection |
+| Baseline lock-interface presentation mechanism (AS-020) | Lock-interface presentation boundary |
+| Accessibility framework (AS-007) | Optional enhancement foreground detection and peer-service boundary |
+| Android Keystore | Cryptographic root of trust |
+| Private storage | Sandbox + encryption |
+| SQLCipher database | Database confidentiality/integrity |
+| Encrypted file store | Payload confidentiality/integrity |
+| Authentication UI | Credential authorization |
+| Session state | Runtime authorization |
+| Lifecycle | Session/enforcement continuity |
+| Notifications | Information-disclosure boundary |
+| Installation/update | Software integrity |
 
-This mapping provides the foundation for the threat/control traceability established later.
+This mapping provides the foundation for threat/control traceability. The current implementation state must be distinguished from the approved target architecture wherever a target component (AS-019/AS-020, and the detection-source selection layer AS-021) has not yet been implemented.
 
 **6.35 Security Architecture Change Control**
 
@@ -1142,40 +985,23 @@ The architecture described here is locked to the approved baseline.
 A change to any of the following requires security-architecture impact assessment:
 
 - Root of trust.
-
 - Credential architecture.
-
 - Database-key architecture.
-
 - Vault encryption architecture.
-
 - Authentication boundary.
-
 - Session model.
-
 - Protected-app enforcement path.
-
-- Accessibility detection mechanism.
-
+- Foreground-detection architecture, including the Usage Access baseline, optional Accessibility enhancement, detection-source selection, and lock-interface presentation mechanism.
 - Watchdog/recovery architecture.
-
 - Boot persistence.
-
 - Device Admin usage.
-
 - Exported components.
-
 - Android permissions forming security boundaries.
-
 - Storage architecture.
-
 - Backup/restore architecture.
-
 - Runtime authorization model.
 
-A change must not be incorporated into the Threat Model merely by editing this section.
-
-The corresponding architectural decision, requirement, implementation, and traceability artifacts must be updated through the project's approved change-control process.
+A change must not be incorporated into the Threat Model merely by editing this section. The corresponding architectural decision, requirement, implementation, and traceability artifacts must be updated through the project's approved change-control process.
 
 **6.36 Section 6 Boundary**
 

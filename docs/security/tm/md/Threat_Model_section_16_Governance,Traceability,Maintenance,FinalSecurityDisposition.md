@@ -302,34 +302,24 @@ A prior verification result SHALL be reassessed when the implementation, depende
 
 **16.10 ADR Relationship**
 
-Architecture Decision Records SHALL be used for material architectural decisions affecting the security model.
-
-The Threat Model SHALL reference applicable ADRs involving:
+Architecture Decision Records SHALL be used for material architectural decisions affecting the security model. The Threat Model SHALL reference applicable ADRs involving:
 
 - trust boundaries;
-
 - authentication;
-
 - authorization;
-
 - cryptography;
-
 - key management;
-
 - secure storage;
-
 - enforcement;
-
-- Accessibility Service architecture;
-
+- the mandatory UsageStatsManager / Usage Access baseline detection architecture;
+- the optional Accessibility enhancement architecture;
+- detection-source selection and Trigger Processor integration;
+- the mechanism used to present the lock interface from a background context;
+- detection-tier health monitoring and failure semantics;
 - Device Admin;
-
 - security-sensitive IPC;
-
 - recovery;
-
 - security assumptions;
-
 - material security tradeoffs.
 
 The Threat Model SHALL record the security consequence of the decision but SHALL NOT duplicate the complete ADR.
@@ -562,101 +552,61 @@ Where project governance establishes controlled terminology, that terminology SH
 
 **16.18 Security Assumption Governance**
 
-Security assumptions SHALL be explicit.
-
-Each material assumption SHALL identify:
-
-- what is trusted;
-
-- why it is trusted;
-
-- what security property depends on it;
-
-- what happens if it fails;
-
-- whether that failure is in scope;
-
-- applicable mitigation;
-
-- reassessment trigger.
+Security assumptions SHALL be explicit. Each material assumption SHALL identify: what is trusted; why it is trusted; what security property depends on it; what happens if it fails; whether that failure is in scope; applicable mitigation; and its reassessment trigger.
 
 For this Threat Model, material assumptions include the trust placed in:
 
 - Android Keystore;
-
 - Android application sandbox;
-
 - Android package-management integrity;
-
 - Device Admin framework;
-
-- Accessibility framework;
-
+- UsageStatsManager and the Usage Access special-permission framework;
+- the foreground-service lifecycle used by the baseline detector;
+- the approved mechanism used to present the lock interface from a background context;
+- the detection-source selection and Trigger Processor path;
+- the optional Accessibility framework when the enhancement tier is enabled;
 - trusted device authentication mechanisms;
-
 - legitimate owner authority.
 
-Assumptions SHALL NOT remain hidden dependencies of the security model.
+Assumptions SHALL NOT remain hidden dependencies of the security model. The Threat Model SHALL distinguish assumptions supporting the required baseline detection path from assumptions supporting the optional Accessibility enhancement. Failure of an enhancement-tier assumption SHALL NOT automatically be treated as failure of the complete enforcement architecture when the baseline path remains healthy.
 
 **16.19 Trust-Boundary Governance**
 
-Changes that introduce, remove, or materially alter a trust boundary SHALL trigger security analysis.
-
-The Threat Model SHALL maintain explicit consideration of the boundaries between:
+Changes that introduce, remove, or materially alter a trust boundary SHALL trigger security analysis. The Threat Model SHALL maintain explicit consideration of the boundaries between:
 
 - unauthenticated and authenticated App Lock state;
-
 - App Lock and protected third-party applications;
-
 - App Lock and other applications;
-
 - App Lock private storage and external actors;
-
 - application code and Android Keystore;
-
-- App Lock and Accessibility framework;
-
+- App Lock and UsageStatsManager / Usage Access;
+- the baseline detector and the detection-source selection / Trigger Processor path;
+- App Lock and the lock-interface presentation mechanism, including any overlay or background-activity-launch capability;
+- App Lock and the optional Accessibility framework;
 - App Lock and Device Admin framework;
-
 - App Lock and boot/watchdog mechanisms;
+- App Lock UI and potentially hostile UI overlays or peer accessibility services.
 
-- App Lock UI and potentially hostile UI overlays or accessibility services.
-
-A new communication path crossing a security boundary SHALL not be treated as an ordinary implementation detail.
+A new communication path crossing a security boundary SHALL NOT be treated as an ordinary implementation detail. The required baseline path and the optional Accessibility enhancement SHALL remain separately identifiable so that a failure or compromise of one path is not silently attributed to the other.
 
 **16.20 Assumption Failure**
 
-If a security assumption becomes invalid, affected threats SHALL be reassessed.
-
-Examples include:
+If a security assumption becomes invalid, affected threats SHALL be reassessed. Examples include:
 
 - material Android platform behavior changes;
-
 - Keystore behavior changes;
-
 - application-sandbox assumptions changing;
-
+- UsageStatsManager or Usage Access behavior changing;
+- foreground-service lifecycle or execution restrictions changing;
+- the approved lock-interface presentation mechanism becoming unavailable or materially restricted;
+- detection-source selection or Trigger Processor assumptions changing;
 - Accessibility framework behavior changing;
-
 - Device Admin behavior changing;
-
 - security-relevant platform restrictions changing.
 
-The reassessment SHALL determine whether the change:
+The reassessment SHALL determine whether the change: invalidates a control; increases risk; introduces a new threat; changes a trust boundary; requires an ADR; requires security testing; or requires phase reassessment.
 
-- invalidates a control;
-
-- increases risk;
-
-- introduces a new threat;
-
-- changes a trust boundary;
-
-- requires an ADR;
-
-- requires security testing;
-
-- requires phase reassessment.
+Failure of an optional Accessibility assumption SHALL be analyzed as an enhancement-tier failure when the mandatory baseline remains operational. Failure of a baseline detection, permission, presentation, or Trigger Processor assumption SHALL remain security-significant because it may affect core enforcement availability.
 
 **16.21 Cross-Document Synchronization**
 
@@ -753,111 +703,83 @@ Previous evidence SHALL remain historically valid for the state in which it was 
 Threat Model reassessment SHALL occur when any of the following occurs:
 
 - a security requirement is added, removed, or materially changed;
-
 - a security control is added, removed, or materially changed;
-
 - authentication architecture changes;
-
 - authorization architecture changes;
-
 - cryptographic or key-management behavior changes;
-
 - protected storage changes;
-
 - the enforcement mechanism changes;
-
-- the Accessibility detection approach changes;
-
+- the baseline UsageStatsManager / Usage Access detection approach changes;
+- the optional Accessibility enhancement approach changes;
+- the detection-source selection or Trigger Processor integration changes;
+- the mechanism used to present the lock interface from a background context changes;
+- the required detection, presentation, or permission health model changes;
 - a security-critical dependency changes;
-
 - a security-relevant ADR is introduced or superseded;
-
 - a material security defect is discovered;
-
 - a penetration test identifies a new finding;
-
 - a material Android platform change affects a security assumption;
-
 - a trust boundary changes;
-
 - a phase security gate is reached;
-
 - a previously accepted risk materially changes;
-
 - a previously established security assumption becomes questionable.
 
 These triggers make Threat Model reassessment an explicit lifecycle requirement rather than an ad-hoc judgment.
 
 **16.25 Historical Security Failures**
 
-Previously discovered security failures SHALL remain part of the Threat Model's historical evidence when they provide meaningful information about attack paths or control effectiveness.
-
-The preserved historical cases include:
+Previously discovered security failures SHALL remain part of the Threat Model's historical evidence when they provide meaningful information about attack paths or control effectiveness. The preserved historical cases include:
 
 - self-gate bypass;
-
 - fast-relaunch bypass;
-
 - fast-switch relock defect;
-
 - release-build cryptographic dependency failure;
-
 - historical plaintext database storage;
+- force-stop and Accessibility availability limitations affecting the current Accessibility-only implementation.
 
-- force-stop/accessibility availability limitation.
+The approved two-tier target architecture SHALL NOT erase or retrospectively reclassify the historical Accessibility-only failure mode as though it never existed. The historical finding SHALL remain traceable to the implementation state in which it was observed. After the two-tier architecture is implemented, future failures SHALL be classified according to the affected path: mandatory baseline detection, optional Accessibility enhancement, detection-source selection, Trigger Processor, or lock-interface presentation.
 
-A fixed vulnerability SHALL remain traceable to the control that corrected it and the verification evidence demonstrating the correction.
-
-Historical failures SHALL not be removed simply because they are no longer reproducible.
+A fixed vulnerability SHALL remain traceable to the control that corrected it and the verification evidence demonstrating the correction. Historical failures SHALL NOT be removed simply because they are no longer reproducible.
 
 **16.26 Known Residual Risks**
 
-The Threat Model SHALL distinguish resolved vulnerabilities from residual risks that remain accepted or incompletely mitigated.
+The Threat Model SHALL distinguish resolved vulnerabilities from residual risks that remain accepted or incompletely mitigated. The current security analysis identifies, at minimum:
 
-The current security analysis identifies, at minimum:
+1.  The delivered implementation continues to rely on Accessibility-based detection until the approved two-tier architecture is implemented and verified.
+2.  Accessibility can appear enabled while expected event delivery is not functioning, affecting the current implementation and the future optional enhancement tier.
+3.  Force-stop, process termination, foreground-service restrictions, and OEM behavior can interrupt detection or enforcement components.
+4.  The approved target architecture depends on the baseline UsageStatsManager / Usage Access detector remaining permitted, operational, and sufficiently timely.
+5.  Loss, revocation, or silent failure of Usage Access or the baseline detector can cause fail-open enforcement if not detected and handled.
+6.  The mechanism used to present the lock interface from a background context remains an implementation decision and may introduce permission, lifecycle, background-launch, overlay, or tapjacking risks.
+7.  Detection-source selection, Trigger Processor, or lock-engine integration defects can prevent a valid foreground transition from producing enforcement.
+8.  A malicious overlay can obscure the authentication UI.
+9.  Peer accessibility services can observe or inject UI interaction.
+10. Root or system compromise lies below the application's guaranteed trust boundary.
+11. Vault and database encryption keys are independent of the user's PIN.
+12. Keystore invalidation currently lacks a recovery path.
+13. Several security-hardening controls and the approved two-tier detection controls remain planned rather than implemented or security-verified.
 
-1.  Accessibility-based enforcement can fail or become unavailable.
-
-2.  Accessibility can be enabled while event delivery is not functioning as expected.
-
-3.  Force-stop and platform/OEM behavior can interrupt enforcement.
-
-4.  The enforcement architecture can fail open when detection disappears.
-
-5.  A malicious overlay can obscure the authentication UI.
-
-6.  Peer accessibility services can observe or inject UI interaction.
-
-7.  Root/system compromise lies below the application's trust boundary.
-
-8.  Vault and database encryption keys are independent of the user's PIN.
-
-9.  Keystore invalidation currently lacks a recovery path.
-
-10. Several security-hardening controls remain planned rather than implemented.
-
-These conditions SHALL NOT be represented as resolved merely because other controls are functioning.
+These conditions SHALL NOT be represented as resolved merely because other controls are functioning. The target architecture and the current delivered implementation SHALL remain separately represented. Approval of the target architecture SHALL NOT reduce current implementation risk until the required controls are implemented and supported by appropriate security-verification evidence.
 
 **16.27 Planned Controls**
 
-Controls that are specified but not implemented SHALL remain explicitly identified as planned or not-started.
+Controls that are specified but not implemented SHALL remain explicitly identified as planned or not-started. In particular, the Threat Model SHALL NOT treat the following as effective mitigations until implementation and appropriate verification evidence exist:
 
-In particular, the Threat Model SHALL NOT treat the following as effective mitigations until implementation and appropriate verification evidence exist:
-
+- the mandatory UsageStatsManager / Usage Access baseline detector;
+- the baseline foreground-service sampling and lifecycle implementation;
+- the detection-source selection layer;
+- the common Trigger Processor integration for both detection tiers;
+- the approved lock-interface presentation mechanism for the baseline tier;
+- baseline permission, detector, presentation, and health monitoring;
+- the optional Accessibility enhancement integrated as a non-mandatory detection source;
+- tier-specific fallback and degradation behavior;
 - root detection;
-
 - root response;
-
 - tamper detection;
-
 - debug protection;
-
 - anti-tapjacking/overlay-obscure defense;
-
 - Keystore-invalidation recovery;
-
 - security-specific audit-log tamper evidence;
-
 - other security controls identified as not-started by the authoritative RTM.
 
 Planned functionality MAY reduce future risk, but SHALL NOT reduce the current risk rating merely because it is scheduled.
@@ -1102,23 +1024,17 @@ Possession of the underlying encryption keys is a separate security boundary.
 
 **16.32.5 Detection and Enforcement Architecture**
 
-Foreground detection is implemented as a **two-tier detection architecture**.
+Foreground detection is governed by an approved two-tier target architecture. The target architecture has been approved, but its corresponding implementation and security verification have not yet been completed.
 
-The **baseline tier** is the mandatory detection path and is designed to permit App Lock to function without Accessibility being enabled.
-
-The baseline tier uses:
+The baseline tier is the mandatory detection path and is designed to permit App Lock to function without Accessibility being enabled. The baseline tier uses:
 
 - Android UsageStatsManager;
-
-- the Android **Usage Access** special permission;
-
+- the Android Usage Access special permission;
 - a foreground service that samples usage events to identify the current foreground application.
 
-Because presenting the lock interface from a background context is subject to Android background-activity-launch restrictions, the baseline tier also requires an approved mechanism for presenting the lock interface. The architecture currently identifies the use of **display-over-other-apps / system alert window permission** as the expected mechanism, either for overlay presentation or for obtaining the applicable activity-launch exemption.
+Because presenting the lock interface from a background context is subject to Android background-activity-launch restrictions, the baseline tier also requires an approved mechanism for presenting the lock interface. The architecture currently identifies display-over-other-apps / system-alert-window capability as the expected mechanism, either for overlay presentation or for obtaining the applicable activity-launch exemption. The final implementation decision between those presentation approaches remains an implementation decision for the Core Security Platform phase and SHALL be recorded through the applicable architecture-governance process.
 
-The final implementation decision between those presentation approaches remains an implementation decision for the Core Security Platform phase.
-
-The baseline tier SHALL remain operational when Accessibility is disabled.
+When implemented, the baseline tier SHALL remain operational when Accessibility is disabled. Until implementation and verification are complete, the delivered build remains Accessibility-only, and the approved baseline tier SHALL NOT be represented as an effective current mitigation.
 
 **16.32.6 Optional Accessibility Enhancement**
 
@@ -1478,9 +1394,15 @@ The PIN is not used as the encryption key for the vault or database.
 
 **16.34.4 Enforcement Boundary**
 
-Continuous Accessibility-based detection is a security-critical availability dependency.
+The approved target enforcement boundary depends on the mandatory UsageStatsManager / Usage Access baseline detector, its required permission and lifecycle, the approved lock-interface presentation mechanism, and the common Trigger Processor and lock-engine path.
 
-Loss of that mechanism can result in fail-open enforcement and therefore constitutes a security concern rather than an ordinary reliability issue.
+Accessibility is an optional enhancement and SHALL NOT be a prerequisite for core protected-application locking in the approved target architecture.
+
+Loss or failure of the optional Accessibility enhancement alone SHALL result in degradation to the baseline detection path when that path remains healthy; it SHALL NOT, by itself, constitute complete loss of App Lock protection.
+
+Loss, revocation, silent failure, or unacceptable degradation of the mandatory baseline detector, its Usage Access permission, its presentation mechanism, the detection-source selection layer, the Trigger Processor, or the lock-engine integration can result in fail-open enforcement and therefore constitutes a security concern rather than an ordinary reliability issue.
+
+The current delivered implementation remains Accessibility-only until the approved two-tier architecture is implemented and security-verified. Accessibility therefore remains a hard availability dependency of the current implementation, and the associated current-state risk SHALL remain open until the migration is complete and supported by evidence.
 
 **16.34.5 Platform Boundary**
 

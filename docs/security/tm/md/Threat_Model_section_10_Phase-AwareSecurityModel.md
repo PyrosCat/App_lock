@@ -677,42 +677,26 @@ A previously verified requirement SHALL NOT retain its verification status solel
 Threat Model reassessment SHALL occur when any of the following occurs:
 
 - a security control changes;
-
 - a security-relevant architectural decision changes;
-
 - authentication changes;
-
 - authorization changes;
-
-- cryptographic/key handling changes;
-
-- protected-app detection changes;
-
-- accessibility architecture changes;
-
+- cryptographic or key-handling changes;
+- the protected-application foreground-detection architecture changes;
+- a detection source is added, removed, reprioritized, or assigned different failure behavior;
+- UsageStatsManager, Usage Access, the baseline sampling service, or baseline detector-health logic changes;
+- the lock-interface presentation mechanism changes, including a change between overlay presentation and an activity-launch path;
+- the optional Accessibility enhancement, its permission model, or its event-processing behavior changes;
+- detection-source selection or Trigger Processor integration changes;
 - a security-sensitive dependency changes;
-
-- a security requirement is added;
-
-- a security requirement is removed;
-
+- a security requirement is added or removed;
 - a trust boundary changes;
-
-- a new exported component is introduced;
-
-- a sensitive data store changes;
-
-- a new attack surface is introduced;
-
-- a major Android platform version changes security behavior;
-
+- a new exported component, sensitive data store, or attack surface is introduced;
+- a major Android platform version changes relevant detection, foreground-service, background-launch, overlay, permission, or Accessibility behavior;
 - a phase security gate is reached;
-
 - penetration testing identifies a previously unknown threat;
-
 - a material security incident or bypass occurs.
 
-These triggers convert Threat Model reassessment from an informal judgment into a controlled lifecycle activity.
+These triggers convert Threat Model reassessment from an informal judgment into a controlled lifecycle activity and ensure that changes to either detection tier are evaluated without treating the optional Accessibility enhancement as the sole enforcement dependency.
 
 **10.20 Change-Control Relationship**
 

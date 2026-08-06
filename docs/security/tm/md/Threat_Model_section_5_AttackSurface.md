@@ -14,17 +14,19 @@ The inventory is based on the current implementation and manifest configuration 
 
 **5.2 Attack Surface Inventory**
 
+The inventory describes the current implementation and, for traceability, the approved target-architecture surfaces marked *planned*. The current delivered build uses AppDetectionService and the Android Accessibility framework for foreground detection. The approved target architecture additionally introduces Usage Access and UsageStatsManager as the baseline detection path and retains Accessibility as an optional enhancement.
+
 The principal security-relevant attack surfaces are:
 
 | **ID** | **Surface** | **Type** | **Security Significance** |
 |----|----|----|----|
 | AS-001 | MainActivity | Activity | Primary application UI and application self-gate entry point |
 | AS-002 | LockScreenActivity | Activity | Authentication boundary for protected applications |
-| AS-003 | AppDetectionService | Accessibility Service | Foreground-app detection and enforcement trigger |
+| AS-003 | AppDetectionService | Accessibility Service | Current foreground-app detection and approved optional enhancement |
 | AS-004 | ProtectionWatchdogService | Foreground Service | Protection-health monitoring and recovery signaling |
 | AS-005 | BootReceiver | BroadcastReceiver | Boot-time protection re-arm |
 | AS-006 | UninstallProtectionReceiver | Device Admin Receiver | Uninstall-protection framework boundary |
-| AS-007 | Android Accessibility framework | Framework interface | Service binding and foreground event delivery |
+| AS-007 | Android Accessibility framework | Framework interface | Current detection interface and approved optional enhancement |
 | AS-008 | Device Admin framework | Framework interface | Administrative/uninstall protection |
 | AS-009 | Android Keystore | Cryptographic interface | Root of trust for protected key material |
 | AS-010 | App-private storage | Storage boundary | Database, encrypted files, preferences, and application state |
@@ -36,8 +38,13 @@ The principal security-relevant attack surfaces are:
 | AS-016 | Android lifecycle and process management | Lifecycle surface | Process death, force-stop, reboot, and recovery behavior |
 | AS-017 | Application notifications | Observable surface | Security-relevant externally visible information |
 | AS-018 | Application installation/update boundary | Package surface | Application artifact and dependency integrity |
+| AS-019 | UsageStatsManager / Usage Access | Framework interface + special permission | Baseline foreground detection *(planned — target architecture)* |
+| AS-020 | Baseline lock-interface presentation mechanism | UI / window surface | Baseline lock-screen presentation via overlay or activity-launch exemption *(planned — target architecture)* |
+| AS-021 | Detection-source selection layer | Runtime component | Selects the active detection tier *(planned — target architecture)* |
 
 The inventory is deliberately broader than the six manifest components because security-relevant interfaces also exist through Android services, storage, lifecycle behavior, and cryptographic facilities.
+
+AS-019 through AS-021 describe the approved target architecture and are marked *planned*. They are inventoried here so that target-architecture threats can trace to a stable attack-surface identifier per §5.30. They receive full security classification when implemented and security-verified.
 
 **5.3 Component Inventory**
 
@@ -189,7 +196,7 @@ exported="false" reduces IPC exposure but does not eliminate attacks against the
 
 **5.6 AS-003 — AppDetectionService**
 
-AppDetectionService is the Accessibility Service responsible for detecting foreground application transitions.
+AppDetectionService is the current Accessibility Service responsible for foreground-application detection. In the approved architecture, this component becomes the **optional Accessibility enhancement tier** rather than the mandatory detection mechanism.
 
 **Exposure**
 
@@ -203,21 +210,11 @@ The Android Accessibility framework is responsible for binding the service.
 
 **Security-Relevant Functions**
 
-The service:
-
-1.  Receives Accessibility events.
-
-2.  Identifies the foreground application.
-
-3.  Passes foreground information to the application lock engine.
-
-4.  Causes the authorization policy to be evaluated.
-
-5.  Initiates the lock-screen path when authentication is required.
+In the current implementation, the service (1) receives Accessibility events, (2) identifies the foreground application, (3) passes foreground information to the application lock engine, (4) causes authorization policy to be evaluated, and (5) initiates the lock-screen path when authentication is required. In the approved architecture, these functions remain valid for the optional Accessibility tier; the baseline enforcement path is provided separately through Usage Access and UsageStatsManager (AS-019).
 
 **Security Boundary**
 
-This component forms a critical boundary between:
+In the current implementation, this component forms the boundary:
 
 Android Accessibility Framework
 
@@ -239,13 +236,15 @@ ApplicationLockEngine
 
 LockScreenActivity
 
+The approved architecture changes the overall model so that two detection sources converge on a common enforcement path:
+
+Usage Access / UsageStatsManager → Detection Selection → Trigger Processor → ApplicationLockEngine → LockScreenActivity
+
+Accessibility / AppDetectionService → Detection Selection → Trigger Processor → ApplicationLockEngine → LockScreenActivity
+
 **Security Significance**
 
-The service is not merely a convenience feature.
-
-Its continuous availability is part of the protected-application enforcement mechanism.
-
-Loss of the service can therefore become a confidentiality and integrity issue if protected applications can subsequently be opened without App Lock authentication.
+The service remains security-relevant because its availability affects the optional enhancement tier and because Accessibility capabilities can affect authentication-UI integrity. However, under the approved architecture, loss of AppDetectionService SHALL NOT by itself constitute loss of core App Lock enforcement.
 
 **Relevant Attack Surface**
 
@@ -285,27 +284,27 @@ The service is:
 
 **Security-Relevant Functions**
 
-The watchdog:
+The watchdog SHALL monitor the health of the active baseline enforcement path and, where applicable, the optional Accessibility enhancement. Its security-relevant monitoring responsibilities include:
 
-- Monitors whether App Lock's protection mechanism remains enabled.
+- baseline Usage Access availability (AS-019);
 
-- Checks Accessibility availability.
+- baseline detector health;
 
-- Detects certain protection-loss conditions.
+- lock-interface presentation capability (AS-020);
 
-- Records protection-disabled events.
+- Accessibility availability when the enhancement is enabled (AS-003/AS-007);
 
-- Raises a high-priority notification when intervention is required.
+- protection-loss conditions;
 
-- Provides a recovery path into Android settings.
+- lifecycle and restart conditions.
+
+The watchdog also records protection-disabled events, raises a high-priority notification when intervention is required, and provides a recovery path into Android settings.
 
 **Security Significance**
 
-The watchdog is part of the application's availability/security monitoring architecture.
+The watchdog is part of the application's availability/security monitoring architecture. It does not itself provide the primary foreground-app detection mechanism; its security significance comes from its ability to detect or report loss of that mechanism.
 
-It does not itself provide the primary foreground-app detection mechanism.
-
-Its security significance comes from its ability to detect or report loss of that mechanism.
+The watchdog must distinguish between loss of a required baseline control, loss of an optional enhancement, and inability to determine detector health. A missing Accessibility enhancement SHALL NOT be reported as total loss of App Lock protection when the baseline path remains healthy.
 
 **Relevant Attack Surface**
 
@@ -395,9 +394,7 @@ Device Admin therefore represents an availability and integrity boundary rather 
 
 **5.10 AS-007 — Accessibility Framework Interface**
 
-The Android Accessibility framework is a major external interface.
-
-App Lock depends on it to receive foreground-app events.
+The Android Accessibility framework is an external security-relevant interface. In the current implementation, App Lock uses it for foreground-app detection. In the approved architecture, it becomes an optional detection interface that may provide faster event-driven foreground detection when explicitly enabled by the user.
 
 **Security-Relevant Inputs**
 
@@ -413,21 +410,17 @@ Potential inputs include:
 
 - Platform restrictions affecting accessibility.
 
+- Interactions with peer Accessibility Services.
+
 **Security-Relevant Outputs**
 
-App Lock uses these inputs to determine which application is currently foregrounded and whether authentication is required.
+When the Accessibility enhancement is active, App Lock uses these inputs to identify foreground transitions and submit detection information to the common enforcement path.
 
 **Attack Surface Characteristics**
 
-The framework introduces both:
+The framework introduces an optional detection dependency; UI-observation and event-injection capabilities that may be available to peer Accessibility Services; platform and OEM availability limitations; and potential silent failure of the event stream, in which a service may appear enabled while the expected event stream is absent.
 
-- Availability dependencies.
-
-- Interaction with other Accessibility Services.
-
-A service may appear enabled while the expected event stream is absent.
-
-This distinction is important and must remain explicit throughout later threat analysis.
+The Accessibility interface SHALL therefore remain a security-relevant attack surface, but it SHALL NOT be represented as the mandatory App Lock enforcement dependency in the approved architecture. This distinction is important and must remain explicit throughout later threat analysis.
 
 **5.11 AS-008 — Device Admin Framework Interface**
 
@@ -924,6 +917,16 @@ These classifications identify the security significance of each surface. They d
 
 Threat severity is determined through the risk methodology established elsewhere in the Threat Model.
 
+The current-implementation classification remains applicable to the current Accessibility path (AS-003/AS-007). For the approved target architecture, the following surfaces require equivalent security classification when implemented:
+
+| **Surface** | **Confidentiality** | **Integrity** | **Availability** |
+|----|---:|---:|---:|
+| AS-019 UsageStatsManager / Usage Access | Medium | High | Critical |
+| AS-020 Baseline lock-interface presentation mechanism | High | Critical | Critical |
+| AS-003/AS-007 Accessibility enhancement | Medium | High | Medium/High |
+
+The final classification of the presentation mechanism (AS-020) SHALL be confirmed when the implementation decision between overlay presentation and the applicable activity-launch mechanism is made.
+
 **5.26 Attack Surface Change Rules**
 
 The following changes constitute attack-surface changes and require Threat Model impact assessment:
@@ -968,6 +971,20 @@ The following changes constitute attack-surface changes and require Threat Model
 
 - Adding a third-party component with access to security-sensitive data.
 
+In addition to the existing change triggers, the following changes constitute attack-surface changes and require Threat Model impact assessment:
+
+- adding, removing, or replacing a foreground-detection source;
+
+- changing the required/optional status of Accessibility;
+
+- introducing or changing the Usage Access requirement;
+
+- changing the lock-interface presentation mechanism (overlay or activity-launch);
+
+- changing detection-source selection behavior.
+
+The existing trigger "changing Accessibility behavior" remains applicable to the optional enhancement tier.
+
 A change to any of these surfaces must not be considered documentation-only.
 
 **5.27 Planned Versus Effective Attack-Surface Controls**
@@ -998,6 +1015,31 @@ This distinction is particularly important for currently planned or incomplete c
 
 Their existence in requirements does not remove the corresponding attack surface.
 
+The following approved architectural controls SHALL NOT be represented as effective controls until implemented and security-verified:
+
+- UsageStatsManager-based baseline foreground detection (AS-019);
+
+- Usage Access permission monitoring;
+
+- baseline detection-health verification;
+
+- baseline lock-interface presentation mechanism (AS-020);
+
+- detection-source selection (AS-021);
+
+- two-tier Trigger Processor integration.
+
+Accessibility remains implemented in the current build, but its role changes under the approved architecture from mandatory detection dependency to optional enhancement. The following states remain distinct:
+
+| **Control** | **Current State** | **Target State** |
+|----|----|----|
+| Accessibility detection (AS-003/AS-007) | Implemented / current detection mechanism | Optional enhancement |
+| Usage Access detection (AS-019) | Not implemented | Mandatory baseline |
+| Detection-source selection (AS-021) | Not implemented | Required |
+| Baseline health monitoring | Not implemented | Required |
+| Accessibility health monitoring | Current monitoring exists | Enhancement health monitoring |
+| Common Trigger Processor path | Existing lock architecture | Shared by both detection tiers |
+
 **5.28 Historical Attack-Surface Findings**
 
 The following historical failures demonstrate attack-surface exposure in lifecycle and navigation behavior:
@@ -1010,7 +1052,9 @@ The following historical failures demonstrate attack-surface exposure in lifecyc
 
 4.  **Plaintext database exposure** — earlier database storage did not provide the current encrypted-at-rest boundary before migration.
 
-5.  **Force-stop availability limitation** — terminating App Lock can interrupt the Accessibility-based enforcement path.
+5.  **Force-stop availability limitation** — terminating App Lock can interrupt the current Accessibility-based enforcement path.
+
+Finding 5 must be interpreted according to implementation state. For the current delivered build, force-stop can interrupt the Accessibility-based enforcement path. For the approved target architecture, the corresponding threat becomes interruption or failure of the **baseline detection and enforcement path**; loss of the optional Accessibility enhancement alone does not constitute the equivalent failure.
 
 These findings are retained as attack-surface evidence.
 

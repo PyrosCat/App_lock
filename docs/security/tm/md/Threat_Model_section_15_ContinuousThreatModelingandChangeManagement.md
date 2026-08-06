@@ -114,67 +114,21 @@ A change affecting authentication, cryptography, trust boundaries, enforcement, 
 
 Threat Model reassessment SHALL be triggered by material changes involving:
 
-- security requirements;
+- security requirements or functional requirements with security implications;
+- removed or modified requirements;
+- architecture or detailed design affecting security boundaries;
+- implementation, removal, or replacement of security controls;
+- authentication, authorization, session handling, key management, encryption, or secure storage;
+- the lock-enforcement mechanism;
+- the foreground-detection architecture, including UsageStatsManager, Usage Access, baseline sampling, detection-source selection, Trigger Processor routing, or detector health;
+- the lock-interface presentation mechanism or its required permission;
+- optional Accessibility Service usage or behavior;
+- exported components, permissions, administrative protections, recovery, backup, or deployment;
+- security-relevant dependencies;
+- Android platform, Android version, OEM behavior, foreground-service, background-launch, overlay, or permission behavior;
+- security defects, penetration-test findings, newly discovered attack techniques, or material phase-gate changes.
 
-- functional requirements with security implications;
-
-- removed requirements;
-
-- modified requirements;
-
-- architecture;
-
-- detailed design affecting security boundaries;
-
-- implementation of security controls;
-
-- removal of security controls;
-
-- changes to authentication;
-
-- changes to authorization;
-
-- changes to session handling;
-
-- changes to key management;
-
-- changes to encryption;
-
-- changes to secure storage;
-
-- changes to the lock-enforcement mechanism;
-
-- changes to Accessibility Service usage;
-
-- changes to exported Android components;
-
-- changes to permissions;
-
-- changes to administrative protections;
-
-- changes to recovery mechanisms;
-
-- changes to backup behavior;
-
-- changes to dependencies with security relevance;
-
-- Android platform behavior;
-
-- Android version support;
-
-- OEM behavior affecting enforcement;
-
-- deployment architecture;
-
-- security defects;
-
-- penetration-test findings;
-
-- newly discovered attack techniques;
-
-- material changes to implementation phase or phase gates.
-
-These triggers SHALL be interpreted according to their actual effect on the security model.
+These triggers SHALL be interpreted according to their actual effect on the current implementation and approved target architecture.
 
 **15.5 Security Requirement Changes**
 
@@ -236,53 +190,19 @@ Security Tests
 
 **15.6 Architecture Changes**
 
-Architectural changes SHALL receive security-impact analysis before implementation where the change affects a security boundary.
-
-Examples include:
+Architectural changes SHALL receive security-impact analysis before implementation where the change affects a security boundary. Examples include:
 
 - introducing or removing a security service;
-
 - changing the lock engine;
+- adding, removing, or reprioritizing a foreground-detection source;
+- changing the UsageStatsManager/Usage Access baseline, sampling service, source-selection layer, or Trigger Processor integration;
+- changing the optional Accessibility enhancement;
+- changing the lock-interface presentation mechanism;
+- changing authentication, storage, encryption, key management, IPC, dependencies, network connectivity, or recovery architecture.
 
-- changing the Accessibility Service architecture;
+The Threat Model SHALL identify whether the change creates a new threat, changes an attack path, invalidates a control, changes a trust boundary or attacker assumption, changes residual risk, or invalidates verification evidence.
 
-- changing the authentication architecture;
-
-- changing storage architecture;
-
-- changing encryption architecture;
-
-- changing key-management architecture;
-
-- introducing a new IPC path;
-
-- changing exported components;
-
-- introducing a new external dependency;
-
-- introducing network connectivity;
-
-- changing recovery architecture.
-
-The Threat Model SHALL identify whether the change:
-
-1.  creates a new threat;
-
-2.  changes an existing attack path;
-
-3.  invalidates an existing control;
-
-4.  changes a trust boundary;
-
-5.  changes attacker capability assumptions;
-
-6.  changes residual risk.
-
-The Threat Model SHALL inform architecture decisions.
-
-It SHALL NOT silently rewrite the TAS, SDS, DDS, or other authoritative architecture documentation.
-
-Where the change represents an architectural deviation, the applicable project governance and ADR process SHALL be followed.
+The Threat Model SHALL inform architecture decisions but SHALL NOT silently rewrite the TAS, SDS, DDS, or other authoritative documents. Architectural deviations SHALL follow the applicable governance and ADR process.
 
 **15.7 Security-Control Changes**
 
@@ -492,85 +412,32 @@ However, affected controls SHALL be identified and reassessed based on actual im
 
 **15.13 Android Platform Changes**
 
-Android platform changes SHALL be treated as potential security-model changes.
+Android platform changes SHALL be treated as potential security-model changes. Reassessment SHALL consider changes affecting:
 
-Reassessment SHALL consider changes affecting:
+- UsageStatsManager, usage-event availability, and Usage Access;
+- foreground-service execution and process-management restrictions;
+- background-activity-launch rules and applicable exemptions;
+- overlay permission and overlay behavior;
+- Accessibility Services and Restricted Settings;
+- boot behavior, package visibility, permissions, Device Admin, Keystore, biometric authentication, application sandboxing, backup, exported components, and task/activity behavior.
 
-- Accessibility Services;
+Major Android-version changes SHALL be considered a defined reassessment trigger. OEM-specific behavior SHALL also be reassessed where it can affect detection, presentation, enforcement availability, or recovery.
 
-- Restricted Settings;
+**15.14 Foreground-Detection and Enforcement Changes**
 
-- background execution;
+Because foreground detection is the trigger for App Lock enforcement, changes to either detection tier or the shared enforcement path SHALL receive elevated security review. The review SHALL consider:
 
-- foreground services;
+- Usage Access state and UsageStatsManager data availability;
+- sampling interval, latency, battery cost, and stale-data detection;
+- baseline foreground-service lifecycle, force-stop behavior, and OEM process management;
+- detection-source selection, source health, and Trigger Processor routing;
+- the selected lock-interface presentation mechanism and Android background-launch/overlay behavior;
+- optional Accessibility permission, service binding, event delivery, Restricted Settings, and silent failure;
+- watchdog operation, boot recovery, and resulting enforcement exposure.
 
-- boot behavior;
+The Threat Model SHALL preserve the distinction between permission granted, detector running, source responsive, data/events current, protected application detected, lock request routed, lock interface presented, and authorization actually enforced.
 
-- overlay restrictions;
-
-- package visibility;
-
-- permissions;
-
-- device-admin behavior;
-
-- Keystore;
-
-- biometric authentication;
-
-- application sandboxing;
-
-- backup behavior;
-
-- exported-component enforcement;
-
-- task and activity behavior.
-
-Major Android-version changes SHALL be considered a defined reassessment trigger.
-
-OEM-specific behavior SHALL also be reassessed where it can affect enforcement availability or recovery.
-
-**15.14 Accessibility Enforcement Changes**
-
-Because App Lock may depends on Accessibility Service behavior for foreground detection, changes to this mechanism SHALL receive elevated security review.
-
-The review SHALL consider:
-
-- event delivery;
-
-- service binding;
-
-- permission state;
-
-- Restricted Settings;
-
-- force-stop behavior;
-
-- OEM process management;
-
-- watchdog operation;
-
-- boot recovery;
-
-- silent event-delivery failure;
-
-- detection latency;
-
-- resulting enforcement exposure.
-
-The Threat Model SHALL preserve the distinction between:
-
-1.  accessibility permission being enabled;
-
-2.  the service being bound;
-
-3.  the service being alive;
-
-4.  events actually being delivered;
-
-5.  the lock engine receiving and acting on those events.
-
-A change that preserves only the first condition SHALL not automatically be considered equivalent security behavior.
+Loss of the optional Accessibility enhancement SHALL NOT be treated as total enforcement loss when the verified baseline remains healthy. A change that preserves only permission state SHALL NOT automatically be considered equivalent security behavior.
 
 **15.15 Cryptographic and Key-Management Changes**
 
@@ -1018,25 +885,20 @@ The review SHALL determine whether the finding affects:
 
 **15.29 Continuous Monitoring of Known Risks**
 
-Known risks SHALL remain monitored until formally closed or accepted.
+Known risks SHALL remain monitored until formally closed or accepted. Monitoring SHALL consider the defined review triggers for each risk.
 
-Monitoring SHALL consider the defined review triggers for each risk.
+For the current Accessibility-only implementation, relevant triggers include Android-version changes, Accessibility and Restricted Settings behavior, store-policy changes, force-stop/OEM behavior, and the Core Security and Release Readiness gates.
 
-For the accessibility-enforcement risk, relevant triggers include:
+For the approved target architecture, relevant triggers additionally include:
 
-- Android major-version changes;
+- UsageStatsManager or Usage Access behavior changes;
+- baseline sampling latency, battery, or health changes;
+- foreground-service and process-lifecycle changes;
+- detection-source selection or Trigger Processor changes;
+- lock-interface presentation or permission changes;
+- optional Accessibility enhancement behavior changes.
 
-- changes to the detection architecture;
-
-- changes to accessibility behavior;
-
-- store-policy changes;
-
-- Core Security gate;
-
-- Release Readiness gate.
-
-A risk with no current action SHALL still retain its status and review conditions.
+A risk with no current action SHALL still retain its status and review conditions. Approval of the target architecture SHALL NOT close the current implementation risk.
 
 **15.30 Document Synchronization**
 
@@ -1149,62 +1011,19 @@ The loop SHALL continue throughout implementation and release preparation.
 Section 15 is complete when:
 
 - Threat Modeling is defined as a continuous activity;
-
-- material change triggers are defined;
-
-- requirement changes trigger security-impact analysis;
-
-- architecture changes trigger security-impact analysis;
-
-- security-control changes trigger reassessment;
-
+- material requirement, architecture, security-control, dependency, platform, and phase-change triggers are defined;
 - previously verified controls can return to re-verification;
-
-- mitigated threats remain preserved;
-
-- previously mitigated threats can be reopened;
-
-- dependency changes are considered;
-
-- Android platform changes are considered;
-
-- Accessibility Service changes receive appropriate scrutiny;
-
-- cryptographic and key-management changes trigger reassessment;
-
-- authentication and authorization changes trigger reassessment;
-
-- recovery changes are treated as security changes;
-
-- phase transitions provide formal reassessment points;
-
+- mitigated threats remain preserved and can be reopened;
+- UsageStatsManager/Usage Access baseline changes receive appropriate scrutiny;
+- detection-source selection, Trigger Processor, health monitoring, and lock-interface presentation changes receive appropriate scrutiny;
+- optional Accessibility changes receive tier-appropriate scrutiny;
+- cryptographic, key-management, authentication, authorization, and recovery changes trigger reassessment;
 - temporary phase risks remain explicitly tracked;
-
-- security-impact classifications are defined;
-
-- change history is preserved;
-
-- traceability impact is assessed;
-
-- ADR impact is assessed;
-
-- Secure Coding Standard impact is assessed;
-
-- security-test impact is assessed;
-
-- residual risk is reassessed;
-
+- change history, traceability, ADR, Secure Coding Standard, security-test, and residual-risk impacts are assessed;
 - insufficient evidence is explicitly identified;
-
-- security defects trigger appropriate reassessment;
-
-- known risks retain review triggers;
-
+- security defects trigger reassessment and known risks retain review triggers;
 - affected engineering documents remain synchronized;
-
-- conflicting documents are not silently reconciled;
-
-- Threat Model version history is preserved.
+- conflicts are not silently reconciled and Threat Model history is preserved.
 
 **15.35 Boundary to Section 16**
 
