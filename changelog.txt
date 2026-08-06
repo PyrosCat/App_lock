@@ -4,6 +4,39 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Report — WP2 emulator matrix (API 26/29/33/35) + F4 race finding   (2026-07-23)
+-------------------------------------------------------------------------------
+Ran the turnkey WP2 harness on the full NucBox emulator matrix
+(matrix_api26/29/33/35) against 7173284. The lead's a32780b fixes are confirmed
+— setup provisioned fully (install/a11y/PIN/Clock) on every level. But a
+prevalent security race surfaced.
+
+- docs/reports/campaigns/2026-07-23_wp2-matrix_nucbox-g5.md — NEW immutable
+  consolidated report. Solid across the matrix: OV-3 IMMEDIATE relock 10/10
+  every run; F3 self-gate/FR-108 PASS every run; core lock/PIN works.
+- FINDING (F4/OV-4 rapid-relaunch race): the protected app intermittently
+  outraces the noHistory lock screen, left foreground with NO lock for 6-12 s.
+  Present on EVERY emulator level, high variance, NOT graded by API: focused
+  loop bypass rates API 26 ~30%, API 29 ~12%, API 33 ~37%, API 35 0/6 in-loop.
+  run_all -n 2 passed 29/33 and failed 26/35, but that pass/fail is largely
+  luck — focused loops caught real bypasses on 29 AND 33 too. API 35 on real
+  Moto G hardware was clean.
+- ROOT CAUSE (API-26 logcat): NOT a detection gap — engine received 5-8 a11y
+  events/burst and launched the lock screen every time; the relaunched window
+  wins the race vs LockScreenActivity (ApplicationLockEngine.kt:61/123). The
+  dominant correlate is slow-emulator timing (real hw clean at API 35), NOT
+  the API version; real slower/older hardware untested, so production severity
+  is unresolved (report §3). The -n 2 gate under-samples the race.
+- rtm.csv FR-108: verification extended to the matrix report; note records the
+  self-gate verified across API 26/29/33/35 emulators + API 35 real hw (f3
+  passed every run). The F4 race is a separate LOCK-ENGINE property, not FR-108
+  — flagged in the note, not conflated.
+- Recommended (not actioned): app-side F4-race fix (lock screen must win the
+  relaunch race); real-hardware OV-4 validation on a slower/older device to
+  settle emulator-artifact vs real exposure; RISK_REGISTER R-002; OV-4 burst
+  count so the gate stops under-sampling. Left to the harness/app owner.
+
+
 Risk R-001 — accessibility-detection production risk tracked   (2026-07-23)
 --------------------------------------------------------------------------
 Captured the accessibility-based-detection concerns surfaced by the Moto G
