@@ -4,6 +4,32 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Security — Threat Model (client, 16 sections) filed + converted   (2026-08-05)
+---------------------------------------------------------------------------
+The client-delivered Threat Model arrived as 16 .docx sections in "New docs/".
+Filed into the governed layout, converted to Markdown, and analyzed.
+
+- docs/security/tm/ — NEW: Threat Model sections 1–16 (.docx, verbatim names)
+  + md/ mirrors. scripts/docx_to_md.py AREAS gained docs/security/tm.
+  "New docs/" removed. docs/README security area now lists tm/ (client-
+  received) alongside the authored SCS; SCS's "pending Threat Model"
+  reference updated to the delivered location.
+- Analysis: exceptionally thorough; already incorporates the scoping work
+  (PIN-not-bound-to-keys explicit §3.10/§6.6/THR-VAULT-005; root out-of-scope
+  NG-001/008; no forgotten-PIN NG-004; Keystore-invalidation, tapjacking,
+  fail-open all first-class; residual-risk register §12.41 enumerates the
+  R-002+ candidates). Risk methodology (Likelihood×Impact, 4 bands) and the
+  evidence-based verification model match the project's own.
+- PRIMARY CONFLICT (internal + vs ADR-013A): the body (§2–§15) models
+  accessibility as the SINGLE/mandatory enforcement mechanism (superseded
+  ADR-013), while §16.32 adopts the two-tier model (ADR-013A) and declares
+  the accessibility-only description superseded. §16.34.4 then re-contradicts
+  §16.32.15. To reconcile at the M2 Threat-Model-approval step. Also: stale
+  forward-refs (§12.44, §14.35 mis-describe their next sections). No crypto
+  miscitation (TM cites no TAS § numbers).
+- No RTM change (docs-only). No code change.
+
+
 Docs — TAS §↔part index; Secure Coding Standard skeleton   (2026-08-04)
 ---------------------------------------------------------------------------
 Navigation + scaffold additions, plus a placement-map touch-up.

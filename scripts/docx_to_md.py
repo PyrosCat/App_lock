@@ -32,6 +32,7 @@ AREAS = [
     "docs/design/sds",
     "docs/design/dds",
     "docs/testing/tsp",
+    "docs/security/tm",
     "docs/process",
 ]
 
