@@ -4,6 +4,7 @@ local.properties
 .idea/
 build/
 captures/
+New docs/
 .externalNativeBuild/
 .cxx/
 *.apk

@@ -16,8 +16,18 @@ stable `R-NNN` id; entries are updated in place as status changes, and closed ri
 
 **Category:** Architecture / Compliance / Security · **Likelihood:** High · **Impact:** High–Critical
 · **Severity:** High · **Status:** Open · **Opened:** 2026-07-23 · **Owner:** project lead
-**Related:** ADR-013 · FR-179, FR-231, FR-233, FR-242, FR-253 · NFR-COMPY-002/003, NFR-COMP-001
+**Related:** ADR-013 → superseded by **ADR-013A** · FR-179, FR-231, FR-233, FR-242, FR-253 ·
+NFR-PERF-012 · NFR-COMPY-002/003, NFR-COMP-001
 · evidence: `docs/reports/campaigns/2026-07-23_wp2-regression_moto-g-2025.md`
+
+**Update 2026-08-04 — mitigating direction set by ADR-013A (two-tier detection).** A product
+decision requires the app to function without accessibility for Play compliance:
+UsageStatsManager + overlay becomes the Play-compliant **baseline**, accessibility an **optional**
+low-latency enhancement. This addresses R-001a/R-001b **as a design matter** and narrows R-001c
+to the optional path. The risk remains **Open** at **High** because the shipping build is still
+accessibility-only — the baseline is not built until M2, so the exposure persists until then.
+A new consideration also opens: the baseline depends on Usage Access + overlay, each with its own
+permission-loss/health story (extends FR-179).
 
 ### Description
 The app detects protected-app launches via `AccessibilityService` (ADR-013). Real-hardware
@@ -45,6 +55,8 @@ testing on a Moto G 2025 (Android 15) surfaced three compounding sub-risks in th
 - R-001c: users get a false sense of security; undermines the product's core promise.
 
 ### Current mitigations
+- **ADR-013A (2026-08-04)** removes the hard accessibility dependency by design (two-tier
+  detection) — **pending M2 implementation**; does not change the current build.
 - In-app onboarding deep-links to Accessibility settings (correct UX for Play installs).
 - FR-179 watchdog alerts on accessibility *revocation* — but does not distinguish the
   malfunctioning-but-enabled state (the R-001c gap).
@@ -52,10 +64,10 @@ testing on a Moto G 2025 (Android 15) surfaced three compounding sub-risks in th
 ### Planned actions
 1. **Decide the distribution model** (Play-only vs sideload-supported) — this sets the severity of
    R-001a and must be an explicit, recorded decision (candidate ADR).
-2. **M2 — evaluate detection approach vs Play policy** (folded into the M2 security-platform gate):
-   AccessibilityService vs `UsageStatsManager` vs hybrid, weighed against NFR-PERF-012 latency,
-   Play-policy risk (R-001b), and Restricted Settings; feed the Threat Model v1. Outcome may
-   confirm ADR-013 or supersede it.
+2. **M2 — build the two-tier detection model per ADR-013A** (the evaluation is now decided): the
+   UsageStatsManager + overlay Play-compliant baseline plus optional-accessibility onboarding, and
+   the open overlay-vs-background-activity-launch presentation choice; feed the Threat Model v1.
+   ADR-013A supersedes ADR-013.
 3. **Accessibility-health self-test** — verify events are *actually delivered* (a window-event
    heartbeat), not merely that the setting is on; surface a truthful protection-status to the user.
    Implements FR-231 (startup health check), FR-242 (runtime self-test), FR-253 (a11y recovery);

@@ -7,7 +7,9 @@ project decisions. New ADRs are required for any change per ADR-010.
 **Lifecycle rules — when to create, what may be amended, and the supersession protocol — are
 governed by [`../../process/GOVERNANCE.md`](../../process/GOVERNANCE.md) §2.** Core rule: the
 decision content of an accepted ADR is immutable; decisions change only by superseding.
-This index is updated in the same commit as any ADR addition or status change.
+This index is updated in the same commit as any ADR addition or status change. A lettered
+suffix (e.g. `ADR-013A`) marks an ADR that supersedes `ADR-013` in that lineage, listed directly
+beneath its root (GOVERNANCE §2.4).
 
 | ADR | Title | Status |
 |-----|-------|--------|
@@ -23,6 +25,7 @@ This index is updated in the same commit as any ADR addition or status change.
 | [ADR-010](ADR-010-architecture-review-gate.md) | Require Architecture Review for Major Technology Changes | Accepted (baseline) |
 | [ADR-011](ADR-011-single-module-layout.md) | Retain Single-Module :app with Package-Enforced Layering | Accepted |
 | [ADR-012](ADR-012-sqlcipher-room.md) | SQLCipher (net.zetetic) as the Room-"(or equivalent)" Encrypted Persistence | Accepted (as built) |
-| [ADR-013](ADR-013-accessibility-detection.md) | Accessibility-Service-Based Foreground App Detection | Accepted (as built) |
+| [ADR-013](ADR-013-accessibility-detection.md) | Accessibility-Service-Based Foreground App Detection | Superseded by ADR-013A |
+| [ADR-013A](ADR-013A-two-tier-detection.md) | Two-Tier Foreground Detection: UsageStatsManager Baseline, Accessibility Optional | Accepted — implementation in M2 |
 | [ADR-014](ADR-014-api-range.md) | Supported API Range: minSdk 26, targetSdk 35, Forward-Compatible to Future Levels | Accepted |
 | [ADR-015](ADR-015-hilt-adoption.md) | Hilt Adoption Plan (Replacing the Graph Service Locator) | Accepted — execution in M1 |

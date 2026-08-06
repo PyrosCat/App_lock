@@ -8,8 +8,10 @@ Usage:
                                                                  # (default outdir: build/doc-text)
 
 Used during the 2026-07-19 baseline migration for hash-verification and RTM generation;
-kept for future doc diffs and searches (the .docx files are authoritative — no committed
-markdown mirrors, see M0_PLAN.md decision D2).
+kept for future doc diffs and searches. The .docx files remain authoritative, and since
+2026-08-03 committed markdown mirrors exist under each spec area's md/ subfolder
+(scripts/docx_to_md.py — user-approved decision superseding M0_PLAN.md decision D2's
+"no markdown mirrors").
 """
 import glob
 import html
