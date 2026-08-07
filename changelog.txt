@@ -4,6 +4,42 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M1/WP3 — static analysis: detekt + ktlint + Konsist architecture rules (ADR-016)   (2026-08-07)
+---------------------------------------------------------------------------
+WP3 delivered and locally verified (detekt 1.23.7 + Konsist 0.17.3 resolve and run
+on Kotlin 2.1.0). Wired into CI. RTM rows (FR-358 etc.) land at WP8 close-out per
+M1_PLAN §5, so rtm.csv is untouched here.
+
+- detekt (io.gitlab.arturbosch.detekt 1.23.7) + ktlint via detekt-formatting.
+  config/detekt/detekt.yml (buildUponDefaultConfig, formatting on, autoCorrect off,
+  jvmTarget 17). 81 pre-existing findings frozen in config/detekt/baseline.xml — same
+  freeze/burn-down philosophy as the WP1 lint baseline; only NEW findings fail.
+- Konsist (com.lemonappdev:konsist 0.17.3) architecture rules as ordinary unit tests
+  (app/src/test/java/com/applock/architecture/ArchitectureRulesTest.kt), scoped to
+  /src/main/ so the test's own strings don't self-trip:
+  - R1 (ACTIVE): no NEW Graph.* lookups outside the frozen baseline of 11 files
+    (Graph.kt + 10 legacy call sites); import-based detection. Mechanizes ADR-015's
+    interim rule; burns down in WP5, flips to "Graph must not exist" at WP5 close.
+  - R3 (ACTIVE): no NEW UI->core.database coupling outside the frozen baseline of 5
+    UI files (AppListViewModel, IntruderLogViewModel, IntruderLogScreen, VaultViewModel,
+    VaultScreen — coupled via DAO access and/or Room-entity imports). Burns down at M3
+    (MVVM/repository refactor). SDS §14.
+  - R2, R4 (DORMANT, @Ignore): layer-direction + entry-point placement; activate at WP6
+    when packages move into the ADR-001/011 target layers (R4 exempts the ADR-018
+    FQCN-pinned components). Authored now, not faked green.
+- ci.yml: added `detekt` to the gradle invocation; Konsist rules already ride in
+  testDebugUnitTest. Full suite green: 71 tests, 2 skipped, 0 failures.
+- EXIT CHECK PASSED (M1_PLAN WP3): a scratch violation (new Graph lookup + unused
+  import) drove BOTH detekt (NoUnusedImports) and Konsist R1 RED; removing it returns
+  the tree to green. CI confirms on push.
+- ADR-016 corrected mid-implementation (dated impl note): R3 needed a frozen baseline
+  too, and the real violator set is 5 UI files (not the 2 first assumed — the coupling
+  is via entities as well as DAOs). A blanket-immediate R3 would have gone red day-one
+  — same defect class caught for R1 in the pre-commit review. R1/R3 baselines enumerated
+  in the ADR. Konsist API used conservatively (file scope + path/import/text) for
+  version robustness.
+
+
 Security — R-002 filed: lock-engine rapid-relaunch race (NucBox WP2 matrix)   (2026-08-06)
 ---------------------------------------------------------------------------
 Follow-up on the NucBox WP2 emulator-matrix report (2039693,

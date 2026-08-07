@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.detekt)
 }
 
 android {
@@ -49,6 +50,30 @@ android {
     }
 }
 
+// WP3 (M1, ADR-016): detekt = style/complexity + ktlint formatting ruleset. Architecture
+// rules (Konsist) live in the unit-test source set, not here. Same baseline philosophy as
+// lint: pre-existing findings frozen in config/detekt/baseline.xml; only NEW findings fail.
+detekt {
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+    baseline = file("$rootDir/config/detekt/baseline.xml")
+    buildUponDefaultConfig = true
+    autoCorrect = false
+    parallel = true
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    jvmTarget = "17"
+    reports {
+        html.required.set(true)
+        xml.required.set(true)
+        sarif.required.set(false)
+        txt.required.set(false)
+    }
+}
+tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
+    jvmTarget = "17"
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -74,4 +99,7 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.konsist) // WP3 (ADR-016): architecture rules as unit tests
+
+    detektPlugins(libs.detekt.formatting) // ktlint ruleset inside detekt
 }

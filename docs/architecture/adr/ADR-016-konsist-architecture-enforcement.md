@@ -14,7 +14,7 @@ The following rules are authored in WP3 and **activate in stages** as their enab
 |------|-----------|----------|-------------|
 | R1 | No **new** `Graph.` lookup sites: references confined to a frozen baseline of the existing legacy call sites (currently 10 files) plus `core/Graph.kt` itself; `di/` exempt once WP5 creates it | ADR-015 interim rule | WP3 immediately (baseline frozen) → baseline burns down in WP5 → flips to "`Graph` must not exist" at WP5 close |
 | R2 | Layer dependency direction (inner layers must not depend on outer) | ADR-001, ADR-011 | Dormant until WP6 package move, then enforced |
-| R3 | No DAO/database types referenced from UI code — selected **by declaration** (ViewModels / `@Composable`s) pre-WP6, because UI code is not yet consolidated under one package (`presentation/` does not exist; `VaultViewModel` sits outside `*/ui`); additionally package-enforced over `presentation/` post-WP6 | SDS §14 | WP3 immediately |
+| R3 | No **new** DAO/database types referenced from UI code — selected **by declaration** (ViewModels / `@Composable`s) pre-WP6, because UI code is not yet consolidated under one package (`presentation/` does not exist; `VaultViewModel` sits outside `*/ui`); frozen baseline grandfathers the current UI→DAO couplings (see implementation note); additionally package-enforced over `presentation/` post-WP6 | SDS §14 | WP3 immediately (frozen baseline; burns down at M3) |
 | R4 | Platform entry points (services/receivers/activities) only in `platform/` / `presentation/` — **exempting the two FQCN-pinned components** (`AppDetectionService`, `UninstallProtectionReceiver`; ADR-018) | ADR-001, ADR-011, ADR-018 | Post-WP6 |
 
 Staged activation is deliberate and recorded here so it is not mistaken for dead code: R2/R4 would fail against today's pre-realignment package layout, so they are authored but kept **dormant** (documented, not deleted) until WP6 moves packages into the target layers, at which point they flip to enforced.
@@ -34,3 +34,30 @@ Staged activation is deliberate and recorded here so it is not mistaken for dead
 
 ## Related
 ADR-001, ADR-010, ADR-011, ADR-015, ADR-018 (R4 exemption); SDS §5.5, §14; M1_PLAN WP3 (defines), WP5/WP6 (activate rules); RTM FR-358 (static analysis in CI → `implemented` at WP3 close), FR-361, NFR-MNT-003.
+
+## Implementation note (2026-08-06, WP3) — R1/R3 frozen baselines
+
+Implementation surfaced concrete baselines; recorded here per GOVERNANCE §2.3 (factual
+detail, does not alter the decision to adopt Konsist or the R1–R4 invariants).
+
+- **R1 baseline** = the 11 files that reference `Graph` today: `core/Graph.kt` (the definition)
+  plus 10 legacy call sites (`AppLockApplication`, `applocker/service/AppDetectionService`,
+  `applocker/service/BootReceiver`, `applocker/service/ProtectionWatchdogService`,
+  `authentication/ui/LockScreenActivity`, `privacy/ui/IntruderLogViewModel`,
+  `ui/AppListViewModel`, `ui/MainActivity`, `ui/SettingsScreen`, `vault/VaultViewModel`).
+  Any *other* file referencing `Graph` fails R1. Baseline burns down in WP5; R1 then flips to
+  "`Graph` must not exist."
+- **R3 needs the same frozen-baseline treatment** (this was not anticipated in the table above,
+  which implied a blanket immediate rule). Running the rule showed **five** UI files couple to
+  the `core.database` package today — more than an initial narrower grep suggested, because the
+  coupling is via both DAO access *and* direct Room-entity imports: `ui/AppListViewModel`
+  (`Graph.database.*Dao()` + entity imports), `privacy/ui/IntruderLogViewModel`
+  (`Graph.database.intruderEventDao()`), `privacy/ui/IntruderLogScreen`, `vault/VaultViewModel`,
+  and `vault/ui/VaultScreen` (entity imports). A blanket R3 would fail on day one. This UI→data
+  coupling is resolved by the **M3 MVVM/repository refactor** (SDS §5.5/§14) — which moves UI onto
+  domain/state models — **not** by the WP6 package move (which would merely relocate it). R3
+  therefore grandfathers those five files and fails any *new* UI declaration that references a
+  `com.applock.core.database` type; the baseline burns down at M3.
+
+Both baselines follow the same "freeze existing, block new, burn down" philosophy already used by
+the WP1 lint baseline and the WP3 detekt baseline.

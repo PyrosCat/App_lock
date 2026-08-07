@@ -1,0 +1,38 @@
+# WP3 (M1, ADR-016) — detekt configuration.
+# buildUponDefaultConfig = true in app/build.gradle.kts, so this file only holds overrides
+# on top of detekt's bundled defaults. Pre-existing findings are frozen in baseline.xml;
+# only NEW findings fail CI (same philosophy as the WP1 lint baseline).
+
+build:
+  # 0 = any non-baselined finding fails the task. The baseline carries current debt.
+  maxIssues: 0
+
+config:
+  validation: true
+  warningsAsErrors: false
+
+# ktlint ruleset, supplied by the detekt-formatting plugin (detektPlugins in the build file).
+# autoCorrect is disabled — CI reports, it does not rewrite source.
+formatting:
+  active: true
+  autoCorrect: false
+  TrailingCommaOnCallSite:
+    active: false
+  TrailingCommaOnDeclarationSite:
+    active: false
+
+# A couple of defaults relaxed to fit this codebase's conventions; revisit at the M2/M3 gates.
+style:
+  MagicNumber:
+    # security/crypto constants (Argon2 params, byte sizes, lockout timings) are inherently numeric
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+  ReturnCount:
+    max: 3
+
+complexity:
+  LongMethod:
+    active: true
+  TooManyFunctions:
+    # Compose screens + DAOs legitimately group many small functions
+    active: false

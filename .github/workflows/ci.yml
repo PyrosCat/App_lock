@@ -35,8 +35,11 @@ jobs:
       - name: Set up Gradle (with caching)
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Unit tests, debug + release (R8) builds, lint
-        run: ./gradlew testDebugUnitTest assembleDebug assembleRelease lint --stacktrace
+      # WP3 (M1, ADR-016): detekt = style/complexity + ktlint (detekt-formatting); the Konsist
+      # architecture rules (R1-R4) run inside testDebugUnitTest. Both gate on their baselines —
+      # only NEW findings fail.
+      - name: Unit tests + Konsist rules, detekt, debug + release (R8) builds, lint
+        run: ./gradlew testDebugUnitTest detekt assembleDebug assembleRelease lint --stacktrace
 
       - name: Upload reports (tests + lint)
         if: always() # evidence survives red runs — that's when it matters
