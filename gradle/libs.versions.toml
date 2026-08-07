@@ -17,6 +17,7 @@ sqlite = "2.4.0"
 camerax = "1.4.1"
 detekt = "1.23.7"
 konsist = "0.17.3"
+licenseReport = "2.9"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -51,3 +52,4 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+license-report = { id = "com.github.jk1.dependency-license-report", version.ref = "licenseReport" }

@@ -4,6 +4,38 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M1/WP4 — build environments & dependency governance (ADR-017)   (2026-08-07)
+---------------------------------------------------------------------------
+WP4 delivered and locally verified: 8 variants assemble, tests green, license
+inventory produced. Config + docs only — no security logic touched. RTM rows
+(FR-226/227/234/247/…) land at the WP8 close-out batch per M1_PLAN §5, so
+rtm.csv is untouched here.
+
+- Build flavors: new `environment` dimension dev/qa/staging/prod × debug/release
+  = 8 variants (app/build.gradle.kts, ADR-017). Non-prod carry applicationIdSuffix
+  .dev/.qa/.staging + versionNameSuffix; prod is isDefault with NO suffix —
+  applicationId stays com.applock permanently (upgrade/Play identity + left half
+  of the persisted a11y/device-admin component strings; ADR-017 + ADR-018). The
+  WP2 harness already reads APP_ID (lib.sh), so no script change was needed.
+- BuildConfig fields (buildFeatures.buildConfig = true): ENVIRONMENT (per flavor),
+  SCHEMA_VERSION = 2 (mirrors the Room schema; FR-234 partial), and BUILD_TIME via
+  the Gradle property `buildTime` → BuildConfig, absent-safe (defaults to "unknown").
+  BUILD_TIME is the FR-227 secure-config INJECTION MECHANISM — no secrets exist yet;
+  a documented no-hard-coding rule sits at the injection site. CI injects the real
+  UTC build time (-PbuildTime=...).
+- Dependabot (.github/dependabot.yml): weekly PRs for the gradle ecosystem (the
+  libs.versions.toml catalog) and github-actions (keeps CI actions patched — a
+  security-posture item). Updates run the full WP1-WP3 CI net before merge.
+- Dependency/license inventory: com.github.jk1.dependency-license-report 2.9;
+  `generateLicenseReport` scoped to prodReleaseRuntimeClasspath (what ships) →
+  app/build/reports/dependency-license/. CI runs it and archives it as the
+  `license-inventory` artifact (FR-247 partial; full CVE tracking is M6).
+- CI (ci.yml): builds only devDebug + prodRelease (bounds CI time; prodRelease is
+  the R8 tripwire + shipping identity), runs the inventory, uploads it. Unit tests
+  run on prodDebug (Konsist rules are variant-agnostic, scoped to src/main).
+- Baselines unchanged: detekt scans src/main (variant-agnostic), Konsist is scoped
+  to /src/main/, lint findings are code-derived — flavors don't shift any baseline.
+
 M1/WP3 — static analysis: detekt + ktlint + Konsist architecture rules (ADR-016)   (2026-08-07)
 ---------------------------------------------------------------------------
 WP3 delivered and locally verified (detekt 1.23.7 + Konsist 0.17.3 resolve and run

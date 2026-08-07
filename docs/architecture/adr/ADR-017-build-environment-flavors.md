@@ -25,3 +25,19 @@ FR-226 mandates four build environments (Development, Testing, Staging, Producti
 
 ## Related requirements
 FR-226 (→ `implemented` at WP4 close), FR-227 (→ `partial`: mechanism only), FR-234 (→ `partial`); related ADRs: ADR-018, ADR-016 (rules run per-variant in the unit-test job).
+
+## Implementation
+
+**2026-08-07 (M1 / WP4) — executed.** `app/build.gradle.kts` declares the `environment` flavor
+dimension (`dev` / `qa` / `staging` / `prod`) × debug/release = 8 assembleable variants. Non-prod
+flavors carry `applicationIdSuffix` `.dev` / `.qa` / `.staging` (+ matching `versionNameSuffix`
+for human-facing build identity); `prod` is `isDefault` with **no** suffix — applicationId stays
+`com.applock`. `buildFeatures.buildConfig = true` enables the fields: `ENVIRONMENT` (per flavor),
+`BUILD_TIME` (Gradle property `buildTime` → `BuildConfig`, absent-safe, defaults to `"unknown"` —
+this is the FR-227 injection *mechanism*; no secrets exist yet and a documented no-hard-coding
+rule sits at the injection site), and `SCHEMA_VERSION` (`2`, mirrors the Room schema in
+`AppLockDatabase`; FR-234 partial). CI builds `devDebug` + `prodRelease` and injects the real UTC
+`buildTime`. All 8 variants assemble locally (WP4 exit check — evidence in
+`docs/reports/campaigns/2026-08-07_wp4-build-variants_2012-i7.md`). RTM rows land at the WP8
+close-out batch (M1_PLAN §5), not in this work package. This note amends implementation status
+only; the decision content above is unchanged (GOVERNANCE §2.3).

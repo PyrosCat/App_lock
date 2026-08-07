@@ -3,9 +3,14 @@
 # Gradle invocation on one job — shares the daemon and dependency cache, which is
 # faster in total than parallel jobs at this project size.
 #
-# assembleRelease is deliberate: it exercises R8/minification (the step that broke
-# in Phase 2 via Tink's compile-only annotations, and the most likely tripwire for
+# The release build (assembleProdRelease) is deliberate: it exercises R8/minification (the step
+# that broke in Phase 2 via Tink's compile-only annotations, and the most likely tripwire for
 # the WP5 Hilt migration). The APK is unsigned — signing is out of scope until M6.
+#
+# WP4 (M1, ADR-017) added the environment flavor dimension (dev/qa/staging/prod × debug/release
+# = 8 variants). CI builds only prodRelease (shipping identity + R8 tripwire) and devDebug (dev
+# fast path) to bound CI time; all 8 assemble locally (WP4 exit check). generateLicenseReport
+# produces the dependency/license inventory archived as an artifact (FR-247 partial).
 name: CI
 
 on:
@@ -36,10 +41,15 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       # WP3 (M1, ADR-016): detekt = style/complexity + ktlint (detekt-formatting); the Konsist
-      # architecture rules (R1-R4) run inside testDebugUnitTest. Both gate on their baselines —
+      # architecture rules (R1-R4) run inside the unit-test task. Both gate on their baselines —
       # only NEW findings fail.
-      - name: Unit tests + Konsist rules, detekt, debug + release (R8) builds, lint
-        run: ./gradlew testDebugUnitTest detekt assembleDebug assembleRelease lint --stacktrace
+      # WP4 (M1, ADR-017): -PbuildTime injects the real UTC build time into BuildConfig
+      # (absent-safe — local builds fall back to "unknown"). Tests run on prodDebug (the
+      # Konsist rules are variant-agnostic, scoped to src/main).
+      - name: Unit tests + Konsist rules, detekt, dev/prod builds, lint, license inventory
+        run: >
+          ./gradlew testProdDebugUnitTest detekt assembleDevDebug assembleProdRelease lint
+          generateLicenseReport -PbuildTime="$(date -u +%Y-%m-%dT%H:%M:%SZ)" --stacktrace
 
       - name: Upload reports (tests + lint)
         if: always() # evidence survives red runs — that's when it matters
@@ -47,6 +57,15 @@ jobs:
         with:
           name: reports
           path: app/build/reports/
+          retention-days: 14
+
+      # WP4 (M1, FR-247 partial): the dependency/license inventory as a durable artifact.
+      - name: Upload dependency-license inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-inventory
+          path: app/build/reports/dependency-license/
           retention-days: 14
 
       - name: Upload APKs

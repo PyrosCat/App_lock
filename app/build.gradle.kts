@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
     alias(libs.plugins.detekt)
+    alias(libs.plugins.license.report)
 }
 
 android {
@@ -16,6 +17,58 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
+
+        // WP4 (M1, ADR-017 / FR-234): build provenance exposed to the app via BuildConfig.
+        // SCHEMA_VERSION mirrors the Room schema version in AppLockDatabase (currently 2) —
+        // keep the two in lockstep when the DB is bumped.
+        buildConfigField("int", "SCHEMA_VERSION", "2")
+        // FR-227 secure-config injection *mechanism* (no secrets exist yet): a Gradle property
+        // flows into BuildConfig, absent-safe. CI injects the real UTC build time
+        // (-PbuildTime=…); local builds fall back to "unknown" so they stay reproducible. This
+        // same absent-safe property path is the sanctioned route for any FUTURE secret — never
+        // hard-code a secret into source or version control (they belong in Gradle properties /
+        // CI secrets, injected here).
+        buildConfigField(
+            "String",
+            "BUILD_TIME",
+            "\"${providers.gradleProperty("buildTime").getOrElse("unknown")}\"",
+        )
+    }
+
+    // WP4 (M1, ADR-017): four build environments as a flavor dimension, crossed with the
+    // debug/release build types → 8 assembleable variants. FR-226's "Testing" maps to `qa`
+    // because Gradle reserves the `test*` name space. Non-prod flavors take an applicationId
+    // suffix so they install side-by-side with prod; ENVIRONMENT is surfaced via BuildConfig.
+    //
+    // prod keeps applicationId `com.applock` PERMANENTLY (isDefault, no suffix): it is the
+    // upgrade / (future) Play-listing identity and the left half of the externally-persisted
+    // accessibility-service and device-admin component strings — see ADR-017 (this half) and
+    // ADR-018 (the FQCN half). Changing it strands every existing install on upgrade.
+    flavorDimensions += "environment"
+    productFlavors {
+        create("dev") {
+            dimension = "environment"
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev" // human-facing env identity (About/bug reports)
+            buildConfigField("String", "ENVIRONMENT", "\"dev\"")
+        }
+        create("qa") {
+            dimension = "environment"
+            applicationIdSuffix = ".qa"
+            versionNameSuffix = "-qa"
+            buildConfigField("String", "ENVIRONMENT", "\"qa\"")
+        }
+        create("staging") {
+            dimension = "environment"
+            applicationIdSuffix = ".staging"
+            versionNameSuffix = "-staging"
+            buildConfigField("String", "ENVIRONMENT", "\"staging\"")
+        }
+        create("prod") {
+            dimension = "environment"
+            isDefault = true // default variant for anchor tasks (lint/run) — the shipping identity
+            buildConfigField("String", "ENVIRONMENT", "\"prod\"")
+        }
     }
 
     buildTypes {
@@ -40,6 +93,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true // WP4: custom BuildConfig fields (ENVIRONMENT / BUILD_TIME / SCHEMA_VERSION)
     }
 
     lint {
@@ -72,6 +126,14 @@ tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
 }
 tasks.withType<io.gitlab.arturbosch.detekt.DetektCreateBaselineTask>().configureEach {
     jvmTarget = "17"
+}
+
+// WP4 (M1, FR-247 partial): dependency + license inventory. `generateLicenseReport` writes
+// app/build/reports/dependency-license/ (HTML index + THIRD-PARTY-NOTICES text); CI archives it
+// as a build artifact. Scoped to the production shipping classpath so the inventory reflects
+// exactly what ships. Full security-status / CVE tracking is M6 (FR-247 → `implemented` there).
+licenseReport {
+    configurations = arrayOf("prodReleaseRuntimeClasspath")
 }
 
 dependencies {

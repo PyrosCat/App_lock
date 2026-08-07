@@ -58,6 +58,26 @@ First-run flow: create a PIN (Argon2id hash in EncryptedSharedPreferences) → e
 app shows the lock screen (PIN or biometrics). Optional: intruder selfie (Settings, needs
 CAMERA) and the encrypted vault (photo-library icon in the app list).
 
+## Build variants
+
+WP4 (M1) added an `environment` flavor dimension — `dev` / `qa` / `staging` / `prod` — crossed
+with the `debug`/`release` build types (8 variants; ADR-017). `prod` is the default and keeps
+applicationId `com.applock`; `dev`/`qa`/`staging` get a matching applicationId + versionName
+suffix so they install **side-by-side** with prod. Each variant exposes `BuildConfig.ENVIRONMENT`,
+`BuildConfig.SCHEMA_VERSION`, and `BuildConfig.BUILD_TIME`.
+
+```bash
+./gradlew assembleProdRelease            # shipping build (R8/minified)
+./gradlew assembleDevDebug               # day-to-day dev build
+./gradlew assembleDebug assembleRelease  # all 8 variants
+```
+
+`BUILD_TIME` is injected via the absent-safe Gradle property `-PbuildTime=<iso8601>` (defaults to
+`unknown`); CI passes the real UTC time. That same property path is the sanctioned route for any
+future secret — **never hard-code secrets** (ADR-017, FR-227). Dependency versions live in the
+`gradle/libs.versions.toml` catalog; Dependabot proposes weekly updates
+(`.github/dependabot.yml`), and CI archives a dependency/license inventory.
+
 ## Architecture (as built)
 
 ```

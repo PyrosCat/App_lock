@@ -1,0 +1,33 @@
+# WP4 (M1 foundation retrofit): dependency governance.
+# Dependabot opens weekly PRs for outdated dependencies so version drift is surfaced
+# continuously rather than discovered at a gate. Updates land as ordinary PRs and run the
+# full CI pipeline (tests + detekt + Konsist + builds + lint) before they can merge — the
+# static-analysis/regression net from WP1-WP3 is the guardrail.
+#
+# Scope note: the Gradle version catalog (gradle/libs.versions.toml) is the single source of
+# dependency versions; the gradle ecosystem below tracks it. Full security-status / CVE
+# tracking (FR-247 complete) is M6 — this is the governance mechanism, not that.
+version: 2
+updates:
+  # Application + build dependencies (version catalog, plugins, wrapper-declared modules).
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps"
+    labels:
+      - dependencies
+
+  # CI workflow actions (actions/checkout, setup-java, gradle/actions, upload-artifact).
+  # Keeping these patched is a security-posture item for a security-focused app.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+    labels:
+      - dependencies
+      - ci
