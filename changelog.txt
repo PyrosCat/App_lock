@@ -4,6 +4,36 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Security — R-002 filed: lock-engine rapid-relaunch race (NucBox WP2 matrix)   (2026-08-06)
+---------------------------------------------------------------------------
+Follow-up on the NucBox WP2 emulator-matrix report (2039693,
+docs/reports/campaigns/2026-07-23_wp2-matrix_nucbox-g5.md). Docs-only.
+
+- NucBox matrix run (API 26/29/33/35) found the F4 rapid-relaunch defense (OV-4)
+  fails intermittently on EVERY emulator level — 12-37% in focused loops, NOT
+  graded by API. Root cause is a window-ordering race, NOT a detection gap: the
+  engine fires a lock decision on every relaunch, but the rapidly-relaunched
+  protected-app window outruns the noHistory LockScreenActivity (self-finishes),
+  leaving the protected app foreground with no lock for the 6-12s poll window.
+  This is the exact race the Phase-3 mitigation anticipated (ApplicationLockEngine
+  .kt:61) and tried to counter (re-launch NEW_TASK|CLEAR_TOP, :123) — the
+  mitigation is probabilistic, not deterministic. So HF-002 (fast-relaunch
+  bypass) was NOT fully closed in Phase 3.
+- Filed RISK_REGISTER R-002 (Severity High, pending real-hardware; Status Open).
+  Real-hardware severity unresolved: Moto G 2025 (fast arm64) was clean; a
+  slower/older real device is untested = the decisive open question. Rated High
+  precautionarily (enforcement bypass).
+- Fix direction ties to M2: the noHistory *Activity* loses the window race by
+  construction; the two-tier baseline **overlay** presentation (AS-020,
+  SYSTEM_ALERT_WINDOW) sits on top and should resist it — so the open
+  overlay-vs-activity-launch decision (ADR-013A) must weigh R-002.
+- Also noted in R-002: the run_all -n 2 gate under-samples this probabilistic
+  race (API 29 + 33 passed -n 2 yet focused loops found real bypasses) — WP2/WP8
+  harness should raise OV-4 burst count.
+- DEFERRED (not done here): citing R-002 from the TM (THR-ENF-004, HF-002
+  annotate-incomplete, §12.41) — a next-TM-revision touch, flagged to user.
+
+
 ADRs — M1 pause point cleared: ADR-016/017/018 + ADR-014 note (D1-D4)   (2026-08-06)
 ---------------------------------------------------------------------------
 All four M1_PLAN §4 pause-point decisions resolved and recorded; WP3 and WP4
