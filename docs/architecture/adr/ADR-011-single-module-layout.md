@@ -13,3 +13,5 @@ Multi-module split per layer or per feature — deferred; revisit when build tim
 
 ## Consequences
 Layer violations are caught by lint/detekt dependency rules rather than compiler-enforced module boundaries; the M1 pipeline must include that check for this ADR to hold.
+
+**Cross-links (added 2026-08-06, GOVERNANCE §2.3):** the M1 check this ADR requires is delivered by **ADR-016** (Konsist rules R1–R4). The WP6 package realignment executing this layout is constrained by **ADR-018**: `AppDetectionService` and `UninstallProtectionReceiver` are permanently FQCN-pinned and stay outside the target layers.

@@ -175,12 +175,22 @@ RTM FR-228 → `implemented`, FR-229 → `partial`.
 - **D1 — Environment flavor names:** recommend `dev` / `qa` / `staging` / `prod` (FR-226's
   "Testing" → `qa` to avoid Gradle's `test*` naming collisions), suffixed applicationIds,
   prod = `com.applock`.
+  **→ Resolved 2026-08-06: ADR-017 accepted** (prod applicationId recorded as permanently
+  fixed — it is the left half of the persisted a11y/device-admin component strings).
 - **D2 — Konsist** as the architecture-rule mechanism (new test-only dependency) — recommended
   over detekt-only, because layer rules then live as ordinary JVM tests; requires ADR-016.
+  **→ Resolved 2026-08-06: ADR-016 accepted** (execution in WP3; rules R1–R4 staged across
+  WP3/WP5/WP6). WP3 is now unblocked.
 - **D3 — FQCN pinning** for `AppDetectionService` + `UninstallProtectionReceiver` (recommend
   pin permanently, no shim classes; recorded in ADR-011/013).
+  **→ Resolved 2026-08-06: ADR-018 accepted** — recorded as a *new* ADR rather than in
+  ADR-011/013 as this line anticipated: ADR-013 is now Superseded (013A), and GOVERNANCE
+  §2.2/§2.3 route a discovered binding constraint to its own record; ADR-011 carries a
+  cross-link. Exact FQCNs verified against the manifest (`.applocker.admin.`, not `admin/`).
 - **D4 — CI device matrix initial scope:** recommend API 30+35 on Actions, full 26/29/33/35 on
   the NucBox, expanding CI as images prove stable (ADR-014 note updated accordingly).
+  **→ Resolved 2026-08-06: dated implementation note appended to ADR-014** (no new ADR —
+  the matrix commitment already lives in ADR-014; only the execution split was open).
 
 ## 5. RTM impact (rows updated at close-out)
 

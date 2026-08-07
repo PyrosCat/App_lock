@@ -97,7 +97,7 @@ immutable** — architecture evolves by *superseding* decisions, never by rewrit
 - Defining or changing an architectural structure, layer rule, or security boundary.
 - Adopting a project-wide convention with architectural consequences.
 - Deviating from the TAS/SDS baseline (per TAS §69.3, deviations need documented approval).
-- Recording a discovered constraint that binds future work (e.g. ADR-013's FQCN pinning).
+- Recording a discovered constraint that binds future work (e.g. ADR-018's FQCN pinning).
 - **Reversing or materially changing a prior decision** → new ADR that supersedes the old.
 
 ### 2.3 Amendment rules

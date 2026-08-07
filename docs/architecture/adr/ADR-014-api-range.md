@@ -32,3 +32,11 @@ regression harness actually running against each level, not merely booting the A
 
 ## Consequences
 Until the CI matrix exists, API levels other than 30 are supported-but-unverified; this gap is tracked in the RTM (NFR-COMP-001 row) and closes in M1.
+
+## Implementation note (2026-08-06) — CI matrix initial scope (M1_PLAN D4)
+Decision content unchanged. Execution split for the M1/WP8 matrix deliverable: the
+Actions-hosted Gradle-managed-device matrix starts with **API 30 + 35**; 26/29/33 are
+attempted on the hosted runners and retained as their images prove stable. The **full
+26/29/33/35 matrix runs locally on the NucBox** (fleet index remains the source of truth
+for per-host status), and the Moto G 2025 covers real-hardware verification manually via
+the WP2 scripts. NFR-COMP-001 closes against this split at WP8.

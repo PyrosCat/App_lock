@@ -29,3 +29,6 @@ beneath its root (GOVERNANCE §2.4).
 | [ADR-013A](ADR-013A-two-tier-detection.md) | Two-Tier Foreground Detection: UsageStatsManager Baseline, Accessibility Optional | Accepted — implementation in M2 |
 | [ADR-014](ADR-014-api-range.md) | Supported API Range: minSdk 26, targetSdk 35, Forward-Compatible to Future Levels | Accepted |
 | [ADR-015](ADR-015-hilt-adoption.md) | Hilt Adoption Plan (Replacing the Graph Service Locator) | Accepted — execution in M1 |
+| [ADR-016](ADR-016-konsist-architecture-enforcement.md) | Konsist for Automated Architecture-Rule Enforcement | Accepted — execution in M1 (WP3) |
+| [ADR-017](ADR-017-build-environment-flavors.md) | Build Environment Flavors: dev/qa/staging/prod with Suffixed Application IDs | Accepted — execution in M1 (WP4) |
+| [ADR-018](ADR-018-fqcn-pinning.md) | Permanent FQCN Pinning of AppDetectionService and UninstallProtectionReceiver | Accepted — binding constraint, enforced from WP6 |

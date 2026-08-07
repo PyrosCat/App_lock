@@ -4,6 +4,54 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+ADRs — M1 pause point cleared: ADR-016/017/018 + ADR-014 note (D1-D4)   (2026-08-06)
+---------------------------------------------------------------------------
+All four M1_PLAN §4 pause-point decisions resolved and recorded; WP3 and WP4
+are unblocked. Docs-only: no code change; RTM rows update at WP close per plan.
+
+- ADR-016 (NEW): Konsist for automated architecture-rule enforcement (D2).
+  Test-only dependency in the existing unit-test job; detekt/ktlint = style,
+  Konsist = architecture. Rules R1-R4 with staged activation (R1+R3 at WP3,
+  R2/R4 dormant until WP6; R1 flips to "Graph must not exist" at WP5 close).
+  PRE-COMMIT REVIEW CORRECTED 3 DEFECTS in the initial draft: (1) R1 as first
+  worded ("no Graph. refs outside core/Graph.kt+di/", active immediately)
+  would have gone RED on day one — 39 legacy refs across 10 files exist; fixed
+  to the frozen-baseline form that actually mechanizes ADR-015's no-NEW-lookups
+  interim rule. (2) R3 scoped to presentation/ was vacuous (package doesn't
+  exist pre-WP6) and a */ui scope would MISS VaultViewModel (sits at vault/
+  root); fixed to declaration-based selection (ViewModels/@Composables) pre-WP6.
+  (3) R4 conflicted with FQCN pinning — the two pinned components stay outside
+  platform/ forever; fixed with a named exemption (ADR-018).
+- ADR-017 (NEW, D1): environment flavor dimension dev/qa/staging/prod
+  (FR-226 "Testing"->qa avoids Gradle test* collisions); applicationIdSuffix
+  .dev/.qa/.staging; PROD applicationId com.applock recorded as PERMANENTLY
+  fixed (upgrade identity + left half of persisted a11y/device-admin component
+  strings). FR-227 injection mechanism absent-safe; BuildConfig ENVIRONMENT/
+  BUILD_TIME/SCHEMA_VERSION.
+- ADR-018 (NEW, D3): permanent FQCN pinning of
+  com.applock.applocker.service.AppDetectionService and
+  com.applock.applocker.admin.UninstallProtectionReceiver (exact names verified
+  against the manifest — note .applocker.admin., the plan's "admin/*" was
+  shorthand). Rationale: Android persists both names outside the app
+  (enabled_accessibility_services as <appId>/<FQCN>; active device admin);
+  rename => silent a11y unbind + stranded device admin on upgrade; no
+  service/receiver alias mechanism exists. No shims. BootReceiver/
+  ProtectionWatchdogService explicitly NOT pinned (may move in WP6).
+  ROUTE DEVIATION from M1_PLAN D3 parenthetical ("recorded in ADR-011/013"):
+  new ADR instead, because ADR-013 is now Superseded (constraint would live in
+  a dead doc) and GOVERNANCE §2.2 routes discovered binding constraints to a
+  new record; ADR-011 got a §2.3-permitted cross-link line instead.
+- ADR-014: dated implementation note appended (D4) — CI GMD matrix starts
+  API 30+35 on Actions, 26/29/33 attempted as images prove stable; full
+  26/29/33/35 stays on the NucBox; Moto G 2025 = manual real-hardware.
+  Decision content unchanged (allowed amendment class, GOVERNANCE §2.3).
+- GOVERNANCE §2.2: dangling example reference corrected "ADR-013's FQCN
+  pinning" -> "ADR-018's FQCN pinning" (the pinning was never actually in
+  ADR-013 — factual cross-ref fix only, no rule change; flagged to user).
+- M1_PLAN §4: D1-D4 all marked resolved with pointers; adr/README index rows
+  added for 016/017/018 (same-commit rule §2.6).
+
+
 Security — Threat Model v2: §10-16 landed — full §1-16 reconciled   (2026-08-06)
 ---------------------------------------------------------------------------
 Landed the approved §10-16 reconciliation into docs/security/tm/ (v2), same
