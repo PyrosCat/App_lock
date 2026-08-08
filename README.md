@@ -22,15 +22,45 @@ Lifecycle position under the new Implementation Strategy (phases 0–6):
 
 | IS Phase | Scope | Status |
 |---|---|---|
-| 0 Foundation | CI/CD, static analysis, Hilt DI, build variants, docs governance | **← current (retrofit, migration M0–M1)** |
+| 0 Foundation | CI/CD, static analysis, Hilt DI, build variants, docs governance | **← current** (migration M1; WP1–WP5 done, WP6 next) |
 | 1 Core Security Platform | Auth, crypto, lock engine, sessions | Built; formal gate review pending (M2) |
 | 2 Core App Features (MVP) | Protected apps ✓, vault ✓, settings ◐, backup ✗, onboarding ✗ | Partial (M3) |
 | 3 Automation | Schedules, Wi-Fi/Bluetooth/location rules, rule engine | Planned (M4; design input in docs/process/PHASE4_PLAN.md) |
 | 4 Production Hardening | Observability, resilience, data lifecycle, scalability | Planned (M5) |
 | 5–6 Security Hardening & Release | Verification campaigns, release governance, v1.0.0 | Planned (M6) |
 
-Migration phase **M0 (baseline & governance) is complete** — docs restructured, RTM and ADR log
-established. Next: M1 foundation retrofit (CI, Hilt, variants, regression harness).
+### Roadmap — where the project stands
+
+Execution runs on the migration path **M0 → M6** ([MIGRATION_ASSESSMENT.md](docs/process/MIGRATION_ASSESSMENT.md));
+M1 (foundation retrofit = IS Phase 0) is broken into work packages WP1–WP8
+([M1_PLAN.md](docs/process/M1_PLAN.md)).
+
+```mermaid
+flowchart LR
+    M0["M0 ✅ Baseline and governance"]:::done --> M1
+    subgraph M1 ["M1 · Foundation retrofit (IS Phase 0) — current"]
+      direction LR
+      WP1["WP1 ✅ CI freeze"]:::done --> WP2["WP2 ✅ Device harness"]:::done
+      WP2 --> WP3["WP3 ✅ Static analysis"]:::done --> WP4["WP4 ✅ Build variants"]:::done
+      WP4 --> WP5["WP5 ✅* Hilt migration"]:::current --> WP6["WP6 ▶ next · Package realign"]:::next
+      WP6 --> WP7["WP7 · DB fail-safe"] --> WP8["WP8 · Instrumentation + gate"]
+    end
+    M1 --> M2["M2 · Security gate: two-tier detection"]
+    M2 --> M3["M3 · MVP: backup, onboarding, MVVM"]
+    M3 --> M4["M4 · Automation"]
+    M4 --> M5["M5 · Production hardening"]
+    M5 --> M6["M6 · Hardening and release → v1.0.0"]
+    classDef done fill:#d4edda,stroke:#28a745,color:#155724
+    classDef current fill:#fff3cd,stroke:#e0a800,color:#856404
+    classDef next fill:#d1ecf1,stroke:#17a2b8,color:#0c5460
+```
+
+\* **WP5 (Hilt) is code-complete and locally verified** (71 unit tests, R8 release build clean,
+zero `Graph` references); the on-device gating-regression harness (Moto G 2025 / NucBox emulator)
+is the remaining WP5 exit step and ADR-015's closure gate before WP6.
+
+Pre-rebaseline **Phases 1–3 are already built and E2E-validated** (see above) — they underlie the
+M1 foundation and get their formal security-gate review in M2.
 
 ## Documentation map
 
@@ -39,7 +69,7 @@ established. Next: M1 foundation retrofit (CI, Hilt, variants, regression harnes
 | `docs/srs/` | Software Requirements Specification, sections 1–18 (FR-001..375) |
 | `docs/nfr/` | Non-Functional Requirements, sections 0–13 |
 | `docs/architecture/tas/` | Technical Architecture Specification, parts 1–9 |
-| `docs/architecture/adr/` | Architecture Decision Records (ADR-001..015, index in README) |
+| `docs/architecture/adr/` | Architecture Decision Records — ADR-001..018 (+ ADR-013A supersession) |
 | `docs/design/sds/` | Software Design Specification, sections 1–17 |
 | `docs/process/` | Implementation Strategy, migration assessment, plans, RTM |
 | `docs/testing/` | Validation campaign records (Phase 3) and the automation test plan |
@@ -105,6 +135,6 @@ random + Keystore-wrapped; Phase-1 plaintext DBs migrate by read-and-reinsert (s
 `sqlcipher_export` silently fails in this integration); FLAG_SECURE in release builds;
 uninstall protection is opt-in device admin.
 
-Known deviations scheduled for migration (see ADRs): `core/Graph.kt` service locator → Hilt
-(ADR-015, M1); destructive-migration fallback removal (ADR-007, M1); root/tamper detection and
+Migration status (see ADRs): `core/Graph.kt` service locator → Hilt **done** (ADR-015, M1/WP5);
+destructive-migration fallback removal pending (ADR-007, M1/WP7); root/tamper detection and
 pattern/knock auth not yet implemented (RTM rows FR-167..170, FR-004/005).

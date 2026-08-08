@@ -64,6 +64,24 @@ Overridable env: `SERIAL`, `APP_ID` (WP4 flavor suffixes), `PIN`, `PROTECTED_PKG
 
 ## Validation status
 
+- **Need to do — WP5 Hilt build (2026-08-08), NucBox G5 emulator matrix.** The M1/WP5 Hilt migration
+  (replacing `core/Graph`) passed local static + unit gates on the 2012 box; the **device gate is
+  unrun**. NucBox to run the emulator half on the Hilt `devDebug` build:
+
+  ```bash
+  ./gradlew assembleDevDebug
+  APP_ID=com.applock.dev \
+    APK=app/build/outputs/apk/dev/debug/app-dev-debug.apk \
+    scripts/e2e/run_all.sh -n 2
+  ```
+
+  Across the API 26/29/33/35 matrix (a11y-via-adb works on emulators — no manual grant needed). The
+  `APP_ID`/`APK` env vars carry the WP4 flavor identity (a11y component is `<APP_ID>/…AppDetectionService`).
+  **Read OV-4 against R-002** (pre-existing rapid-relaunch flake, 12–37% on some APIs) — identical
+  behavior to the pre-Hilt build = no Hilt regression. File a dated
+  `docs/reports/campaigns/…_wp5-harness_nucbox-g5.md`. This is **ADR-015's closure gate**; nothing
+  after WP2 proceeds while red. (The real-hardware half — Moto G 2025 — is owed on the 2012 box.)
+
 - **Baseline achieved (2026-07-22, NucBox G5, API 33 x86_64):** `run_all.sh -n 2` → all four
   checks PASS 2/2; the security assertions (IMMEDIATE relock 10/10, F4 rapid-relaunch,
   F3/FR-108 self-gate) held in every run. WP2 exit criterion met for API 33. Report:
