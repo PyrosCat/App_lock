@@ -25,44 +25,32 @@ class ArchitectureRulesTest {
     private fun KoFileDeclaration.residesAt(relPathUnderPackageRoot: String): Boolean =
         path.replace('\\', '/').endsWith("com/applock/$relPathUnderPackageRoot")
 
-    // ---- R1 — no new Graph.* lookup sites (ADR-015 interim rule; ADR-016) ----------------
+    // ---- R1 — the Graph service locator must not exist (ADR-015 realized; WP5) -----------
     //
-    // Frozen baseline = the 11 files that reference Graph today: the definition + 10 legacy
-    // call sites. Any *other* production file that does a `Graph.` lookup fails. `di/` is
-    // exempt for when WP5 introduces it. Baseline burns down in WP5; the rule then flips to
-    // "Graph must not exist".
-    private val r1GraphBaseline = setOf(
-        "core/Graph.kt", // the definition
-        "AppLockApplication.kt",
-        "applocker/service/AppDetectionService.kt",
-        "applocker/service/BootReceiver.kt",
-        "applocker/service/ProtectionWatchdogService.kt",
-        "authentication/ui/LockScreenActivity.kt",
-        "privacy/ui/IntruderLogViewModel.kt",
-        "ui/AppListViewModel.kt",
-        "ui/MainActivity.kt",
-        "ui/SettingsScreen.kt",
-        "vault/VaultViewModel.kt",
-    )
-
+    // WP5 deleted core/Graph.kt and migrated every consumer to Hilt. The WP3 interim rule
+    // ("no NEW Graph lookups", with a frozen baseline) is now terminal: no production file may
+    // reference com.applock.core.Graph, and core/Graph.kt must not come back.
     @Test
-    fun `R1 - no new Graph service-locator lookups outside the frozen baseline`() {
-        val offenders = productionFiles()
+    fun `R1 - the Graph service locator no longer exists or is referenced`() {
+        val referencing = productionFiles()
             .filter { referencesGraph(it) }
-            .filterNot { file -> isInDiPackage(file) }
-            .filterNot { file -> r1GraphBaseline.any { file.residesAt(it) } }
             .map { it.path }
-
         assertTrue(
-            "ADR-015/ADR-016 R1: new Graph.* lookup site(s) introduced — take dependencies via " +
-                "constructor injection instead (Graph is being removed in WP5). Offending files:\n" +
-                offenders.joinToString("\n") { "  - $it" },
-            offenders.isEmpty(),
+            "ADR-015 R1: com.applock.core.Graph was removed in WP5 — do not reintroduce the " +
+                "service locator. Take dependencies via Hilt (@Inject / the di/ module) instead. " +
+                "Offending file(s):\n" + referencing.joinToString("\n") { "  - $it" },
+            referencing.isEmpty(),
+        )
+
+        val graphFile = productionFiles()
+            .filter { it.residesAt("core/Graph.kt") }
+            .map { it.path }
+        assertTrue(
+            "ADR-015 R1: core/Graph.kt must not exist — it was deleted in WP5. Found:\n" +
+                graphFile.joinToString("\n") { "  - $it" },
+            graphFile.isEmpty(),
         )
     }
-
-    private fun isInDiPackage(file: KoFileDeclaration): Boolean =
-        "/com/applock/di/" in file.path.replace('\\', '/')
 
     // A real Graph consumer: cross-package call sites must import com.applock.core.Graph;
     // the only same-package case is core/ itself. This is more precise than a raw text match

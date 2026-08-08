@@ -1,6 +1,6 @@
 # ADR-015 — Hilt Adoption Plan (Replacing the Graph Service Locator)
 
-**Status:** Accepted — execution in M1 · **Date:** 2026-07-19 · **Source:** M0 decision; SDS §5.5, TAS §70
+**Status:** Accepted — implemented in M1/WP5 (2026-08-08); formal closure at the M1/WP8 gate, after the device gating-regression suite runs on the Hilt build · **Date:** 2026-07-19 · **Source:** M0 decision; SDS §5.5, TAS §70
 
 ## Context
 `core/Graph.kt` is a global service locator, prohibited by SDS §5.5. It was always intended as a placeholder ("can be replaced with Hilt later"). All constructed objects already use constructor injection; only lookup sites couple to `Graph`.
@@ -20,3 +20,33 @@ R8 + Hilt interaction is exercised by the CI release-build smoke test from day o
 
 ## Consequences
 NFR-TEST-001 improves (mock substitution); SDS §5 compliance achieved; ~15 files touched mechanically in M1.
+
+## Implementation
+
+**2026-08-08 (M1 / WP5) — executed** (Hilt 2.56.2 + hilt-navigation-compose, KSP). `di/AppModule.kt`
+reproduces every former `Graph` member as `@Provides @Singleton` (identical construction
+expressions; the two settings closures — `LockSessionManager.policyProvider` and `IntruderPolicy`
+enabled/threshold — preserved verbatim; `@ApplicationScope` qualifier for the app `CoroutineScope`).
+The 12 domain/data classes were left un-annotated (construction lives in the module). Entry points:
+`@AndroidEntryPoint` field injection on `MainActivity`, `LockScreenActivity`, `AppDetectionService`,
+`ProtectionWatchdogService`; `@HiltViewModel` on `AppListViewModel` / `VaultViewModel` /
+`IntruderLogViewModel` plus two thin new VMs (`AuthGateViewModel`, `SettingsViewModel`) for the
+composable-only consumers; `AppLockApplication` is `@HiltAndroidApp` and re-runs the startup
+policy-cache warm-up via an injected `LockPolicyManager`. `Graph.kt` deleted; Konsist **R1** flipped
+from "no new lookups" to the terminal "Graph must not exist / is not referenced."
+
+**Deviations from the Decision's step 3 wording (implementation reality, decision content
+unchanged):**
+- `AppDetectionService` (the accessibility service) uses **`@AndroidEntryPoint` field injection**,
+  which works for an `AccessibilityService`; the "entry-point accessors" this ADR earmarked for the
+  a11y service were not needed there.
+- `BootReceiver` instead required the **`@EntryPoint` + `EntryPointAccessors`** technique: a
+  `BroadcastReceiver.onReceive` overrides an abstract member, so the `super.onReceive()` call Hilt's
+  `@AndroidEntryPoint` member injection needs does not compile. (`UninstallProtectionReceiver` needs
+  no DI and is not annotated.)
+
+**Verification:** `assembleProdRelease` + `minifyProdReleaseWithR8` clean (the ADR's R8-interaction
+risk is retired); 71 unit tests / 2 skipped / 0 failures; detekt + lint green. The device
+gating-regression suite (OV-3/OV-4/F3) is the remaining exit criterion before ADR closure — it is
+hardware-gated and runs at WP5 close / into WP8. Evidence:
+`docs/reports/campaigns/2026-08-08_wp5-hilt-migration_2012-i7.md`.

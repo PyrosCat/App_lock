@@ -4,6 +4,42 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M1/WP5 — Hilt DI migration: retire the Graph service locator (ADR-015)   (2026-08-08)
+---------------------------------------------------------------------------
+Mechanical, behavior-preserving replacement of core/Graph with Hilt. Split into two
+commits (introduce Hilt with Graph left dead; then delete Graph + flip Konsist R1),
+each independently green. rtm.csv untouched (WP8 batch). The device gating-regression
+harness (OV-3/OV-4/F3) is the remaining hardware-gated exit step before ADR-015 closes.
+
+- Hilt 2.56.2 + androidx.hilt:hilt-navigation-compose 1.2.0 (KSP). di/AppModule.kt
+  reproduces every Graph member 1:1 as @Provides @Singleton (same construction
+  expressions; the LockSessionManager + IntruderPolicy settings-closures preserved
+  verbatim; @ApplicationScope qualifier for the app CoroutineScope). The 12 domain/data
+  classes stay un-annotated — construction lives in the module.
+- Entry points: @AndroidEntryPoint field injection on MainActivity, LockScreenActivity,
+  AppDetectionService, ProtectionWatchdogService; @HiltAndroidApp on AppLockApplication
+  (startup cache warm-up re-run via injected LockPolicyManager). ViewModels →
+  @HiltViewModel: AppListViewModel/VaultViewModel/IntruderLogViewModel + two thin new VMs
+  (AuthGateViewModel, SettingsViewModel) for the composable-only Graph consumers (gate +
+  settings). Passthroughs are synchronous/same-thread — no behavior change.
+- BootReceiver uses a Hilt @EntryPoint + EntryPointAccessors, NOT @AndroidEntryPoint: a
+  BroadcastReceiver.onReceive overrides an abstract member, so the super.onReceive() that
+  Hilt member injection needs does not compile (deviation from ADR-015 step 3, which had
+  earmarked entry-point accessors for the a11y service — that one worked with field
+  injection). UninstallProtectionReceiver needs no DI, left un-annotated.
+- Graph.kt deleted; Konsist R1 flipped from "no new Graph lookups (frozen baseline)" to
+  the terminal "Graph must not exist / is not referenced" (r1GraphBaseline + isInDiPackage
+  removed). R3 unchanged; R2/R4 stay dormant (WP6).
+- Build hygiene: packaging exclude for META-INF/versions/9/OSGI-INF/MANIFEST.MF
+  (org.jspecify, a new Dagger transitive, collides with bcprov). detekt baseline: re-keyed
+  8 pre-existing entries whose signatures shifted (7 composables viewModel()→hiltViewModel();
+  1 LockScreenActivity Wrapping Graph.lockEngine→lockEngine) — same debt, re-keyed, nothing
+  new silenced; two new DI-provider LongParameterList findings accepted via @Suppress at the
+  call site (mirrors the already-baselined engine constructor).
+- Verified: assembleProdRelease + minifyProdReleaseWithR8 clean (R8+Hilt OK, no Phase-2
+  déjà vu); 71 tests / 2 skipped / 0 fail; detekt + lint green; zero Graph references.
+
+
 M1/WP4 — build environments & dependency governance (ADR-017)   (2026-08-07)
 ---------------------------------------------------------------------------
 WP4 delivered and locally verified: 8 variants assemble, tests green, license
