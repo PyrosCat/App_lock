@@ -4,6 +4,11 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs — README roadmap: fix Mermaid render on GitHub   (2026-08-08)
+------------------------------------------------------------------
+Reordered the flowchart so the M1 subgraph is declared before edges reference it — the pre-declaration `--> M1` had created a plain node that collided with the subgraph id (GitHub's "Cannot read properties of undefined (reading 'render')"). Verified 200 OK via a real Mermaid engine.
+
+
 M1/WP5 — Hilt DI migration: retire the Graph service locator (ADR-015)   (2026-08-08)
 ---------------------------------------------------------------------------
 Mechanical, behavior-preserving replacement of core/Graph with Hilt. Split into two

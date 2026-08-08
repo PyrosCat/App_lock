@@ -37,22 +37,33 @@ M1 (foundation retrofit = IS Phase 0) is broken into work packages WP1–WP8
 
 ```mermaid
 flowchart LR
-    M0["M0 ✅ Baseline and governance"]:::done --> M1
-    subgraph M1 ["M1 · Foundation retrofit (IS Phase 0) — current"]
-      direction LR
-      WP1["WP1 ✅ CI freeze"]:::done --> WP2["WP2 ✅ Device harness"]:::done
-      WP2 --> WP3["WP3 ✅ Static analysis"]:::done --> WP4["WP4 ✅ Build variants"]:::done
-      WP4 --> WP5["WP5 ✅* Hilt migration"]:::current --> WP6["WP6 ▶ next · Package realign"]:::next
-      WP6 --> WP7["WP7 · DB fail-safe"] --> WP8["WP8 · Instrumentation + gate"]
-    end
-    M1 --> M2["M2 · Security gate: two-tier detection"]
-    M2 --> M3["M3 · MVP: backup, onboarding, MVVM"]
-    M3 --> M4["M4 · Automation"]
-    M4 --> M5["M5 · Production hardening"]
-    M5 --> M6["M6 · Hardening and release → v1.0.0"]
     classDef done fill:#d4edda,stroke:#28a745,color:#155724
     classDef current fill:#fff3cd,stroke:#e0a800,color:#856404
     classDef next fill:#d1ecf1,stroke:#17a2b8,color:#0c5460
+
+    M0["M0 ✅ Baseline and governance"]:::done
+
+    subgraph M1 ["M1 · Foundation retrofit (IS Phase 0) — current"]
+      direction LR
+      WP1["WP1 ✅ CI freeze"]:::done
+      WP2["WP2 ✅ Device harness"]:::done
+      WP3["WP3 ✅ Static analysis"]:::done
+      WP4["WP4 ✅ Build variants"]:::done
+      WP5["WP5 ✅* Hilt migration"]:::current
+      WP6["WP6 ▶ next · Package realign"]:::next
+      WP7["WP7 · DB fail-safe"]
+      WP8["WP8 · Instrumentation + gate"]
+      WP1 --> WP2 --> WP3 --> WP4 --> WP5 --> WP6 --> WP7 --> WP8
+    end
+
+    M2["M2 · Security gate: two-tier detection"]
+    M3["M3 · MVP: backup, onboarding, MVVM"]
+    M4["M4 · Automation"]
+    M5["M5 · Production hardening"]
+    M6["M6 · Hardening and release → v1.0.0"]
+
+    M0 --> M1
+    M1 --> M2 --> M3 --> M4 --> M5 --> M6
 ```
 
 \* **WP5 (Hilt) is code-complete and locally verified** (71 unit tests, R8 release build clean,
