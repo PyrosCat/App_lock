@@ -6,18 +6,25 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.view.accessibility.AccessibilityEvent
-import com.applock.core.Graph
+import com.applock.applocker.engine.ApplicationLockEngine
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 /**
  * Monitors foreground application changes via window-state accessibility
  * events (TAS §10) and forwards them to the lock engine.
  */
+@AndroidEntryPoint
 class AppDetectionService : AccessibilityService() {
 
+    @Inject
+    lateinit var lockEngine: ApplicationLockEngine
+
+    // Read lazily in onReceive (screen-off, long after Hilt injection completes in onCreate).
     private val screenOffReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
-                Graph.lockEngine.onScreenOff()
+                lockEngine.onScreenOff()
             }
         }
     }
@@ -30,7 +37,7 @@ class AppDetectionService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val packageName = event.packageName?.toString() ?: return
-        Graph.lockEngine.onAppForegrounded(packageName)
+        lockEngine.onAppForegrounded(packageName)
     }
 
     override fun onInterrupt() = Unit

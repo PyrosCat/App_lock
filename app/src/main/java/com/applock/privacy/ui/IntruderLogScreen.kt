@@ -47,7 +47,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.applock.R
 import com.applock.core.database.IntruderEventEntity
 import java.text.DateFormat
@@ -58,7 +58,7 @@ import java.util.Date
 @Composable
 fun IntruderLogScreen(
     onBack: () -> Unit,
-    viewModel: IntruderLogViewModel = viewModel(),
+    viewModel: IntruderLogViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onBack)
 

@@ -10,14 +10,14 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -43,13 +43,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.applock.R
 import com.applock.applocker.admin.UninstallProtectionReceiver
 import com.applock.applocker.session.RelockPolicy
-import com.applock.core.Graph
 import com.applock.privacy.IntruderPolicy
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,12 +59,13 @@ fun SettingsScreen(
     onOpenIntruderLog: () -> Unit,
 ) {
     BackHandler(onBack = onBack)
+    val settingsVm: SettingsViewModel = hiltViewModel()
 
-    var selected by remember { mutableStateOf(Graph.settings.relockPolicy) }
+    var selected by remember { mutableStateOf(settingsVm.settings.relockPolicy) }
 
     fun select(policy: RelockPolicy) {
         selected = policy
-        Graph.settings.relockPolicy = policy
+        settingsVm.settings.relockPolicy = policy
     }
 
     Scaffold(
@@ -122,7 +123,7 @@ fun SettingsScreen(
             }
             if (biometricsSupported) {
                 var biometricsEnabled by remember {
-                    mutableStateOf(Graph.settings.biometricUnlockEnabled)
+                    mutableStateOf(settingsVm.settings.biometricUnlockEnabled)
                 }
                 ToggleOption(
                     title = stringResource(R.string.settings_biometric_title),
@@ -130,7 +131,7 @@ fun SettingsScreen(
                     checked = biometricsEnabled,
                     onCheckedChange = {
                         biometricsEnabled = it
-                        Graph.settings.biometricUnlockEnabled = it
+                        settingsVm.settings.biometricUnlockEnabled = it
                     },
                 )
             }
@@ -173,16 +174,17 @@ fun SettingsScreen(
 @Composable
 private fun IntruderSettings(onOpenIntruderLog: () -> Unit) {
     val context = LocalContext.current
-    var enabled by remember { mutableStateOf(Graph.settings.intruderCaptureEnabled) }
+    val settingsVm: SettingsViewModel = hiltViewModel()
+    var enabled by remember { mutableStateOf(settingsVm.settings.intruderCaptureEnabled) }
     var threshold by remember {
-        mutableStateOf(Graph.settings.intruderCaptureThreshold)
+        mutableStateOf(settingsVm.settings.intruderCaptureThreshold)
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            Graph.settings.intruderCaptureEnabled = true
+            settingsVm.settings.intruderCaptureEnabled = true
             enabled = true
         } else {
             Toast.makeText(
@@ -199,13 +201,13 @@ private fun IntruderSettings(onOpenIntruderLog: () -> Unit) {
         checked = enabled,
         onCheckedChange = { wanted ->
             if (!wanted) {
-                Graph.settings.intruderCaptureEnabled = false
+                settingsVm.settings.intruderCaptureEnabled = false
                 enabled = false
             } else if (
                 ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
                 PackageManager.PERMISSION_GRANTED
             ) {
-                Graph.settings.intruderCaptureEnabled = true
+                settingsVm.settings.intruderCaptureEnabled = true
                 enabled = true
             } else {
                 permissionLauncher.launch(Manifest.permission.CAMERA)
@@ -234,7 +236,7 @@ private fun IntruderSettings(onOpenIntruderLog: () -> Unit) {
                             selected = threshold == choice,
                             onClick = {
                                 threshold = choice
-                                Graph.settings.intruderCaptureThreshold = choice
+                                settingsVm.settings.intruderCaptureThreshold = choice
                             },
                             role = Role.RadioButton,
                         )

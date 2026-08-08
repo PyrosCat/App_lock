@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,6 +36,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -47,23 +49,27 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.runtime.DisposableEffect
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.applock.R
 import com.applock.applocker.service.AppDetectionService
 import com.applock.applocker.service.ProtectionWatchdogService
 import com.applock.authentication.ui.PinPad
-import com.applock.core.Graph
 import com.applock.core.security.LockoutState
 import com.applock.privacy.ui.IntruderLogScreen
 import com.applock.ui.theme.AppLockTheme
 import com.applock.vault.ui.VaultScreen
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    // Same activity-scoped instance the gate composables get via hiltViewModel() — used here for
+    // the onCreate PIN-set check (formerly Graph.credentialRepository).
+    private val authGate: AuthGateViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,7 +91,7 @@ class MainActivity : ComponentActivity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 0)
         }
 
-        if (Graph.credentialRepository.isPinSet()) {
+        if (authGate.isPinSet()) {
             ProtectionWatchdogService.start(this)
         }
 
@@ -103,7 +109,8 @@ private enum class Screen { PIN_SETUP, SELF_GATE, APP_LIST, SETTINGS, VAULT, INT
 
 @Composable
 private fun AppLockNav() {
-    val pinSet = Graph.credentialRepository.isPinSet()
+    val authGate: AuthGateViewModel = hiltViewModel()
+    val pinSet = authGate.isPinSet()
     var screen by rememberSaveable {
         mutableStateOf(if (pinSet) Screen.SELF_GATE else Screen.PIN_SETUP)
     }
@@ -152,6 +159,7 @@ private fun AppLockNav() {
 
 @Composable
 private fun PinSetupScreen(onDone: () -> Unit) {
+    val authGate: AuthGateViewModel = hiltViewModel()
     var firstPin by remember { mutableStateOf<String?>(null) }
     var error by remember { mutableStateOf(false) }
 
@@ -166,7 +174,7 @@ private fun PinSetupScreen(onDone: () -> Unit) {
             firstPin = entered
             error = false
         } else if (firstPin == entered) {
-            Graph.credentialRepository.setPin(entered.toCharArray())
+            authGate.setPin(entered.toCharArray())
             onDone()
         } else {
             firstPin = null
@@ -178,6 +186,7 @@ private fun PinSetupScreen(onDone: () -> Unit) {
 
 @Composable
 private fun SelfGateScreen(onUnlocked: () -> Unit) {
+    val authGate: AuthGateViewModel = hiltViewModel()
     var error by remember { mutableStateOf(false) }
 
     // The app's own gate counts toward the same lockout as protected apps
@@ -186,7 +195,7 @@ private fun SelfGateScreen(onUnlocked: () -> Unit) {
     LaunchedEffect(Unit) {
         while (true) {
             lockoutRemainingMs =
-                (Graph.lockoutManager.currentState() as? LockoutState.LockedOut)
+                (authGate.lockoutState() as? LockoutState.LockedOut)
                     ?.remainingMs ?: 0L
             delay(250)
         }
@@ -210,19 +219,19 @@ private fun SelfGateScreen(onUnlocked: () -> Unit) {
         subtitle = subtitle,
     ) { pin ->
         if (lockoutRemainingMs > 0 ||
-            Graph.lockoutManager.currentState() is LockoutState.LockedOut
+            authGate.lockoutState() is LockoutState.LockedOut
         ) {
             return@PinEntryScaffold true
         }
-        if (Graph.credentialRepository.verifyPin(pin)) {
-            Graph.lockEngine.onUnlockSuccess(context.packageName)
+        if (authGate.verifyPin(pin)) {
+            authGate.onUnlockSuccess(context.packageName)
             onUnlocked()
             false
         } else {
             error = true
             // Through the engine (not lockoutManager directly) so gate failures
             // are audit-logged and count toward intruder capture (FR-081).
-            Graph.lockEngine.onUnlockFailure(context.packageName)
+            authGate.onUnlockFailure(context.packageName)
             true
         }
     }
@@ -256,7 +265,7 @@ private fun PinEntryScaffold(
 private fun AppListScreen(
     onOpenSettings: () -> Unit,
     onOpenVault: () -> Unit,
-    viewModel: AppListViewModel = viewModel(),
+    viewModel: AppListViewModel = hiltViewModel(),
 ) {
     val apps by viewModel.apps.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current

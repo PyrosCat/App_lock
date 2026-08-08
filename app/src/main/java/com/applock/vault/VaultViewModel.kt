@@ -5,8 +5,8 @@ import android.net.Uri
 import android.util.LruCache
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.applock.core.Graph
 import com.applock.core.database.VaultItemEntity
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,10 +15,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class VaultViewModel : ViewModel() {
-
-    private val repository = Graph.vaultRepository
+@HiltViewModel
+class VaultViewModel @Inject constructor(
+    private val repository: VaultRepository,
+) : ViewModel() {
 
     val items: StateFlow<List<VaultItemEntity>> = repository.items
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())

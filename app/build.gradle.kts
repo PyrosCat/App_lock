@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.detekt)
     alias(libs.plugins.license.report)
+    alias(libs.plugins.hilt)
 }
 
 android {
@@ -102,6 +103,16 @@ android {
         // M2/M3 gate reviews) — never regenerate it to silence a new finding.
         baseline = file("lint-baseline.xml")
     }
+
+    packaging {
+        resources {
+            // WP5 (M1): Hilt/Dagger 2.56 pulls in org.jspecify:jspecify, whose multi-release-JAR
+            // OSGi manifest collides with the same path in bcprov-jdk18on. It is build metadata,
+            // absent from the runtime APK either way — exclude it so mergeJavaResource does not
+            // fail on the duplicate.
+            excludes += "/META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+        }
+    }
 }
 
 // WP3 (M1, ADR-016): detekt = style/complexity + ktlint formatting ruleset. Architecture
@@ -158,6 +169,11 @@ dependencies {
     implementation(libs.androidx.camera.camera2)
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.kotlinx.coroutines.android)
+
+    // WP5 (M1, ADR-015): Hilt DI — replaces the core/Graph service locator.
+    implementation(libs.hilt.android)
+    implementation(libs.androidx.hilt.navigation.compose)
+    ksp(libs.hilt.android.compiler)
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

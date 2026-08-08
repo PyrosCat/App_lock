@@ -5,10 +5,12 @@ import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.applock.applocker.service.ProtectionWatchdogService
-import com.applock.core.Graph
+import com.applock.core.database.ProtectedAppDao
 import com.applock.core.database.ProtectedAppEntity
+import com.applock.core.database.SecurityEventDao
 import com.applock.core.database.SecurityEventEntity
 import com.applock.core.database.SecurityEventType
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -17,6 +19,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
 data class InstalledApp(
     val packageName: String,
@@ -24,9 +27,13 @@ data class InstalledApp(
     val isProtected: Boolean,
 )
 
-class AppListViewModel(application: Application) : AndroidViewModel(application) {
+@HiltViewModel
+class AppListViewModel @Inject constructor(
+    application: Application,
+    private val dao: ProtectedAppDao,
+    private val securityEventDao: SecurityEventDao,
+) : AndroidViewModel(application) {
 
-    private val dao = Graph.database.protectedAppDao()
     private val installedApps = MutableStateFlow<List<Pair<String, String>>>(emptyList())
 
     val apps: StateFlow<List<InstalledApp>> =
@@ -69,7 +76,7 @@ class AppListViewModel(application: Application) : AndroidViewModel(application)
             } else {
                 dao.delete(packageName)
             }
-            Graph.database.securityEventDao().insert(
+            securityEventDao.insert(
                 SecurityEventEntity(
                     eventType = if (protect) SecurityEventType.APP_PROTECTED
                     else SecurityEventType.APP_UNPROTECTED,

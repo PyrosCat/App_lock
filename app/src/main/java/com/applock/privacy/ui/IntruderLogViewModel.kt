@@ -4,17 +4,22 @@ import android.graphics.Bitmap
 import android.util.LruCache
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.applock.core.Graph
+import com.applock.core.database.IntruderEventDao
 import com.applock.core.database.IntruderEventEntity
+import com.applock.privacy.IntruderCaptureManager
+import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-class IntruderLogViewModel : ViewModel() {
+@HiltViewModel
+class IntruderLogViewModel @Inject constructor(
+    private val dao: IntruderEventDao,
+    private val captureManager: IntruderCaptureManager,
+) : ViewModel() {
 
-    private val dao = Graph.database.intruderEventDao()
-    private val captureManager = Graph.intruderCaptureManager
     private val photoCache = LruCache<Long, Bitmap>(16)
 
     val events: StateFlow<List<IntruderEventEntity>> = dao.observeAll()

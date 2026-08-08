@@ -14,10 +14,14 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.applock.R
-import com.applock.core.Graph
+import com.applock.applocker.policy.LockPolicyManager
+import com.applock.core.database.SecurityEventDao
 import com.applock.core.database.SecurityEventEntity
 import com.applock.core.database.SecurityEventType
+import com.applock.core.security.CredentialRepository
+import com.applock.di.ApplicationScope
 import com.applock.ui.MainActivity
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,6 +29,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 /**
  * Foreground watchdog (FR-179): keeps the process warm and periodically
@@ -35,8 +40,24 @@ import kotlinx.coroutines.launch
  * Stops itself when there is nothing to protect so the ongoing notification
  * doesn't linger for unconfigured installs.
  */
+@AndroidEntryPoint
 class ProtectionWatchdogService : Service() {
 
+    @Inject
+    lateinit var credentialRepository: CredentialRepository
+
+    @Inject
+    lateinit var policyManager: LockPolicyManager
+
+    @Inject
+    @ApplicationScope
+    lateinit var appScope: CoroutineScope
+
+    @Inject
+    lateinit var securityEventDao: SecurityEventDao
+
+    // The health-check loop's own scope — cancelled in onDestroy. Distinct from the injected
+    // application scope (appScope), which must outlive this service for the disablement audit.
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var wasHealthy = true
 
@@ -62,8 +83,8 @@ class ProtectionWatchdogService : Service() {
     }
 
     private fun checkProtectionHealth() {
-        val expectProtection = Graph.credentialRepository.isPinSet() &&
-            Graph.policyManager.protectedPackages.value.isNotEmpty()
+        val expectProtection = credentialRepository.isPinSet() &&
+            policyManager.protectedPackages.value.isNotEmpty()
         if (!expectProtection) {
             stopSelf()
             return
@@ -74,8 +95,8 @@ class ProtectionWatchdogService : Service() {
         if (!healthy) {
             if (wasHealthy) {
                 Log.w(TAG, "Accessibility service disabled while apps are protected")
-                Graph.appScope.launch {
-                    Graph.database.securityEventDao().insert(
+                appScope.launch {
+                    securityEventDao.insert(
                         SecurityEventEntity(
                             eventType = SecurityEventType.PROTECTION_DISABLED,
                             packageName = null,

@@ -41,18 +41,36 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.applock.R
+import com.applock.applocker.engine.ApplicationLockEngine
 import com.applock.applocker.engine.ApplicationLockEngine.UnlockMethod
-import com.applock.core.Graph
+import com.applock.core.SettingsRepository
+import com.applock.core.security.CredentialRepository
+import com.applock.core.security.LockoutManager
 import com.applock.core.security.LockoutState
 import com.applock.ui.theme.AppLockTheme
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
+import javax.inject.Inject
 
 /**
  * Shown on top of a protected app when authentication is required.
  * FragmentActivity (not ComponentActivity) because androidx.biometric
  * requires one to host its prompt.
  */
+@AndroidEntryPoint
 class LockScreenActivity : FragmentActivity() {
+
+    @Inject
+    lateinit var lockEngine: ApplicationLockEngine
+
+    @Inject
+    lateinit var settings: SettingsRepository
+
+    @Inject
+    lateinit var credentialRepository: CredentialRepository
+
+    @Inject
+    lateinit var lockoutManager: LockoutManager
 
     private lateinit var targetPackage: String
     private var authenticated = false
@@ -79,13 +97,13 @@ class LockScreenActivity : FragmentActivity() {
         // Back must not reveal the protected app underneath.
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                Graph.lockEngine.onLockScreenDismissed(targetPackage)
+                lockEngine.onLockScreenDismissed(targetPackage)
                 finish()
             }
         })
 
         val appLabel = resolveAppLabel(targetPackage)
-        val biometricsAvailable = Graph.settings.biometricUnlockEnabled &&
+        val biometricsAvailable = settings.biometricUnlockEnabled &&
             BiometricManager.from(this)
                 .canAuthenticate(BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS
 
@@ -126,14 +144,14 @@ class LockScreenActivity : FragmentActivity() {
                             PinPad(
                                 onPinComplete = { pin ->
                                     if (lockoutRemaining() > 0) return@PinPad true
-                                    if (Graph.credentialRepository.verifyPin(pin)) {
+                                    if (credentialRepository.verifyPin(pin)) {
                                         authenticated = true
-                                        Graph.lockEngine.onUnlockSuccess(targetPackage)
+                                        lockEngine.onUnlockSuccess(targetPackage)
                                         finish()
                                         false // don't clear — we're leaving
                                     } else {
                                         error = true
-                                        Graph.lockEngine.onUnlockFailure(targetPackage)
+                                        lockEngine.onUnlockFailure(targetPackage)
                                         true // clear input, let the user retry
                                     }
                                 },
@@ -166,7 +184,7 @@ class LockScreenActivity : FragmentActivity() {
     }
 
     private fun lockoutRemaining(): Long =
-        (Graph.lockoutManager.currentState() as? LockoutState.LockedOut)?.remainingMs ?: 0L
+        (lockoutManager.currentState() as? LockoutState.LockedOut)?.remainingMs ?: 0L
 
     private fun showBiometricPrompt(appLabel: String) {
         if (biometricInFlight || lockoutRemaining() > 0) return
@@ -178,7 +196,7 @@ class LockScreenActivity : FragmentActivity() {
                 override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                     biometricInFlight = false
                     authenticated = true
-                    Graph.lockEngine.onUnlockSuccess(targetPackage, UnlockMethod.BIOMETRIC)
+                    lockEngine.onUnlockSuccess(targetPackage, UnlockMethod.BIOMETRIC)
                     finish()
                 }
 

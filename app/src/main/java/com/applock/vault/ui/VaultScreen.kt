@@ -65,7 +65,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.applock.R
 import com.applock.core.database.VaultItemEntity
 import com.applock.ui.SelfLock
@@ -79,7 +79,7 @@ import java.util.Date
 @Composable
 fun VaultScreen(
     onBack: () -> Unit,
-    viewModel: VaultViewModel = viewModel(),
+    viewModel: VaultViewModel = hiltViewModel(),
 ) {
     BackHandler(onBack = onBack)
 
