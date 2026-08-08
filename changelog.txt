@@ -4,6 +4,18 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M1/WP5 — device gate: Moto G 2025 gating regression 2/2 green (real hardware)   (2026-08-08)
+-------------------------------------------------------------------------------------------
+Post-Hilt gating-regression harness on the physical Moto G 2025 (Android 15 / arm64 / 720×1604):
+`run_all.sh --skip-setup -n 2` → smoke / OV-3 / OV-4 / F3 all PASS 2/2, matching the pre-Hilt
+WP2 baseline on the same device (2026-07-23) → no Hilt regression. ADR-015's closure gate
+(real-hardware half) is MET; WP6 unblocked. The NucBox emulator API 26/29/33/35 matrix (the
+emulator half) is still owed. Two operator notes captured in the report: OV-4 was clean on real
+hardware (R-002 is an emulator artifact), and the harness assumes portrait — the device was in
+landscape and every gesture missed until accelerometer_rotation/user_rotation were forced to 0.
+Evidence: docs/reports/campaigns/2026-08-08_wp5-harness_moto-g-2025.md.
+
+
 Docs — README roadmap: fix Mermaid render on GitHub   (2026-08-08)
 ------------------------------------------------------------------
 Reordered the flowchart so the M1 subgraph is declared before edges reference it — the pre-declaration `--> M1` had created a plain node that collided with the subgraph id (GitHub's "Cannot read properties of undefined (reading 'render')"). Verified 200 OK via a real Mermaid engine.
