@@ -4,7 +4,48 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
-M1/WP5 — device gate: Moto G 2025 gating regression 2/2 green (real hardware)   (2026-08-08)
+Analysis — R-002 rapid-relaunch lock race: root cause   (2026-08-09)
+-------------------------------------------------------------------
+Root-cause analysis of R-002 (HF-002), backed by code + the NucBox WP2
+logcat evidence + external research.
+
+- docs/reports/security/2026-08-09_r-002-rapid-relaunch-race-analysis.md —
+  NEW (first report under reports/security/). R-002 is a STRUCTURAL race, not
+  a tunable flake: the engine detects reactively via an async accessibility
+  event, then covers the app with a full-screen noHistory Activity that
+  competes in the same task ordering as the app's own am-starts and
+  self-finishes the instant it loses. Detection isn't the miss (engine fires
+  5-8 lock launches/burst); the lock just can't win the last window
+  transition. BAL restrictions (API 29+) add platform headwind and explain
+  the noisy, non-monotonic per-API rate.
+- Fix is a MECHANISM change, not tuning: suspend the target app (Device
+  Owner) so it can't foreground pre-auth (what robust lockers do); or hold a
+  persistent overlay instead of a raced noHistory activity; at minimum drop
+  noHistory so a lost race self-heals. Complements ADR-013A/R-001 (detection
+  half) — accessibility-reactive covering shouldn't be the sole enforcement.
+- No code/RTM change. R-002 itself lives in RISK_REGISTER (lead-owned); this
+  analysis record is written for that risk to reference. A timestamped
+  activity-ordering trace on real hardware is the recommended confirmation.
+
+
+Report — WP5 post-Hilt gating regression on the NucBox emulator matrix   (2026-08-09)
+------------------------------------------------------------------------------------
+NucBox emulator complement to the Moto G real-hardware WP5 gate (below). Rebuilt the
+post-Hilt prod-debug APK from 3a0e6fd and ran the WP2 harness across matrix_api26/29/33/35.
+
+- docs/reports/campaigns/2026-08-09_wp5-matrix_nucbox-g5.md — NEW immutable report.
+  WP5 (ADR-015) did NOT regress the gating: OV-3 IMMEDIATE relock 10/10 and F3 self-gate
+  PASS on every run at every level. With the Moto G 2025 real-hardware gate, this is the
+  ADR-015 hardware-gated exit evidence on the x86_64 emulator matrix.
+- R-002 rapid-relaunch race re-checked post-Hilt — statistically UNCHANGED vs pre-Hilt at
+  every level (API 26 ~25% vs ~30%; 29 ~12% vs ~12%; 33 ~37% vs ~37%; 35 present both).
+  WP5 neither fixed nor worsened it (behavior-preserving). R-002 stays open, tracked.
+- API 29 gotcha (not an app bug): a KNOWN Android-10 emulator Zygote-init race
+  intermittently caps app heap at -Xmx16m, so the 19 MiB Argon2 PIN hash OOM-crashed
+  PIN creation. Confirmed via research; the standard adb-root + heapgrowthlimit=256m +
+  framework-restart workaround let it provision and behave like every other level.
+- No app/repo change; runtime-only emulator heap override. RTM untouched (FR-108 self-gate
+  already carries WP2 verification; gate/WP8 owns any status change).
 -------------------------------------------------------------------------------------------
 Post-Hilt gating-regression harness on the physical Moto G 2025 (Android 15 / arm64 / 720×1604):
 `run_all.sh --skip-setup -n 2` → smoke / OV-3 / OV-4 / F3 all PASS 2/2, matching the pre-Hilt
