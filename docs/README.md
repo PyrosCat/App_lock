@@ -61,7 +61,7 @@ stay one line. `scripts/` holds tooling (e.g. `extract_docx.py`). `app/` is the 
 | `architecture/adr/` | Individual **decisions** with rationale + consequences, numbered, dated. | Append-only; each is small (`.md`). | …you made or are recording a significant decision (tech choice, boundary, constraint). One file `ADR-NNN-<slug>.md`; add a row to `adr/README.md`. |
 | `design/sds/` | *How* components are designed internally (per-subsystem). | Read-mostly spec (`.docx`). | …component-level design is specified/changed. |
 | `design/dds/` | *How* the database is designed — architecture, logical, physical, operations volumes. | Read-mostly spec (`.docx`). | …database design is specified/changed. |
-| `process/` | **How the project is run and evolves**: Implementation Strategy, migration assessment, phase plans (M0/M1…), the RTM, the risk register, environment setup, governance/gate records, **operational & machine/fleet status**. | Living working docs (`.md`). | …it's a plan, a process/governance record, a tracked risk, a dev-environment or **fleet/machine status report**, or anything about *running the project* rather than the product spec. |
+| `process/` | **How the project is run and evolves**: Implementation Strategy, the roadmap (milestone status), migration assessment (frozen snapshot), phase plans (M0/M1…), the RTM, the risk register, environment setup, governance/gate records, **operational & machine/fleet status**. | Living working docs (`.md`); snapshots frozen per GOVERNANCE.md §5.1. | …it's a plan, a process/governance record, a tracked risk, a dev-environment or **fleet/machine status report**, or anything about *running the project* rather than the product spec. |
 | `security/` | **Security governance & analysis**: the **Threat Model** (`tm/`, 16 sections — *what we defend against*; **v2**, fully reconciled to the two-tier model, see `tm/VERSION.md`) and the authored **Secure Coding Standard** (*how we write secure code*). | `tm/`: read-mostly spec (`.docx` + `md/`). SCS: living (`.md`). | …it's a security governance/analysis doc: Threat Model in `tm/`; the authored SCS at the area root. Security *requirements* stay in `srs/` §8, security *architecture* in `tas/` Part III, the risk register in `process/`. |
 | `testing/` | Test **plans** (`.md`, area root): what to verify, procedures, harness specs. `tsp/`: the client-received **Test Specification** volumes. | Plans: living (`.md`). `tsp/`: read-mostly spec (`.docx`). | …it defines how something will be tested (plans at root; only client-received Test Spec revisions go in `tsp/`). Results go to `reports/campaigns/`. |
 | `reports/` | **Evidence**: dated, immutable records — fleet/machine status, executed campaign results, gate reviews, benchmarks, security reviews, release records. | Append-only, never edited (`.md`). | …you are recording **what happened**: an observation, measurement, review, or test execution. See `reports/README.md` for categories + naming (`YYYY-MM-DD_topic_host.md`). |
@@ -112,7 +112,10 @@ The general split: **plan** ("how we'll test/set up") → `process/` or `testing
 
 ## Orientation shortcuts (read these first on a new machine)
 
-- `docs/process/MIGRATION_ASSESSMENT.md` — the current state of the project and the migration plan.
+- `docs/process/ROADMAP.md` — where the project stands: milestone status M0–M6 + the canonical
+  milestone ↔ IS-phase mapping (living; GOVERNANCE.md §5.3).
+- `docs/process/MIGRATION_ASSESSMENT.md` — the frozen 2026-07-19 re-baseline analysis (how we
+  got here; snapshot — see its status banner).
 - `docs/process/M1_PLAN.md` — the active work (M1 foundation retrofit, work packages WP1–WP8).
 - `docs/architecture/adr/README.md` — the decisions already made (incl. ADR-014 fleet).
 - `docs/process/DEV_ENVIRONMENT_SETUP.md` — how to set up this machine.

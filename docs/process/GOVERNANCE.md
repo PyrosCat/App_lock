@@ -1,14 +1,15 @@
-# Project Governance Rules — RTM, ADR, Git Workflow, Dates
+# Project Governance Rules — RTM, ADR, Git Workflow, Dates, Document Classes & Risk
 
 Authoritative rules for maintaining the Requirements Traceability Matrix, Architecture
-Decision Records, the multi-machine git workflow, and date handling. They bind **every
-contributor — human or AI assistant — on every fleet machine.**
+Decision Records, the multi-machine git workflow, date handling, and document classes &
+risk authority. They bind **every contributor — human or AI assistant — on every fleet
+machine.**
 
 **Keywords:** **MUST** / **MUST NOT** = mandatory, no exceptions without explicit user
 approval recorded in the changelog. **SHOULD** = required unless a justified reason is
 documented where the deviation occurs. **MAY** = optional.
 
-**Precedence:** for the four areas below, this document overrides older guidance in other
+**Precedence:** for the five areas below, this document overrides older guidance in other
 docs; on discovering a conflict, correct the other doc in the next docs commit. Changes to
 this document itself require explicit user approval and a changelog entry.
 
@@ -217,11 +218,70 @@ files — never assume the other machine "knows".
 
 ---
 
-## 5. Enforcement
+## 5. Document Classes & Risk Authority
+
+Adopted 2026-08-10 (user-approved). Trigger: the 2026-08-10 scale/gate crosswalk review
+found risk ratings drifting between a frozen assessment and the living register, with no
+stated rule for which wins.
+
+### 5.1 Document classes
+
+Every `docs/` artifact belongs to exactly one class, which fixes how it may change:
+
+| Class | Examples | Change rule |
+|---|---|---|
+| **Spec (client-received)** | `srs/` `nfr/` `tas/` `sds/` `dds/` `tsp/` `security/tm/` | Preserved verbatim; changes arrive only as new revisions (docs/README.md convention 7). |
+| **Living** | `ROADMAP.md`, `RISK_REGISTER.md`, `M*_PLAN.md`, `rtm.csv`, this document, READMEs | Updated in place; **MUST** reflect current truth at all times. |
+| **Snapshot** | `MIGRATION_ASSESSMENT.md`, `TS_GAP_ANALYSIS.md`, dated analyses | Frozen at their stated date. Original text **MUST NOT** be rewritten; dated annotations **MAY** be added to correct a reading or point at living successors. |
+| **Evidence** | `docs/reports/**` | Immutable per `docs/reports/README.md`. |
+
+When a snapshot's content acquires a living successor, the snapshot **MUST** carry a banner
+naming it, and the living document is authoritative from that date. Citing a snapshot's
+judgments (ratings, priorities) **SHOULD** name it as a snapshot, with its date.
+
+### 5.2 Risk authority
+
+`docs/process/RISK_REGISTER.md` is the **single authoritative record of tracked project
+risks**.
+
+- Gate reviews **MUST** take the risk picture from the register, not from snapshots or
+  prose summaries.
+- Every register entry **MUST** carry: stable `R-NNN` id · category · likelihood · impact ·
+  severity (Likelihood × Impact on the Low/Medium/High/Critical scale, consistent with
+  TM §14) · status · opened date · owner · **affected gate(s)** · provenance where the risk
+  derives from a snapshot or report.
+- TM §14 gate consequences apply: a **Critical** risk **MUST NOT** be silently carried past
+  a gate (TM §14.9); a **High** risk blocks its affected security gate absent remediation or
+  an explicitly approved compensating treatment (TM §14.10).
+- Risk statements anywhere else (assessments, reports, threat-model text) are inputs or
+  history — on conflict the register wins, and the conflicting document is annotated per
+  §5.1.
+
+### 5.3 Milestones and phase citation
+
+`docs/process/ROADMAP.md` owns the canonical mapping **migration milestones M0–M6 ↔
+Implementation Strategy Phases 0–6** and their current status. Because the IS numbers its
+phases **0–6** while the Test Specification lists the same sequence **1–7** (TSP §11.7), a
+bare "Phase N" is ambiguous: phase references in project-authored docs **MUST** be written
+as `IS Phase N (Mx)` — e.g. "IS Phase 1 (M2)".
+
+### 5.4 Classification vocabularies
+
+Ratings **MUST** be qualified by object and source, because the project carries several
+disjoint scales: risk severity (Low/Medium/High/Critical — TM §14, the register), defect
+severity (Critical/Major/Minor — TSP §12.10), defect priority (urgency — TSP §12.11,
+deliberately separate from severity), and two snapshot P-scales (`P0–P3` in
+MIGRATION_ASSESSMENT Phase 10; `P1–P3` in TS_GAP_ANALYSIS — different anchors, different
+ranges). Write "Critical *defect*", "High *risk*", "P1 *(migration)*". Snapshot P-codes
+prioritize plans; they **MUST NOT** be treated as gate criteria.
+
+---
+
+## 6. Enforcement
 
 - A discovered violation of these rules **MUST** be corrected in the next commit touching
   that artifact, and noted in the changelog if it affected recorded state (e.g. an RTM
   status that was overstated).
-- These rules apply from their adoption date (2026-07-22). Pre-existing artifacts are not
-  retroactively rewritten (history stays honest); they are brought into compliance when
-  next touched.
+- These rules apply from their adoption date (2026-07-22; §5 from 2026-08-10). Pre-existing
+  artifacts are not retroactively rewritten (history stays honest); they are brought into
+  compliance when next touched.

@@ -4,6 +4,44 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Governance — document classes, risk authority, living roadmap   (2026-08-10)
+----------------------------------------------------------------------------
+Resolves the risk-record drift found in the 2026-08-10 scale/gate crosswalk review:
+MIGRATION_ASSESSMENT Phase 11 (frozen 2026-07-19) still read "Security risk: Low–Medium"
+while the living register carries R-001/R-002 (both High), and its Schedule and
+Migration-data-loss risks were live but tracked nowhere. Root cause: the assessment fused
+a point-in-time record with a living plan, with no rule for which document wins.
+
+- GOVERNANCE.md: NEW §5 "Document Classes & Risk Authority" (Enforcement renumbered §6;
+  no doc cited the old §5 — verified). §5.1 document classes spec/living/snapshot/evidence
+  with change rules; §5.2 RISK_REGISTER.md declared the single authoritative risk record
+  (required fields incl. affected gate(s); TM §14.9/14.10 gate consequences restated);
+  §5.3 ROADMAP.md owns the M0–M6 ↔ IS-phase mapping and phases are cited "IS Phase N (Mx)"
+  (IS counts 0–6, TSP §11.7 counts the same phases 1–7); §5.4 ratings qualified by
+  object+source (Critical *defect* vs High *risk*; "P1 (migration)" vs "P1 (test-gap)");
+  P-codes never adjudicate gates.
+- docs/process/ROADMAP.md — NEW living milestone tracker, extracted from
+  MIGRATION_ASSESSMENT Phase 12: canonical phase-mapping table + per-milestone
+  status/scope/gate-evidence rows (M0 done, M1 current WP1–5 done, M2 gate-blocked by
+  R-001/R-002, …).
+- RISK_REGISTER.md: authority header; "Affected gate(s)" column + per-entry field
+  (R-001 → M2·M6; R-002 → M2, explicitly NOT an M1 item); promoted from the Phase 11
+  snapshot: NEW R-003 schedule/capacity (High; M1 estimate overrun already tracking) and
+  NEW R-004 fallbackToDestructiveMigration data-loss trap (High; AppLockDatabase.kt still
+  chains it — verified; closes at M1/WP7 with the fail-safe + FR-229 check).
+- MIGRATION_ASSESSMENT.md: frozen-snapshot banner + dated [2026-08-10] annotations on
+  Phases 10 (P0s all done; cite as "Pn (migration)"), 11 (risk rows superseded/resolved →
+  register), and 12 (live plan → ROADMAP.md). Original text unedited throughout.
+- README.md + docs/README.md: orientation now points at ROADMAP.md for current state;
+  MIGRATION_ASSESSMENT relabeled as the frozen baseline analysis.
+- rtm.csv untouched (no requirement changed state; GOVERNANCE §1.4 no drive-bys).
+
+Decision note: no "MIGRATION_ASSESSMENT v2". The living half of that document now lives in
+ROADMAP.md + RISK_REGISTER.md; a new dated assessment is warranted only by a future
+re-baseline event (new client doc drop / major scope change). The M1 gate record (WP8)
+carries the mid-migration state review.
+
+
 Analysis — R-002 rapid-relaunch lock race: root cause   (2026-08-09)
 -------------------------------------------------------------------
 Root-cause analysis of R-002 (HF-002), backed by code + the NucBox WP2

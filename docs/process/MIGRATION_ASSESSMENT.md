@@ -8,6 +8,15 @@ Implementation Strategy v2.0)
 The new documentation set is adopted as authoritative. This assessment determines how the
 existing project migrates to it while preserving the maximum amount of validated work.
 
+> **[2026-08-10 — document status]** This assessment is a **frozen point-in-time record** of
+> the 2026-07-19 re-baseline (snapshot class, GOVERNANCE.md §5.1). Its judgments were correct
+> at that date and are **not maintained**. Living successors: **milestone plan & status →
+> `ROADMAP.md`** (supersedes Phase 12 as the live plan) · **risks → `RISK_REGISTER.md`**
+> (authoritative per GOVERNANCE.md §5.2 — see the Phase 11 annotation; the Phase 11 Security
+> rating in particular is no longer current) · **gap execution → `M1_PLAN.md` + `rtm/rtm.csv`**
+> (see the Phase 10 annotation). Original text below is unedited; all annotations are marked
+> **[2026-08-10]**.
+
 ---
 
 ## Phase 1 — Project Inventory
@@ -329,6 +338,11 @@ cheap precisely because the feature code is small and healthy; it gets cheaper n
 
 ## Phase 10 — Gap Analysis
 
+> **[2026-08-10]** Snapshot prioritization — cite these codes as "P*n* (migration)"
+> (GOVERNANCE.md §5.4). Execution status lives in `ROADMAP.md` / `rtm/rtm.csv`. All four
+> **P0** rows are completed: CI (M1/WP1), Hilt DI (M1/WP5), RTM (M0), repo/docs
+> reorganization (M0).
+
 Priority: **P0** blocks efficient development · **P1** blocks the next phase gates · **P2** needed before release · **P3** deferrable.
 
 | Gap | Area | Priority |
@@ -357,6 +371,13 @@ Priority: **P0** blocks efficient development · **P1** blocks the next phase ga
 
 ## Phase 11 — Risk Assessment
 
+> **[2026-08-10]** Superseded as a risk record — tracked risks live in `RISK_REGISTER.md`
+> (authoritative, GOVERNANCE.md §5.2). Notably: the **Security risk row (Low–Medium)
+> predates R-001 (High, opened 2026-07-23) and R-002 (High, opened 2026-08-06)** and is not
+> current; **Documentation risk (High) is resolved** (Threat Model, Test Specification, and
+> DDS delivered 2026-08-03..05); **Schedule risk → R-003**; the **Migration-risk data-loss
+> trap → R-004**. Remaining rows are historical context.
+
 | Risk | Level | Analysis & mitigation |
 |---|---|---|
 | Architecture risk | **Medium** | The refactor touches a *proven* lock engine whose two historical bypasses (F3 self-gate, F4 fast-relaunch) lived exactly in the code being restructured. Mitigate: freeze engine behavior with the OV-3/OV-4/F3 device regression suite before refactoring; migrate DI mechanically (Hilt modules mirroring Graph) before any structural change; one subsystem per PR. |
@@ -372,6 +393,10 @@ Priority: **P0** blocks efficient development · **P1** blocks the next phase ga
 ---
 
 ## Phase 12 — Migration Strategy
+
+> **[2026-08-10]** Superseded as the live plan by `ROADMAP.md` (current milestone status +
+> the canonical M ↔ IS-phase mapping). This table remains the baseline scoping and effort
+> record.
 
 Phases map onto the Implementation Strategy (IS) phase model. Effort in solo-dev weeks (rough).
 

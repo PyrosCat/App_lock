@@ -31,7 +31,8 @@ Lifecycle position under the new Implementation Strategy (phases 0–6):
 
 ### Roadmap — where the project stands
 
-Execution runs on the migration path **M0 → M6** ([MIGRATION_ASSESSMENT.md](docs/process/MIGRATION_ASSESSMENT.md));
+Execution runs on the migration path **M0 → M6** (live status: [ROADMAP.md](docs/process/ROADMAP.md);
+baseline analysis: [MIGRATION_ASSESSMENT.md](docs/process/MIGRATION_ASSESSMENT.md));
 M1 (foundation retrofit = IS Phase 0) is broken into work packages WP1–WP8
 ([M1_PLAN.md](docs/process/M1_PLAN.md)).
 
