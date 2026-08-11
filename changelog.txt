@@ -4,6 +4,27 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Reports — independent formal code review filed (evidence)   (2026-08-11)
+------------------------------------------------------------------------
+First report under `docs/reports/reviews/` (GOVERNANCE §5.1 evidence class):
+`docs/reports/reviews/2026-08-11_formal-code-review.md` — independent static review of the app
+baseline at commit 363320d. Six findings, all spot-verified against source:
+- CR-001 (Critical) rapid-relaunch lock-presentation bypass — = existing R-002.
+- CR-002 (Critical) cold-start policy fail-open: LockPolicyManager cache starts empty + fills
+  async, absence read as "not protected", no loading/failed state — NEW.
+- CR-003 (Critical) non-atomic legacy migration: plaintext source deleted before the encrypted
+  import commits; interruption = permanent loss (in-memory snapshot only) — NEW, distinct from R-004.
+- CR-004 (Major) destructive-migration fallback — = existing R-004 (M1/WP7).
+- CR-005 (Major) biometric non-matches skip product lockout/intruder accounting — NEW.
+- CR-006 (Major) vault/intruder delete drops the index row before (and ignoring) blob deletion — NEW.
+Disposition: changes requested for future gates; no NEW review-driven M1 logic (existing WP7/R-004
+treatment unchanged). CR-001→R-002, CR-004→R-004 already tracked; CR-002/003/005/006 triage into
+RISK_REGISTER.md follows separately (candidate R-005/R-006 + defect rows).
+Housekeeping: the report file was inadvertently bundled into be0a9aa (the M1_PLAN commit) and
+pushed rather than committed on its own; per GOVERNANCE §3.3 pushed history is not rewritten, so
+this entry records the filing after the fact.
+
+
 M1_PLAN — interface extraction scoped out of M1   (2026-08-10)
 --------------------------------------------------------------
 Follow-up to the governance restructure (363320d). The frozen MIGRATION_ASSESSMENT Phase 12
