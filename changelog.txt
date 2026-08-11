@@ -4,6 +4,17 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M1_PLAN — interface extraction scoped out of M1   (2026-08-10)
+--------------------------------------------------------------
+Follow-up to the governance restructure (363320d). The frozen MIGRATION_ASSESSMENT Phase 12
+M1 row listed "interface extraction for engine/auth/repos" as M1 scope, but M1 is mechanical
+DI/package work only (freeze-first). Added the deferral to M1_PLAN.md's "Out (deliberately)"
+list + a dated note: the SDS interface-first contracts land with the services that consume
+them (Security/Authorization in M2, presentation in M3); detailed M2/M3 split deferred to
+those milestones' plans. Authority: living plan over frozen snapshot (GOVERNANCE §5.1).
+No code/RTM change.
+
+
 Governance — document classes, risk authority, living roadmap   (2026-08-10)
 ----------------------------------------------------------------------------
 Resolves the risk-record drift found in the 2026-08-10 scale/gate crosswalk review:

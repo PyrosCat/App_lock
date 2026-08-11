@@ -24,9 +24,17 @@ device regression harness (OV-3/OV-4/F3 + core flows); seed instrumentation test
 managed-device matrix (ADR-014); test-fleet onboarding (Moto G 2023, NucBox G5).
 
 **Out (deliberately):** any feature work; full MVVM/navigation refactor (M3 — M1 only does the
-mechanical DI/package work); centralized Security Service facade (M2); logging platform (M5 —
-but a thin logging interface lands here per ADR-008); WorkManager (M5); kotlinx-serialization
-(deferred until the M3 configuration service needs it); release signing/deployment (M6).
+mechanical DI/package work); centralized Security Service facade (M2); **interface extraction for
+engine/auth/repos (M2/M3, landing with the services that consume the interfaces — not M1)**;
+logging platform (M5 — but a thin logging interface lands here per ADR-008); WorkManager (M5);
+kotlinx-serialization (deferred until the M3 configuration service needs it); release
+signing/deployment (M6).
+
+> **[2026-08-10]** Interface extraction was listed under M1 in `MIGRATION_ASSESSMENT.md` Phase 12
+> (frozen snapshot); that placement is **superseded here** — M1 is mechanical DI/package work only
+> (freeze-first), and the SDS interface-first contracts land with the services that consume them
+> (Security / Authorization in M2, presentation in M3). Detailed M2/M3 breakdown is deferred to
+> those milestones' plans. Authority: living plan over frozen snapshot (GOVERNANCE.md §5.1).
 
 ## 2. Work packages (execution order)
 
