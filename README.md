@@ -36,40 +36,50 @@ baseline analysis: [MIGRATION_ASSESSMENT.md](docs/process/MIGRATION_ASSESSMENT.m
 M1 (foundation retrofit = IS Phase 0) is broken into work packages WP1–WP8
 ([M1_PLAN.md](docs/process/M1_PLAN.md)).
 
+**Legend:** 🟢 done · 🟡 current · 🔵 next · ⚪ planned.
+
+The milestone spine, **M0 → M6**:
+
 ```mermaid
 flowchart LR
-    classDef done fill:#d4edda,stroke:#28a745,color:#155724
-    classDef current fill:#fff3cd,stroke:#e0a800,color:#856404
-    classDef next fill:#d1ecf1,stroke:#17a2b8,color:#0c5460
+    classDef done fill:#c9efd4,stroke:#248a3d,color:#14532d
+    classDef current fill:#ffe6a1,stroke:#c99700,color:#6b5200
+    classDef todo fill:#e6e8ea,stroke:#8a9199,color:#3a4149
 
-    M0["M0 ✅ Baseline and governance"]:::done
+    M0["M0<br/>Baseline and governance"]:::done
+    M1["M1<br/>Foundation retrofit<br/>(IS Phase 0)"]:::current
+    M2["M2<br/>Security gate:<br/>two-tier detection"]:::todo
+    M3["M3<br/>MVP: backup,<br/>onboarding, MVVM"]:::todo
+    M4["M4<br/>Automation"]:::todo
+    M5["M5<br/>Production hardening"]:::todo
+    M6["M6<br/>Hardening and release<br/>v1.0.0"]:::todo
 
-    subgraph M1 ["M1 · Foundation retrofit (IS Phase 0) — current"]
-      direction LR
-      WP1["WP1 ✅ CI freeze"]:::done
-      WP2["WP2 ✅ Device harness"]:::done
-      WP3["WP3 ✅ Static analysis"]:::done
-      WP4["WP4 ✅ Build variants"]:::done
-      WP5["WP5 ✅* Hilt migration"]:::current
-      WP6["WP6 ▶ next · Package realign"]:::next
-      WP7["WP7 · DB fail-safe"]
-      WP8["WP8 · Instrumentation + gate"]
-      WP1 --> WP2 --> WP3 --> WP4 --> WP5 --> WP6 --> WP7 --> WP8
-    end
-
-    M2["M2 · Security gate: two-tier detection"]
-    M3["M3 · MVP: backup, onboarding, MVVM"]
-    M4["M4 · Automation"]
-    M5["M5 · Production hardening"]
-    M6["M6 · Hardening and release → v1.0.0"]
-
-    M0 --> M1
-    M1 --> M2 --> M3 --> M4 --> M5 --> M6
+    M0 --> M1 --> M2 --> M3 --> M4 --> M5 --> M6
 ```
 
-\* **WP5 (Hilt) is code-complete and locally verified** (71 unit tests, R8 release build clean,
-zero `Graph` references); the on-device gating-regression harness (Moto G 2025 / NucBox emulator)
-is the remaining WP5 exit step and ADR-015's closure gate before WP6.
+**M1 (current)** breaks into eight work packages — WP1–WP5 done, WP6 next:
+
+```mermaid
+flowchart LR
+    classDef done fill:#c9efd4,stroke:#248a3d,color:#14532d
+    classDef next fill:#bde3ec,stroke:#1592a8,color:#0c4a56
+    classDef todo fill:#e6e8ea,stroke:#8a9199,color:#3a4149
+
+    WP1["WP1<br/>CI freeze"]:::done
+    WP2["WP2<br/>Device harness"]:::done
+    WP3["WP3<br/>Static analysis"]:::done
+    WP4["WP4<br/>Build variants"]:::done
+    WP5["WP5<br/>Hilt migration"]:::done
+    WP6["WP6<br/>Package realign"]:::next
+    WP7["WP7<br/>DB fail-safe"]:::todo
+    WP8["WP8<br/>Instrumentation and gate"]:::todo
+
+    WP1 --> WP2 --> WP3 --> WP4 --> WP5 --> WP6 --> WP7 --> WP8
+```
+
+**WP5 (Hilt) is complete** — 71 unit tests, R8 release build clean, zero `Graph` references, and the
+on-device gating-regression gate is **green on both real hardware (Moto G 2025, 2/2) and the NucBox
+API 26/29/33/35 emulator matrix** — ADR-015 validated. WP6 (package realignment) is next.
 
 Pre-rebaseline **Phases 1–3 are already built and E2E-validated** (see above) — they underlie the
 M1 foundation and get their formal security-gate review in M2.
