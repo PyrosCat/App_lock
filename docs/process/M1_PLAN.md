@@ -142,17 +142,25 @@ commits** (reviewability + regression isolation).
 **Exit check:** tests + harness green post-move; Konsist layer rules active; upgrade-install
 over a WP5 build on the emulator keeps a11y bound and data intact.
 
-### WP7 — Database migration hardening (FR-228, ADR-007/012)
-- Remove `fallbackToDestructiveMigration()`.
-- Replace with an explicit fail-safe open path (mirroring the existing plaintext-migration
-  failure handling): on `openHelper` failure → move DB files aside as `.recovery-<ts>.bak`
-  (data preserved, FR-228 "recovery"), start fresh, raise a persistent notification, log a
-  security event. Never crash-loop the accessibility service; never silently wipe.
-- Startup `PRAGMA quick_check` after open (FR-229 seed; full integrity framework is M2+).
-- Tests: JVM test for the fail-safe decision logic; on-device: upgrade-install with a
-  deliberately future schema version → fail-safe path engages, `.bak` present, app usable.
-**Exit check:** the deliberate-failure drill passes; normal upgrade (v2→v2) untouched;
-RTM FR-228 → `implemented`, FR-229 → `partial`.
+### WP7 — Database migration hardening (FR-163/164, FR-228/229, ADR-007/012)
+Two independently-reviewable fixes to `AppLockDatabase`, **one commit each** (regression isolation):
+- **(a) Destructive-fallback removal (R-004).** Remove `fallbackToDestructiveMigration()`; replace
+  with an explicit fail-safe open path (mirroring the existing plaintext-migration failure
+  handling): on `openHelper` failure → move DB files aside as `.recovery-<ts>.bak` (data preserved,
+  FR-228 "recovery"), start fresh, raise a persistent notification, log a security event. Never
+  crash-loop the accessibility service; never silently wipe. Startup `PRAGMA quick_check` after
+  open (FR-229 seed; full integrity framework is M2+).
+- **(b) Atomic legacy conversion (R-006 / review CR-003).** Make the plaintext→encrypted import
+  atomic: **retain the plaintext source** (as `.bak`) until the encrypted import is committed and
+  row-count/schema-verified; idempotent restart at each stage; remove the source only after
+  validation. Closes the interruption window where the in-memory snapshot is the only copy.
+- Tests: JVM tests for the fail-safe decision logic; on-device drills — (a) upgrade-install with a
+  deliberately future schema version → fail-safe path engages, `.bak` present, app usable;
+  (b) interrupted legacy conversion (kill/throw between snapshot and committed import) → data
+  recovers from the retained source, no loss.
+**Exit check:** both deliberate-failure drills pass; normal upgrade (v2→v2) and a clean legacy
+conversion untouched; RTM FR-228 → `implemented`, FR-229 → `partial`, with R-004 **and** R-006
+closure evidence cited.
 
 ### WP8 — Instrumentation seed & managed-device matrix (ADR-014), close-out
 - `app/src/androidTest/`: smoke suite — app launches to PIN setup; DB opens encrypted

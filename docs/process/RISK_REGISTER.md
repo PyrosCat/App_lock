@@ -18,12 +18,31 @@ compensating treatment.
 | [R-002](#r-002) | Lock-engine rapid-relaunch window-ordering race (protected app outruns the lock screen) | **High** (pending real-hardware) | M2 | Open |
 | [R-003](#r-003) | Schedule/capacity: enterprise-scale baseline vs solo-developer cadence | **High** | all (pacing) | Open |
 | [R-004](#r-004) | `fallbackToDestructiveMigration` — silent data-loss trap on schema mismatch | **High** | M1 (WP7) | Open |
-| [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** (proposed) | M2 | Proposed |
-| [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **High** (proposed) | M1/WP7 (rec.) | Proposed |
+| [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** | M2 | Open |
+| [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **Medium** | M1/WP7 | Open |
 
 **Defects — not tracked as risks** (2026-08-11 review, decision 2026-08-11): CR-005 biometric failure
 accounting (Major, M2) · CR-006 orphaned vault/intruder blob on delete (Major, M3/M5). Held pending a
 defect-record convention (owed — ROADMAP M1 gate / TS_GAP G-04). See the defects section below.
+
+## Severity scoring — Likelihood × Impact
+
+Severity = the cell below (adopted 2026-08-11), using the qualitative Likelihood and Impact
+definitions in TM §14. Standard qualitative matrix; a rating that departs from it is an explicit,
+documented override (none at present).
+
+| Likelihood ↓ \ Impact → | Low | Medium | High | Critical |
+|---|---|---|---|---|
+| **Critical** | Medium | High | Critical | Critical |
+| **High** | Medium | High | High | Critical |
+| **Medium** | Low | Medium | High | High |
+| **Low** | Low | Low | **Medium** | High |
+
+An entry whose Likelihood or Impact is a range takes the lead's assessed point value. Entries that
+predate this matrix (R-001…R-005) keep their recorded severity and are reconciled to it **when next
+touched** (GOVERNANCE §6), not retroactively — each already lands on its recorded value except where
+a pre-existing impact *range* is involved. Worked examples: R-002 (Medium × High = High), R-005
+(Medium × High = High), R-006 (Low × High = Medium).
 
 ---
 
@@ -257,7 +276,7 @@ flavor that adds an upgrade path.
 ## R-005 — Cold-start policy fail-open (protection cache empty until async load)
 
 **Category:** Security / Enforcement / Initialization · **Likelihood:** Medium · **Impact:** High
-· **Severity:** **High (proposed)** · **Status:** Proposed — lead to confirm ID/severity/gate
+· **Severity:** **High** (Medium × High per the scoring rubric) · **Status:** Open
 · **Opened:** 2026-08-11 · **Owner:** project lead
 **Affected gate(s):** M2 — IS Phase-1 security gate (fail-secure initialization is core-security
 scope). Not an M1 item (no review-driven M1 logic; review §5.5).
@@ -299,16 +318,15 @@ the M1 gate record (as an open-risk input, not an M1 blocker).
 ## R-006 — Non-atomic legacy plaintext→encrypted migration (rollback source removed before commit)
 
 **Category:** Reliability / Data integrity / Security-policy preservation · **Likelihood:** Low
-· **Impact:** High · **Severity:** **High (proposed)** · **Status:** Proposed — lead to confirm
-ID/gate · **Opened:** 2026-08-11 · **Owner:** project lead
-**Affected gate(s):** **M1/WP7 (recommended)** — fold into the fail-safe migration work alongside
-R-004 (same `AppLockDatabase` file, same class of fix, one deliberate-failure drill); M2 only if
-deferred. Folding is a living-doc decision (review §5.3) that also updates M1_PLAN / ROADMAP /
-M1 exit criteria — pending lead confirmation. Distinct from R-004 (schema-mismatch fallback vs
-import atomicity).
-**Severity note:** held at **High** — with no likelihood×impact scoring matrix adopted, the
-High-impact rating governs; a Low-likelihood downgrade would require an agreed rubric (not yet
-defined — candidate follow-up).
+· **Impact:** High · **Severity:** **Medium** · **Status:** Open · **Opened:** 2026-08-11
+· **Owner:** project lead
+**Affected gate(s):** **M1/WP7** — folded into the fail-safe migration work alongside R-004 (same
+`AppLockDatabase` file, same class of fix, one deliberate-failure drill), confirmed 2026-08-11.
+Distinct from R-004 (schema-mismatch fallback vs import atomicity).
+**Severity note:** **Medium** = Low likelihood × High impact under the scoring rubric (top of
+register). Impact is high (permanent security-data loss), but the failure fires only on an
+interrupted one-time legacy conversion — a narrow window, Phase-1 plaintext upgraders only — so
+likelihood is Low. Remediated in WP7 regardless of severity.
 **Provenance:** 2026-08-11 code review **CR-003** (Critical defect). NEW risk.
 **Related:** FR-163, FR-164, FR-228, FR-262, FR-372 · `AppLockDatabase.kt:107-144`
 (`snapshotAndRemovePlaintext` reads legacy rows into memory, then `check(dbFile.delete())`) ·

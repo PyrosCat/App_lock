@@ -4,6 +4,22 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Risk/M1 — fold R-006 into WP7; adopt severity scoring matrix   (2026-08-11)
+--------------------------------------------------------------------------
+Follow-through on the code-review triage (previous entry):
+- Adopted a Likelihood×Impact→Severity **scoring matrix** in RISK_REGISTER (standard qualitative
+  4×4, grounded in TM §14) — retires the ad-hoc severity calls the triage surfaced. Pre-existing
+  entries (R-001..R-005) are reconciled to it when next touched (GOVERNANCE §6), not retroactively.
+- R-006 (non-atomic legacy migration) re-rated **High → Medium** per the matrix (Low likelihood ×
+  High impact = Medium; lead confirmed it need not stay High); status Proposed → Open. Still
+  **folded into M1/WP7** alongside R-004 — the fold is about shared code/fix, not severity — and
+  remediated there regardless.
+- M1_PLAN WP7 restructured into (a) destructive-fallback removal (R-004) and (b) atomic legacy
+  conversion (R-006 / review CR-003), **one commit each**, each with its own deliberate-failure
+  drill; FR-163/164 added alongside FR-228/229. ROADMAP M1/WP7 note updated.
+R-005 confirmed Open (High = Medium × High per the matrix; gate M2). No product-logic change; no code touched.
+
+
 Risk register — triage of 2026-08-11 code-review findings   (2026-08-11)
 ------------------------------------------------------------------------
 Triaged the four un-mapped findings from docs/reports/reviews/2026-08-11_formal-code-review.md
