@@ -3,8 +3,9 @@
 **The single authoritative record of tracked project risks** (GOVERNANCE.md §5.2,
 2026-08-10): gate reviews take the risk picture from here; risk statements elsewhere are
 inputs or history. The `MIGRATION_ASSESSMENT.md` Phase 11 table is a frozen 2026-07-19
-snapshot — its still-live items are tracked here (R-003, R-004). TAS §67 is the risk
-*architecture* spec. Each risk has a stable `R-NNN` id; entries are updated in place as
+snapshot — its still-live items are tracked here (R-003, R-004). Independent-review findings are
+triaged here too (R-005/R-006 from the 2026-08-11 code review; see the pending-triage section).
+TAS §67 is the risk *architecture* spec. Each risk has a stable `R-NNN` id; entries are updated in place as
 status changes, and closed risks are marked `Closed` with the resolving reference rather
 than deleted. Severity = Likelihood × Impact (Low / Medium / High / Critical, consistent
 with TM §14). **Affected gate(s)** names the gate(s) a risk can block: per TM §14.10 a High
@@ -17,6 +18,12 @@ compensating treatment.
 | [R-002](#r-002) | Lock-engine rapid-relaunch window-ordering race (protected app outruns the lock screen) | **High** (pending real-hardware) | M2 | Open |
 | [R-003](#r-003) | Schedule/capacity: enterprise-scale baseline vs solo-developer cadence | **High** | all (pacing) | Open |
 | [R-004](#r-004) | `fallbackToDestructiveMigration` — silent data-loss trap on schema mismatch | **High** | M1 (WP7) | Open |
+| [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** (proposed) | M2 | Proposed |
+| [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **High** (proposed) | M1/WP7 (rec.) | Proposed |
+
+**Defects — not tracked as risks** (2026-08-11 review, decision 2026-08-11): CR-005 biometric failure
+accounting (Major, M2) · CR-006 orphaned vault/intruder blob on delete (Major, M3/M5). Held pending a
+defect-record convention (owed — ROADMAP M1 gate / TS_GAP G-04). See the defects section below.
 
 ---
 
@@ -244,3 +251,112 @@ configuration with no error surfaced.
 ### Review triggers
 Any Room schema/version change; WP7 execution; M3 backup/restore design; any new build
 flavor that adds an upgrade path.
+
+---
+
+## R-005 — Cold-start policy fail-open (protection cache empty until async load)
+
+**Category:** Security / Enforcement / Initialization · **Likelihood:** Medium · **Impact:** High
+· **Severity:** **High (proposed)** · **Status:** Proposed — lead to confirm ID/severity/gate
+· **Opened:** 2026-08-11 · **Owner:** project lead
+**Affected gate(s):** M2 — IS Phase-1 security gate (fail-secure initialization is core-security
+scope). Not an M1 item (no review-driven M1 logic; review §5.5).
+**Provenance:** 2026-08-11 code review **CR-002** (Critical defect). NEW risk — not previously tracked.
+**Related:** FR-001, FR-017, FR-179 · `LockPolicyManager.kt:21-40` (empty-set init + async fill;
+absence read as "not protected", no loading/failed state) · `ApplicationLockEngine.kt:54-57`
+(synchronous consumer) · `ProtectionWatchdogService.kt:85-90` (same empty cache read as
+"protection unnecessary").
+
+### Description
+`LockPolicyManager` seeds its protected-package cache as `emptySet()` and fills it asynchronously
+(`startCaching` collecting a Room Flow). `evaluate()` treats absence from the set as **not
+protected**, with no "loading" or "failed" state. A window-state event arriving before the first
+cache emission — cold start, process restart, first event after boot — therefore resolves to an
+**allow** decision. The watchdog can read the same empty cache as evidence that protection is
+unnecessary, so protection-health monitoring can also stand down before readiness is established.
+
+### Impact
+A protected application launched in the pre-load window is foreground without a valid authorization
+session — a fail-**open** on the primary enforcement boundary. Comparable in kind to R-002 (a
+bypass window) but rooted in initialization rather than a presentation race.
+
+### Current mitigations
+- App startup warms the cache early (`startCaching` at application init), shortening the window.
+- No fail-secure gate exists for the pre-load state — that absence is the risk.
+
+### Planned actions (M2 — no M1 logic per the review)
+1. Model explicit **loading / ready / failed** policy states; treat unknown readiness as
+   **fail-secure** (block or hold locked until the first snapshot is confirmed).
+2. Deterministic cold-start / process-restart tests + watchdog readiness/restart tests.
+3. On implementation, reassess FR-001/FR-017/FR-179 RTM rows with evidence (no promotion without it).
+
+### Review triggers
+The M2 core-security work; any change to policy-cache initialization or watchdog readiness logic;
+the M1 gate record (as an open-risk input, not an M1 blocker).
+
+---
+
+## R-006 — Non-atomic legacy plaintext→encrypted migration (rollback source removed before commit)
+
+**Category:** Reliability / Data integrity / Security-policy preservation · **Likelihood:** Low
+· **Impact:** High · **Severity:** **High (proposed)** · **Status:** Proposed — lead to confirm
+ID/gate · **Opened:** 2026-08-11 · **Owner:** project lead
+**Affected gate(s):** **M1/WP7 (recommended)** — fold into the fail-safe migration work alongside
+R-004 (same `AppLockDatabase` file, same class of fix, one deliberate-failure drill); M2 only if
+deferred. Folding is a living-doc decision (review §5.3) that also updates M1_PLAN / ROADMAP /
+M1 exit criteria — pending lead confirmation. Distinct from R-004 (schema-mismatch fallback vs
+import atomicity).
+**Severity note:** held at **High** — with no likelihood×impact scoring matrix adopted, the
+High-impact rating governs; a Low-likelihood downgrade would require an agreed rubric (not yet
+defined — candidate follow-up).
+**Provenance:** 2026-08-11 code review **CR-003** (Critical defect). NEW risk.
+**Related:** FR-163, FR-164, FR-228, FR-262, FR-372 · `AppLockDatabase.kt:107-144`
+(`snapshotAndRemovePlaintext` reads legacy rows into memory, then `check(dbFile.delete())`) ·
+`:90-99` (encrypted DB opened + `importLegacyRows` **after** source removal).
+
+### Description
+The one-time Phase-1 plaintext→SQLCipher migration reads legacy rows into an **in-memory** snapshot,
+deletes the plaintext source, then opens the encrypted DB and imports. Between the source delete and
+a committed import there is no durable copy: process death, encrypted-open failure, storage failure,
+or an import exception permanently loses the protected-app policy and security/intruder event
+history. Loss of policy makes previously protected apps appear unprotected on next start.
+
+### Impact
+Permanent loss of security-policy + audit data on an interrupted migration; silent de-protection.
+**High impact, low likelihood** (fires only for installs upgrading from a Phase-1 plaintext DB, in a
+short window). Distinct from R-004, which is the destructive **schema-mismatch** fallback in the same
+builder — this is the plaintext-import atomicity gap.
+
+### Current mitigations
+- The migration runs once and has completed cleanly in validated flows; the plaintext→encrypted path
+  was E2E-exercised in Phase 3.
+- No move-before-convert / commit-before-delete ordering exists — that absence is the risk.
+
+### Planned actions (phase per the WP7 scope decision)
+1. **Decide scope:** fold into M1/WP7's fail-safe work (alongside R-004) or assign to M2 — and update
+   `M1_PLAN.md`, `ROADMAP.md`, this entry, and M1 exit criteria accordingly (living-doc decision; the
+   review does not silently expand WP7).
+2. Durable backup / move-before-convert; commit + validate before removing the source; idempotent
+   restart at each stage; row-count / schema / protected-policy verification.
+3. Interrupted-conversion deliberate-failure test (pairs with the R-004 / TS_GAP G-05 drill).
+
+### Review triggers
+The WP7 scope decision; any change to `AppLockDatabase` migration; M3 backup/restore design.
+
+---
+
+## Defects — held, not tracked as risks (2026-08-11 code review)
+
+Decision 2026-08-11: these two review findings are **Major defects**, not project risks. They are
+recorded here as an interim holding place **until a defect-record convention exists** (owed — see
+`ROADMAP.md` M1-gate scope; TS_GAP G-04, "decide at the M1 gate"). Authoritative detail is the review
+evidence `docs/reports/reviews/2026-08-11_formal-code-review.md`.
+
+| Defect | Finding | Severity | Affected gate |
+|---|---|---|---|
+| CR-005 | Biometric non-matches skip product lockout / intruder / audit accounting (`LockScreenActivity.kt:208-212` — not routed to `ApplicationLockEngine.onUnlockFailure`, `:90-103`). Platform biometric lockout + counted PIN fallback are partial compensating controls; the gap is intruder-capture + cross-method audit. | **Major** | M2 (auth controls) |
+| CR-006 | Vault/intruder delete removes the index row before (and ignoring) blob deletion → orphaned ciphertext reported as success (`VaultRepository.kt:78-81`; `IntruderLogViewModel.kt:35-40`). Data-lifecycle / secure-delete consistency gap; the blob stays encrypted (no confidentiality breach). | **Major** | M3 (Vault) or M5 (data lifecycle) — lead chooses |
+
+Related requirements: CR-005 → FR-009/010/014/081/174; CR-006 → FR-085/115.
+When the defect-record convention lands, migrate these (and future defects) into it and retire this
+interim section.

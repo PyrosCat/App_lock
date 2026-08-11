@@ -4,6 +4,29 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Risk register — triage of 2026-08-11 code-review findings   (2026-08-11)
+------------------------------------------------------------------------
+Triaged the four un-mapped findings from docs/reports/reviews/2026-08-11_formal-code-review.md
+(CR-001→R-002 and CR-004→R-004 were already tracked). New risk IDs are PROPOSED pending lead
+confirmation (GOVERNANCE §5.2 — the register is the risk authority):
+- R-005 (proposed High) — cold-start policy fail-open (CR-002): LockPolicyManager cache empty
+  until async load; absence read as "not protected", no fail-secure pre-load gate. Affected
+  gate M2. New risk, comparable in kind to R-002.
+- R-006 (proposed High) — non-atomic legacy plaintext→encrypted migration (CR-003): rollback
+  source deleted before the import commits; interruption = permanent loss. Distinct from R-004
+  (same AppLockDatabase file — schema-mismatch fallback vs import atomicity). Affected gate
+  **recommended M1/WP7** (fold into the fail-safe work with R-004); the fold is a living-doc
+  decision, not yet applied to M1_PLAN/ROADMAP/exit-criteria. Severity held at High: absent a
+  likelihood×impact scoring matrix, the High-impact rating governs (rubric = candidate follow-up).
+- CR-005 (biometric failure accounting, M2) and CR-006 (orphaned vault/intruder blob on delete,
+  M3/M5) — decided 2026-08-11 to **hold as Major defects, NOT risks** (no R-NNN). Recorded in a new
+  RISK_REGISTER "Defects — held, not tracked as risks" interim section until a defect-record
+  convention exists; that decision added to ROADMAP.md M1-gate (WP8) scope (TS_GAP G-04).
+rtm.csv untouched (GOVERNANCE §1.4 no drive-by): RTM reassessment of the affected FRs
+(FR-001/017/179 for R-005; FR-174 etc. for CR-005) is owed when the M2 code lands, per review §8.7.
+No product-logic change; no M1 logic directed.
+
+
 Reports — independent formal code review filed (evidence)   (2026-08-11)
 ------------------------------------------------------------------------
 First report under `docs/reports/reviews/` (GOVERNANCE §5.1 evidence class):
