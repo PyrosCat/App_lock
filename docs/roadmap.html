@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>App Lock — Product Roadmap</title>
+<style>
+  :root {
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f5f7fa; --surface-3:#eaeef3;
+    --ink:#152030; --ink-soft:#4f5e75; --ink-faint:#8090a4;
+    --line:#dce2ea; --line-strong:#c3ccd9;
+    --accent:#0f8f80; --accent-ink:#0b6d61; --accent-soft:#e0f1ee;
+    --current:#b9781a; --current-soft:#faeed6; --current-line:#e5c98f;
+    --next:#2e7fa8; --next-soft:#e2eef6; --next-line:#bcd6e7;
+    --planned:#7a879b; --planned-soft:#edeff3;
+    --shadow:0 1px 2px rgba(20,30,45,.06), 0 8px 24px -12px rgba(20,30,45,.14);
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", Consolas, "Roboto Mono", monospace;
+    --maxw: 1000px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0c111a; --surface:#131a26; --surface-2:#18212f; --surface-3:#1e2937;
+      --ink:#e8edf4; --ink-soft:#a3b1c4; --ink-faint:#6c7c92;
+      --line:#232e3d; --line-strong:#33475e;
+      --accent:#2bb7a6; --accent-ink:#5fcdbe; --accent-soft:#123531;
+      --current:#e0a53a; --current-soft:#332815; --current-line:#5c481f;
+      --next:#5aa8d0; --next-soft:#132735; --next-line:#2c4a60;
+      --planned:#7688a0; --planned-soft:#1a2432;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 32px -14px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="light"] {
+    --bg:#eef1f5; --surface:#ffffff; --surface-2:#f5f7fa; --surface-3:#eaeef3;
+    --ink:#152030; --ink-soft:#4f5e75; --ink-faint:#8090a4;
+    --line:#dce2ea; --line-strong:#c3ccd9;
+    --accent:#0f8f80; --accent-ink:#0b6d61; --accent-soft:#e0f1ee;
+    --current:#b9781a; --current-soft:#faeed6; --current-line:#e5c98f;
+    --next:#2e7fa8; --next-soft:#e2eef6; --next-line:#bcd6e7;
+    --planned:#7a879b; --planned-soft:#edeff3;
+    --shadow:0 1px 2px rgba(20,30,45,.06), 0 8px 24px -12px rgba(20,30,45,.14);
+  }
+  :root[data-theme="dark"] {
+    --bg:#0c111a; --surface:#131a26; --surface-2:#18212f; --surface-3:#1e2937;
+    --ink:#e8edf4; --ink-soft:#a3b1c4; --ink-faint:#6c7c92;
+    --line:#232e3d; --line-strong:#33475e;
+    --accent:#2bb7a6; --accent-ink:#5fcdbe; --accent-soft:#123531;
+    --current:#e0a53a; --current-soft:#332815; --current-line:#5c481f;
+    --next:#5aa8d0; --next-soft:#132735; --next-line:#2c4a60;
+    --planned:#7688a0; --planned-soft:#1a2432;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 12px 32px -14px rgba(0,0,0,.6);
+  }
+
+  * { box-sizing:border-box; }
+  html { -webkit-text-size-adjust:100%; }
+  body {
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+  }
+  .wrap { max-width:var(--maxw); margin:0 auto; padding:0 clamp(18px,4vw,36px); }
+
+  /* theme toggle */
+  .toggle {
+    position:fixed; top:16px; right:16px; z-index:10;
+    font-family:var(--mono); font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--ink-soft); background:var(--surface); border:1px solid var(--line);
+    border-radius:999px; padding:7px 13px; cursor:pointer; box-shadow:var(--shadow);
+  }
+  .toggle:hover { color:var(--ink); border-color:var(--line-strong); }
+
+  /* ---------- hero ---------- */
+  header.hero { padding:clamp(48px,9vw,104px) 0 clamp(28px,4vw,44px); }
+  .eyebrow {
+    font-family:var(--mono); font-size:12.5px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--accent-ink); margin:0 0 20px; display:flex; align-items:center; gap:11px;
+  }
+  .eyebrow::before {
+    content:""; width:26px; height:2px; background:var(--accent); display:inline-block; border-radius:2px;
+  }
+  h1 {
+    font-size:clamp(33px,6vw,58px); line-height:1.04; letter-spacing:-.025em;
+    font-weight:760; margin:0 0 22px; text-wrap:balance; max-width:16ch;
+  }
+  h1 .thin { color:var(--ink-soft); font-weight:400; }
+  .lede {
+    font-size:clamp(17px,2vw,21px); line-height:1.5; color:var(--ink-soft);
+    max-width:56ch; margin:0 0 30px; text-wrap:pretty;
+  }
+  .lede strong { color:var(--ink); font-weight:640; }
+  .hero-meta {
+    font-family:var(--mono); font-size:12.5px; color:var(--ink-faint);
+    display:flex; flex-wrap:wrap; gap:6px 20px; padding-top:22px; border-top:1px solid var(--line);
+  }
+  .hero-meta b { color:var(--ink-soft); font-weight:600; }
+
+  /* ---------- stat row ---------- */
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:34px 0 8px; }
+  @media (max-width:720px){ .stats { grid-template-columns:repeat(2,1fr); } }
+  .stat {
+    background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:18px 18px 16px; box-shadow:var(--shadow);
+  }
+  .stat .k {
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.11em; text-transform:uppercase;
+    color:var(--ink-faint); margin:0 0 9px;
+  }
+  .stat .v { font-size:20px; font-weight:680; letter-spacing:-.01em; line-height:1.2; }
+  .stat .v small { display:block; font-size:12.5px; font-weight:500; color:var(--ink-soft); margin-top:3px; letter-spacing:0; }
+  .stat .v .num { font-variant-numeric:tabular-nums; }
+  .stat--accent .v { color:var(--accent-ink); }
+
+  /* ---------- section frame ---------- */
+  section { padding:clamp(44px,7vw,78px) 0; }
+  .sec-eyebrow {
+    font-family:var(--mono); font-size:11.5px; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-faint); margin:0 0 10px;
+  }
+  h2 { font-size:clamp(23px,3vw,31px); letter-spacing:-.018em; font-weight:720; margin:0 0 6px; text-wrap:balance; }
+  .sec-sub { color:var(--ink-soft); margin:0 0 34px; max-width:60ch; font-size:16.5px; }
+
+  /* ---------- roadmap spine ---------- */
+  .spine { display:flex; flex-direction:column; }
+  .ms { display:grid; grid-template-columns:54px 1fr; }
+  .ms__rail { position:relative; }
+  .ms__rail::before {
+    content:""; position:absolute; left:50%; transform:translateX(-50%);
+    top:0; bottom:0; width:2px; background:var(--rail,var(--planned)); opacity:.55;
+  }
+  .ms:first-child .ms__rail::before { top:26px; }
+  .ms:last-child  .ms__rail::before { bottom:calc(100% - 26px); }
+  .ms__dot {
+    position:absolute; left:50%; top:26px; transform:translate(-50%,-50%);
+    width:26px; height:26px; border-radius:50%;
+    background:var(--surface); border:2px solid var(--dot,var(--planned));
+    display:grid; place-items:center; z-index:1;
+    font-family:var(--mono); font-size:11px; font-weight:700; color:var(--dot,var(--planned));
+  }
+  .ms__body { padding:12px 0 30px 14px; }
+  .ms:last-child .ms__body { padding-bottom:6px; }
+  .ms__head { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:7px; }
+  .ms__code {
+    font-family:var(--mono); font-size:12px; font-weight:700; letter-spacing:.04em;
+    color:var(--ink-faint); background:var(--surface-2); border:1px solid var(--line);
+    padding:2px 8px; border-radius:6px;
+  }
+  .ms__title { font-size:clamp(18px,2.2vw,21px); font-weight:660; letter-spacing:-.01em; margin:0; }
+  .ms__desc { color:var(--ink-soft); margin:0; max-width:58ch; font-size:15.5px; }
+
+  /* state colors on a milestone */
+  .ms--done    { --rail:var(--accent);  --dot:var(--accent); }
+  .ms--current { --rail:var(--accent);  --dot:var(--current); }
+  .ms--planned { --rail:var(--planned); --dot:var(--planned); }
+  .ms--done .ms__dot    { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .ms--current .ms__dot { background:var(--current); color:#fff; border-color:var(--current);
+                          box-shadow:0 0 0 5px var(--current-soft); }
+
+  /* status chip */
+  .chip {
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.06em; text-transform:uppercase;
+    font-weight:700; padding:3px 9px; border-radius:999px; white-space:nowrap;
+    border:1px solid transparent;
+  }
+  .chip--done    { color:var(--accent-ink); background:var(--accent-soft);  border-color:var(--accent); }
+  .chip--current { color:var(--current);    background:var(--current-soft); border-color:var(--current-line); }
+  .chip--next    { color:var(--next);       background:var(--next-soft);    border-color:var(--next-line); }
+  .chip--planned { color:var(--planned);    background:var(--planned-soft); border-color:var(--line-strong); }
+
+  /* current milestone gets an emphasised card + WP sub-track */
+  .ms--current .ms__body {
+    background:var(--surface); border:1px solid var(--current-line); border-radius:16px;
+    padding:20px 22px 22px; margin-bottom:30px; box-shadow:var(--shadow);
+  }
+  .subtrack { margin-top:18px; padding-top:18px; border-top:1px dashed var(--line-strong); }
+  .subtrack .st-label {
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.11em; text-transform:uppercase;
+    color:var(--ink-faint); margin:0 0 13px;
+  }
+  .wps { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  @media (max-width:720px){ .wps { grid-template-columns:repeat(2,1fr); } }
+  .wp {
+    border:1px solid var(--line); border-radius:11px; padding:11px 12px; background:var(--surface-2);
+    position:relative;
+  }
+  .wp .wp-code {
+    font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:.05em;
+    color:var(--ink-faint); display:flex; align-items:center; justify-content:space-between; margin-bottom:5px;
+  }
+  .wp .wp-name { font-size:13.5px; font-weight:560; line-height:1.3; color:var(--ink); }
+  .wp .tick { color:var(--accent); font-weight:700; }
+  .wp--done { background:var(--accent-soft); border-color:var(--accent); }
+  .wp--done .wp-code { color:var(--accent-ink); }
+  .wp--next { background:var(--current-soft); border-color:var(--current-line); }
+  .wp--next .wp-code { color:var(--current); }
+  .wp--next .wp-name { color:var(--ink); }
+  .wp .wp-flag {
+    font-family:var(--mono); font-size:8.5px; letter-spacing:.1em; text-transform:uppercase;
+    font-weight:700; color:var(--current);
+  }
+
+  /* ---------- delivered grid ---------- */
+  .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  @media (max-width:820px){ .cards { grid-template-columns:repeat(2,1fr); } }
+  @media (max-width:520px){ .cards { grid-template-columns:1fr; } }
+  .card {
+    background:var(--surface); border:1px solid var(--line); border-radius:16px;
+    padding:22px 20px; box-shadow:var(--shadow);
+  }
+  .card .ic { width:34px; height:34px; margin-bottom:14px; color:var(--accent); }
+  .card h3 { font-size:16.5px; font-weight:660; margin:0 0 7px; letter-spacing:-.01em; }
+  .card p { color:var(--ink-soft); margin:0; font-size:14.5px; line-height:1.55; }
+
+  /* ---------- next callout ---------- */
+  .callout {
+    background:var(--surface); border:1px solid var(--line); border-left:4px solid var(--next);
+    border-radius:14px; padding:22px 24px; display:flex; gap:18px; align-items:flex-start;
+    box-shadow:var(--shadow);
+  }
+  .callout .cta-code {
+    font-family:var(--mono); font-weight:700; color:var(--next); font-size:15px;
+    background:var(--next-soft); border:1px solid var(--next-line); border-radius:8px;
+    padding:6px 11px; flex:none;
+  }
+  .callout h3 { margin:0 0 5px; font-size:17px; font-weight:660; }
+  .callout p { margin:0; color:var(--ink-soft); font-size:15px; }
+
+  /* ---------- footer ---------- */
+  footer {
+    border-top:1px solid var(--line); padding:32px 0 56px; margin-top:20px;
+    font-family:var(--mono); font-size:12.5px; color:var(--ink-faint); line-height:1.8;
+  }
+  footer b { color:var(--ink-soft); font-weight:600; }
+
+  :focus-visible { outline:2px solid var(--accent); outline-offset:3px; border-radius:5px; }
+
+  /* reveal */
+  .reveal { opacity:0; transform:translateY(14px); transition:opacity .6s ease, transform .6s ease; }
+  .reveal.in { opacity:1; transform:none; }
+  @media (prefers-reduced-motion:reduce){ .reveal { opacity:1; transform:none; transition:none; } }
+</style>
+</head>
+<body>
+<button class="toggle" id="themeToggle" type="button" aria-label="Toggle colour theme">◐ Theme</button>
+
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">App Lock &nbsp;·&nbsp; Product roadmap</p>
+    <h1>The security foundation is built. <span class="thin">Now hardening toward release.</span></h1>
+    <p class="lede">App Lock keeps your apps and media private on your own device — PIN and biometric locking, an encrypted vault, and silent intruder capture, with <strong>everything encrypted at rest and nothing leaving the phone</strong>. The core protection is implemented and <strong>validated on real hardware</strong>; work now focuses on the engineering platform that carries it to a v1.0.0 release.</p>
+    <div class="hero-meta">
+      <span><b>Status as of</b> 11 August 2026</span>
+      <span><b>Phase</b> Foundation (M1 of M0–M6)</span>
+      <span><b>Target</b> v1.0.0</span>
+    </div>
+
+    <div class="stats">
+      <div class="stat stat--accent">
+        <p class="k">Current phase</p>
+        <p class="v">Foundation<small>Engineering platform retrofit</small></p>
+      </div>
+      <div class="stat">
+        <p class="k">Foundation progress</p>
+        <p class="v"><span class="num">5</span> / <span class="num">8</span><small>work packages complete</small></p>
+      </div>
+      <div class="stat">
+        <p class="k">Core security</p>
+        <p class="v">Validated<small>on device + emulator matrix</small></p>
+      </div>
+      <div class="stat">
+        <p class="k">Encryption</p>
+        <p class="v">At rest<small>Argon2id · SQLCipher · AES-GCM</small></p>
+      </div>
+    </div>
+  </header>
+
+  <section id="roadmap">
+    <p class="sec-eyebrow">The plan</p>
+    <h2>Seven milestones to v1.0.0</h2>
+    <p class="sec-sub">Delivery runs as a sealed sequence — each milestone is completed and reviewed before the next begins. Two are behind us; the foundation milestone is underway now.</p>
+
+    <div class="spine">
+
+      <article class="ms ms--done reveal">
+        <div class="ms__rail"><span class="ms__dot">✓</span></div>
+        <div class="ms__body">
+          <div class="ms__head">
+            <span class="ms__code">M0</span>
+            <h3 class="ms__title">Baseline &amp; governance</h3>
+            <span class="chip chip--done">Complete</span>
+          </div>
+          <p class="ms__desc">The project baseline: a full documentation set, a requirements map, and the quality-governance rules that every later step is held to.</p>
+        </div>
+      </article>
+
+      <article class="ms ms--current reveal">
+        <div class="ms__rail"><span class="ms__dot">▸</span></div>
+        <div class="ms__body">
+          <div class="ms__head">
+            <span class="ms__code">M1</span>
+            <h3 class="ms__title">Foundation</h3>
+            <span class="chip chip--current">In progress</span>
+          </div>
+          <p class="ms__desc">The engineering foundation beneath the product: automated builds and testing, an on-device security regression harness that guards the locking behaviour, and a modern, layered architecture. <strong style="color:var(--ink)">Five of eight work packages are complete.</strong></p>
+
+          <div class="subtrack">
+            <p class="st-label">Foundation work packages</p>
+            <div class="wps">
+              <div class="wp wp--done"><div class="wp-code">WP1 <span class="tick">✓</span></div><div class="wp-name">Continuous integration</div></div>
+              <div class="wp wp--done"><div class="wp-code">WP2 <span class="tick">✓</span></div><div class="wp-name">Automated device testing</div></div>
+              <div class="wp wp--done"><div class="wp-code">WP3 <span class="tick">✓</span></div><div class="wp-name">Code-quality gates</div></div>
+              <div class="wp wp--done"><div class="wp-code">WP4 <span class="tick">✓</span></div><div class="wp-name">Build environments</div></div>
+              <div class="wp wp--done"><div class="wp-code">WP5 <span class="tick">✓</span></div><div class="wp-name">Dependency architecture</div></div>
+              <div class="wp wp--next"><div class="wp-code">WP6 <span class="wp-flag">Next</span></div><div class="wp-name">Layered architecture</div></div>
+              <div class="wp"><div class="wp-code">WP7</div><div class="wp-name">Data-safe migrations</div></div>
+              <div class="wp"><div class="wp-code">WP8</div><div class="wp-name">Test suite &amp; phase gate</div></div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="ms ms--planned reveal">
+        <div class="ms__rail"><span class="ms__dot">M2</span></div>
+        <div class="ms__body">
+          <div class="ms__head">
+            <span class="ms__code">M2</span>
+            <h3 class="ms__title">Security platform</h3>
+            <span class="chip chip--next">Up next</span>
+          </div>
+          <p class="ms__desc">Play-compliant two-tier app detection — so protection holds reliably within Google Play policy — plus centralized security services for encryption and keys.</p>
+        </div>
+      </article>
+
+      <article class="ms ms--planned reveal">
+        <div class="ms__rail"><span class="ms__dot">M3</span></div>
+        <div class="ms__body">
+          <div class="ms__head">
+            <span class="ms__code">M3</span>
+            <h3 class="ms__title">Core app experience</h3>
+            <span class="chip chip--planned">Planned</span>
+          </div>
+          <p class="ms__desc">Backup &amp; restore, guided first-run onboarding, and the complete day-to-day app experience.</p>
+        </div>
+      </article>
+
+      <article class="ms ms--planned reveal">
+        <div class="ms__rail"><span class="ms__dot">M4</span></div>
+        <div class="ms__body">
+          <div class="ms__head">
+            <span class="ms__code">M4</span>
+            <h3 class="ms__title">Automation</h3>
+            <span class="chip chip--planned">Planned</span>
+          </div>
+          <p class="ms__desc">Smart locking rules — schedules and Wi-Fi, Bluetooth, or location triggers that lock and unlock automatically.</p>
+        </div>
+      </article>
+
+      <article class="ms ms--planned reveal">
+        <div class="ms__rail"><span class="ms__dot">M5</span></div>
+        <div class="ms__body">
+          <div class="ms__head">
+            <span class="ms__code">M5</span>
+            <h3 class="ms__title">Production hardening</h3>
+            <span class="chip chip--planned">Planned</span>
+          </div>
+          <p class="ms__desc">Observability, resilience, and performance — making the app dependable and efficient under real-world use.</p>
+        </div>
+      </article>
+
+      <article class="ms ms--planned reveal">
+        <div class="ms__rail"><span class="ms__dot">M6</span></div>
+        <div class="ms__body">
+          <div class="ms__head">
+            <span class="ms__code">M6</span>
+            <h3 class="ms__title">Security hardening &amp; release</h3>
+            <span class="chip chip--planned">Planned</span>
+          </div>
+          <p class="ms__desc">Final security hardening, a full independent verification campaign, and the signed <strong style="color:var(--ink)">v1.0.0</strong> release.</p>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <section id="delivered">
+    <p class="sec-eyebrow">Already delivered</p>
+    <h2>Built and validated</h2>
+    <p class="sec-sub">The protection users rely on is implemented today — and its core locking behaviour is checked by an automated regression gate on real hardware.</p>
+
+    <div class="cards">
+      <div class="card reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10.5" rx="2.2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/><circle cx="12" cy="15.6" r="1.3"/></svg>
+        <h3>PIN &amp; biometric locking</h3>
+        <p>Passcodes are hashed with Argon2id at OWASP-recommended strength and verified in constant time. Biometric unlock with a PIN fallback.</p>
+      </div>
+      <div class="card reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6z"/><path d="M9.2 12l1.9 1.9L15 10"/></svg>
+        <h3>Encrypted vault</h3>
+        <p>Move photos and files into a private vault sealed with AES-256-GCM over a SQLCipher database. Byte-identical export and secure delete.</p>
+      </div>
+      <div class="card reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1L9 4h6l1.5 2h1A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.4" r="3.1"/></svg>
+        <h3>Intruder capture</h3>
+        <p>After repeated failed unlock attempts, a silent front-camera photo is taken and stored encrypted, with a timestamped record for review.</p>
+      </div>
+      <div class="card reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6z"/><path d="M12 8.5v4"/><circle cx="12" cy="15.4" r="0.6" fill="currentColor"/></svg>
+        <h3>Brute-force defense</h3>
+        <p>Escalating lockout with persisted counters after repeated failures, plus a watchdog that alerts if protection is switched off.</p>
+      </div>
+      <div class="card reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2.4"/><path d="M9.4 6.2l1.5 1.5 3.7-3.6" transform="translate(-0.2 0.4)"/><path d="M10.5 18h3"/></svg>
+        <h3>Validated on real hardware</h3>
+        <p>Core locking passes an automated regression gate twice over on a physical Moto G (Android 15) and across an emulator matrix from Android 8 to 15.</p>
+      </div>
+      <div class="card reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="8" cy="7" r="1.4" fill="currentColor" stroke="none"/><circle cx="14" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="10" cy="17" r="1.4" fill="currentColor" stroke="none"/></svg>
+        <h3>Modern engineering</h3>
+        <p>Continuous integration, automated code-quality gates, dependency governance, and a dependency-injected, layered architecture.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="next" style="padding-top:0;">
+    <div class="callout reveal">
+      <span class="cta-code">M2</span>
+      <div>
+        <h3>What comes next</h3>
+        <p>The security platform milestone: a Play-compliant two-tier detection model so the app locks reliably within Google Play policy, alongside centralized security and key-management services — the gateway to completing the app experience.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <b>App Lock</b> — local-first Android security · app locking, encrypted vault, intruder capture.<br>
+    In active development. Status as of <b>11 August 2026</b>; the roadmap is indicative and is reviewed at each phase gate.
+  </footer>
+
+</div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('themeToggle');
+    function current() {
+      var set = document.documentElement.getAttribute('data-theme');
+      if (set) return set;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    btn.addEventListener('click', function () {
+      var next = current() === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+    });
+
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var items = document.querySelectorAll('.reveal');
+    if (reduce || !('IntersectionObserver' in window)) {
+      items.forEach(function (el) { el.classList.add('in'); });
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+        });
+      }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+      items.forEach(function (el, i) { el.style.transitionDelay = Math.min(i * 55, 330) + 'ms'; io.observe(el); });
+    }
+  })();
+</script>
+</body>
+</html>

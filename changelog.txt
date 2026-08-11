@@ -4,6 +4,15 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs — client-facing roadmap showcase (docs/roadmap.html)   (2026-08-11)
+-----------------------------------------------------------------------
+NEW self-contained HTML progress page for presenting project status to the client — distinct in
+purpose from ROADMAP.md (the internal living tracker): a milestone spine M0→M6 with M1 expanded to
+WP1–8, current status (WP5 done / WP6 next), a "built and validated" capabilities grid, and
+light/dark themes. Regenerated fresh with current state (supersedes the ephemeral 2026-08-08
+scratchpad version noted in the handoff). No external dependencies; opens offline.
+
+
 Risk/M1 — fold R-006 into WP7; adopt severity scoring matrix   (2026-08-11)
 --------------------------------------------------------------------------
 Follow-through on the code-review triage (previous entry):
