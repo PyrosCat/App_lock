@@ -7,7 +7,7 @@
         errorLine1="        runCatching { notifications.notify(INTRUDER_NOTIFICATION_ID, notification) }"
         errorLine2="                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/applock/privacy/IntruderCaptureManager.kt"
+            file="src/main/java/com/applock/service/IntruderCaptureManager.kt"
             line="219"
             column="23"/>
     </issue>
@@ -491,7 +491,7 @@
         errorLine1="    val photo by produceState&lt;Bitmap?>(initialValue = null, key1 = event.id) {"
         errorLine2="                 ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/applock/privacy/ui/IntruderLogScreen.kt"
+            file="src/main/java/com/applock/presentation/intruder/IntruderLogScreen.kt"
             line="147"
             column="18"/>
     </issue>
@@ -502,7 +502,7 @@
         errorLine1="    val thumbnail by produceState&lt;Bitmap?>(initialValue = null, key1 = item.id) {"
         errorLine2="                     ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/applock/vault/ui/VaultScreen.kt"
+            file="src/main/java/com/applock/presentation/vault/VaultScreen.kt"
             line="274"
             column="22"/>
     </issue>
@@ -513,7 +513,7 @@
         errorLine1="                    val state by produceState&lt;PreviewState>(PreviewState.Loading, item.id) {"
         errorLine2="                                 ~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/applock/vault/ui/VaultScreen.kt"
+            file="src/main/java/com/applock/presentation/vault/VaultScreen.kt"
             line="363"
             column="34"/>
     </issue>
@@ -608,7 +608,7 @@
         errorLine1="        mutableStateOf(Graph.settings.intruderCaptureThreshold)"
         errorLine2="        ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/applock/ui/SettingsScreen.kt"
+            file="src/main/java/com/applock/presentation/settings/SettingsScreen.kt"
             line="178"
             column="9"/>
     </issue>

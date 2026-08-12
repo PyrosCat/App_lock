@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.view.accessibility.AccessibilityEvent
-import com.applock.applocker.engine.ApplicationLockEngine
+import com.applock.service.ApplicationLockEngine
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 

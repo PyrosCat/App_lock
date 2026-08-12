@@ -1,7 +1,7 @@
 package com.applock
 
 import android.app.Application
-import com.applock.applocker.policy.LockPolicyManager
+import com.applock.domain.LockPolicyManager
 import dagger.hilt.android.HiltAndroidApp
 import javax.inject.Inject
 

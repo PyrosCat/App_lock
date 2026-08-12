@@ -1,0 +1,88 @@
+package com.applock.presentation.applist
+
+import android.app.Application
+import android.content.Intent
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.applock.data.ProtectedAppDao
+import com.applock.data.ProtectedAppEntity
+import com.applock.data.SecurityEventDao
+import com.applock.data.SecurityEventEntity
+import com.applock.data.SecurityEventType
+import com.applock.platform.ProtectionWatchdogService
+import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import javax.inject.Inject
+
+data class InstalledApp(
+    val packageName: String,
+    val label: String,
+    val isProtected: Boolean,
+)
+
+@HiltViewModel
+class AppListViewModel @Inject constructor(
+    application: Application,
+    private val dao: ProtectedAppDao,
+    private val securityEventDao: SecurityEventDao,
+) : AndroidViewModel(application) {
+
+    private val installedApps = MutableStateFlow<List<Pair<String, String>>>(emptyList())
+
+    val apps: StateFlow<List<InstalledApp>> =
+        combine(installedApps, dao.observeAll()) { installed, protectedApps ->
+            val protectedSet = protectedApps.filter { it.enabled }.map { it.packageName }.toSet()
+            installed.map { (pkg, label) ->
+                InstalledApp(pkg, label, pkg in protectedSet)
+            }.sortedWith(compareByDescending<InstalledApp> { it.isProtected }.thenBy { it.label.lowercase() })
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    init {
+        loadInstalledApps()
+    }
+
+    private fun loadInstalledApps() {
+        viewModelScope.launch {
+            val context = getApplication<Application>()
+            val list = withContext(Dispatchers.IO) {
+                val pm = context.packageManager
+                val intent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+                pm.queryIntentActivities(intent, 0)
+                    .asSequence()
+                    .map { it.activityInfo.applicationInfo }
+                    .distinctBy { it.packageName }
+                    .filter { it.packageName != context.packageName }
+                    .map { it.packageName to pm.getApplicationLabel(it).toString() }
+                    .toList()
+            }
+            installedApps.value = list
+        }
+    }
+
+    fun setProtected(packageName: String, protect: Boolean) {
+        viewModelScope.launch {
+            if (protect) {
+                dao.upsert(ProtectedAppEntity(packageName = packageName, enabled = true))
+                // The watchdog stops itself when nothing is protected; protecting
+                // an app must bring it back without waiting for the next launch.
+                ProtectionWatchdogService.start(getApplication())
+            } else {
+                dao.delete(packageName)
+            }
+            securityEventDao.insert(
+                SecurityEventEntity(
+                    eventType = if (protect) SecurityEventType.APP_PROTECTED
+                    else SecurityEventType.APP_UNPROTECTED,
+                    packageName = packageName,
+                )
+            )
+        }
+    }
+}

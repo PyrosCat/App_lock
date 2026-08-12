@@ -27,7 +27,7 @@
         android:theme="@style/Theme.AppLock">
 
         <activity
-            android:name=".ui.MainActivity"
+            android:name=".presentation.applist.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -39,7 +39,7 @@
              excludeFromRecents + noHistory: never appears in the app switcher.
              taskAffinity="": runs in its own task so it doesn't drag MainActivity along. -->
         <activity
-            android:name=".authentication.ui.LockScreenActivity"
+            android:name=".presentation.authentication.LockScreenActivity"
             android:excludeFromRecents="true"
             android:exported="false"
             android:launchMode="singleTop"
@@ -63,7 +63,7 @@
 
         <!-- Watches that the accessibility permission stays granted (FR-179) -->
         <service
-            android:name=".applocker.service.ProtectionWatchdogService"
+            android:name=".platform.ProtectionWatchdogService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
             <property
@@ -73,7 +73,7 @@
 
         <!-- Restores the watchdog after reboot; sessions are already gone (in-memory) -->
         <receiver
-            android:name=".applocker.service.BootReceiver"
+            android:name=".platform.BootReceiver"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
