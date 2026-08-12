@@ -4,6 +4,33 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M1/WP6 — package realignment into the ADR-001/011 layers   (2026-08-11)
+----------------------------------------------------------------------
+Mechanical relocation of the single-module source into the target layer packages
+(di/domain/service/data/security/platform/presentation), then activation of the layer rules. No
+production logic changed — the gating engine, security, and data code are byte-identical; only
+their packages and imports move. Verified by the full CI gate (67 unit tests + Konsist, detekt, R8
+release, lint) green across the move.
+- Moves: applocker.{session,policy} / privacy.IntruderPolicy / vault.VaultFileTypes -> domain;
+  applocker.engine / privacy.IntruderCaptureManager -> service; core.database + the repositories
+  -> data; core.security -> security; applocker.service.{BootReceiver,ProtectionWatchdogService}
+  -> platform; all UI -> presentation.<feature>; the Hilt module stays in di. Manifest, unit tests,
+  and the detekt + lint baselines updated in lockstep (import re-ordering + same-package-import
+  cleanup after the rename; no new findings silenced).
+- ADR-018 FQCN PINS HONORED: AppDetectionService (com.applock.applocker.service) and
+  UninstallProtectionReceiver (com.applock.applocker.admin) do NOT move — their fully-qualified
+  names are the externally persisted accessibility-grant / device-admin component strings, and
+  renaming them would silently break protection on upgrade. Verified unchanged in manifest + source.
+- Konsist rules activated (ADR-016): R2 (layer dependency direction) now enforced, with a frozen
+  baseline of the five inner->outer edges awaiting the M2/M3 interface extraction (they burn down
+  then); R4 (Android entry points only in platform/ or presentation/, the two pinned components
+  exempted) now enforced; R3 repointed to the new data package (DAO/entity types only — repositories
+  remain the sanctioned UI access path). R1 unchanged.
+- Device exit criteria (owed, run on hardware next): OV-3/OV-4/F3 gating harness green post-move,
+  plus the ADR-018 upgrade-install drill (install over a WP5 build -> accessibility stays bound,
+  device-admin intact, data survives). RTM batch deferred to the WP8 M1-gate per M1_PLAN §5.
+
+
 Docs — client-facing roadmap showcase (docs/roadmap.html)   (2026-08-11)
 -----------------------------------------------------------------------
 NEW self-contained HTML progress page for presenting project status to the client — distinct in

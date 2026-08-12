@@ -61,3 +61,34 @@ detail, does not alter the decision to adopt Konsist or the R1–R4 invariants).
 
 Both baselines follow the same "freeze existing, block new, burn down" philosophy already used by
 the WP1 lint baseline and the WP3 detekt baseline.
+
+## Implementation note (2026-08-11, WP6) — R2/R4 activated, R3 repointed
+
+WP6 moved the source into the ADR-001/011 target layers (di / domain / service / data / security /
+platform / presentation), so the dormant rules flip to enforced. Recorded per GOVERNANCE §2.3
+(factual detail; the R1–R4 invariants and the decision to adopt Konsist are unchanged).
+
+- **R2 (layer dependency direction) — active, with a frozen baseline.** Core layers are ranked
+  inner→outer `domain(0) < {data(1), security(1)} < service(2) < presentation(3)` — domain is the
+  core and depends on nothing; data and security depend only on domain; service depends on
+  domain/data/security; presentation is outermost. A core-layer file may import another core layer
+  only when the target's rank is strictly lower
+  (same layer always allowed; same-rank-different-layer, i.e. `data <-> security`, forbidden).
+  `platform/`, `di/`, the two ADR-018 pinned entry points and the root `AppLockApplication` are
+  adapters/wiring and are **exempt** from R2 (R4 governs platform placement). Five inner→outer edges
+  survive the move because the repository/port interfaces that would invert them are extracted only
+  in M2/M3 (SDS §5.5); they are grandfathered by the R2 baseline and **burn down then**:
+  `domain/LockPolicyManager → data` (ProtectedAppDao), `data/AppLockDatabase → security`
+  (DatabaseKeyProvider), `data/VaultRepository → security` (EncryptedFileStore),
+  `service/ApplicationLockEngine → presentation` (LockScreenActivity),
+  `service/IntruderCaptureManager → presentation` (MainActivity). Any **new** inner→outer edge fails.
+- **R4 (entry-point placement) — active.** Activities / Services / BroadcastReceivers must reside
+  under `platform/` or `presentation/`, detected by directly-declared Android supertype, **except**
+  the two ADR-018 FQCN-pinned components (`AppDetectionService`, `UninstallProtectionReceiver`),
+  which are exempt by residence. (The root `Application` is not an R4 entry point and stays at the
+  package root.)
+- **R3 (no DAO/db types from UI) — repointed, unchanged in intent.** The database types moved
+  `core.database → data`, but so did the repositories; since repositories are the sanctioned UI
+  access path, R3 now matches `com.applock.data.*` **excluding `*Repository`**, and additionally
+  treats any file under `presentation/` as UI (the ADR-016 table's "package-enforced over
+  presentation/" line). Same five-file baseline, relocated to the new paths; still burns down at M3.

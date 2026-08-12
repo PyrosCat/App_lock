@@ -37,3 +37,7 @@ This constraint may be revisited only via a superseding ADR that includes an exp
 
 ## Related requirements
 FR-179 (protection-revocation alerting), FR-253 (accessibility recovery), risk **R-001a** (`docs/process/RISK_REGISTER.md`); no FR mandates the pinning directly — it is a discovered Android-platform constraint. Related ADRs: ADR-011 (constrains its WP6 execution), ADR-013/013A (the pinned service is the current detector and future optional enhancement), ADR-016 (R4 exemption), ADR-017 (applicationId half).
+
+## Implementation status (2026-08-11, WP6)
+
+Honored. During the WP6 package realignment both classes stayed put — `AppDetectionService` at `com.applock.applocker.service` and `UninstallProtectionReceiver` at `com.applock.applocker.admin` — verified unchanged in both `AndroidManifest.xml` (`android:name` values) and source (`package` declarations). Every other component moved (`BootReceiver`, `ProtectionWatchdogService` → `platform/`; activities → `presentation/`). Konsist **R4 exempts exactly these two FQCNs** (ADR-016), so the exception is machine-checked. The upgrade-install drill (install a WP6 build over a WP5 build → accessibility stays bound, device-admin registration intact, data survives) is part of the WP6 device exit criteria and is run on hardware.

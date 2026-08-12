@@ -3,16 +3,16 @@ package com.applock.architecture
 import com.lemonappdev.konsist.api.Konsist
 import com.lemonappdev.konsist.api.declaration.KoFileDeclaration
 import org.junit.Assert.assertTrue
-import org.junit.Ignore
 import org.junit.Test
 
 /**
- * WP3 (M1) architecture rules — ADR-016 (Konsist). These run in the ordinary unit-test job.
+ * M1 architecture rules — ADR-016 (Konsist). These run in the ordinary unit-test job.
  *
- * R1 + R3 are active now with **frozen baselines** (freeze existing, block new, burn down),
- * mirroring the WP1 lint baseline and the WP3 detekt baseline. R2 + R4 are authored but
- * dormant (@Ignore) until WP6 moves packages into the ADR-001/011 target layers — see the
- * ADR-016 staged-activation table.
+ * R1 + R3 carry frozen baselines (freeze existing, block new, burn down). R2 + R4 were authored
+ * dormant in WP3 and **activated in WP6** once the ADR-001/011 target layers landed:
+ *  - R2 (layer dependency direction) carries a frozen baseline of the five inner->outer edges that
+ *    only the M2/M3 interface extraction (SDS §5.5) can remove; they burn down then.
+ *  - R4 (entry-point placement) exempts the two ADR-018 FQCN-pinned components.
  */
 class ArchitectureRulesTest {
 
@@ -24,6 +24,9 @@ class ArchitectureRulesTest {
 
     private fun KoFileDeclaration.residesAt(relPathUnderPackageRoot: String): Boolean =
         path.replace('\\', '/').endsWith("com/applock/$relPathUnderPackageRoot")
+
+    private fun KoFileDeclaration.relPath(): String =
+        path.replace('\\', '/').substringAfter("com/applock/")
 
     // ---- R1 — the Graph service locator must not exist (ADR-015 realized; WP5) -----------
     //
@@ -62,18 +65,83 @@ class ArchitectureRulesTest {
         return importsGraph || corePackageUse
     }
 
+    // ---- R2 — layer dependency direction (ADR-001/011) — ACTIVE from WP6 ------------------
+    //
+    // Core layers ranked innermost(0)..outermost(3). A core-layer file may import another core
+    // layer only when the target rank is strictly lower (same layer is always allowed; same rank
+    // but a different layer — e.g. data <-> security — is a violation). platform/, di/, the two
+    // ADR-018 pinned entry points and the root Application are adapters/wiring, exempt from R2
+    // (R4 governs platform placement). The five inner->outer edges that clean architecture removes
+    // only via the M2/M3 interface extraction (SDS §5.5) are grandfathered by r2Baseline and burn
+    // down then; any NEW inner->outer edge fails.
+    private val coreLayerRank = mapOf(
+        "domain" to 0,
+        "data" to 1,
+        "security" to 1,
+        "service" to 2,
+        "presentation" to 3,
+    )
+
+    // fromFile (path under com/applock) -> the outer layer it is grandfathered to reach today.
+    private val r2Baseline = setOf(
+        "domain/LockPolicyManager.kt" to "data", // reads ProtectedAppDao (repo interface -> M2/M3)
+        "data/AppLockDatabase.kt" to "security", // DatabaseKeyProvider (key-provider interface -> M2)
+        "data/VaultRepository.kt" to "security", // EncryptedFileStore (crypto-store interface -> M2/M3)
+        "service/ApplicationLockEngine.kt" to "presentation", // launches LockScreenActivity (nav -> M2/M3)
+        "service/IntruderCaptureManager.kt" to "presentation", // PendingIntent to MainActivity (nav -> M2/M3)
+    )
+
+    @Test
+    fun `R2 - inner layers do not depend on outer layers`() {
+        val violations = productionFiles().flatMap { r2ViolationsIn(it) }
+        assertTrue(
+            "ADR-001/011 R2: a core layer must depend only on strictly-inner layers " +
+                "(inner to outer: domain < {data, security} < service < presentation). New " +
+                "outward dependencies must go through the proper layer/interface (interface " +
+                "extraction lands in M2/M3). Offending edge(s):\n" + violations.joinToString("\n"),
+            violations.isEmpty(),
+        )
+    }
+
+    // Wrong-direction core-layer imports in one file (empty for exempt files / clean files).
+    private fun r2ViolationsIn(file: KoFileDeclaration): List<String> {
+        val fromLayer = coreLayerOf(file) ?: return emptyList()
+        val fromRank = coreLayerRank.getValue(fromLayer)
+        val rel = file.relPath()
+        return file.imports.mapNotNull { import ->
+            val toLayer = coreLayerOfImport(import.name) ?: return@mapNotNull null
+            val toRank = coreLayerRank.getValue(toLayer)
+            val wrong = toRank > fromRank || (toRank == fromRank && toLayer != fromLayer)
+            val grandfathered = r2Baseline.any { it.first == rel && it.second == toLayer }
+            if (wrong && !grandfathered) "  - $rel ($fromLayer) -> ${import.name} ($toLayer)" else null
+        }
+    }
+
+    private val coreLayers = listOf("domain", "data", "security", "service", "presentation")
+
+    // The core layer a production FILE belongs to (null = exempt: platform/di/pinned/root).
+    private fun coreLayerOf(file: KoFileDeclaration): String? {
+        val p = file.path.replace('\\', '/')
+        return coreLayers.firstOrNull { "/com/applock/$it/" in p }
+    }
+
+    private fun coreLayerOfImport(name: String): String? =
+        coreLayers.firstOrNull { name.startsWith("com.applock.$it.") }
+
     // ---- R3 — no new DAO/database types referenced from UI (SDS §14; ADR-016) -------------
     //
-    // Frozen baseline = the UI files that currently couple to the core.database package today
-    // (DAO access via Graph.database.*Dao() and/or direct Room-entity imports). Any *new* UI
-    // declaration (ViewModel / *Screen / a file in a `.ui` package) that touches the data layer
-    // fails. Baseline burns down at M3 (MVVM/repository refactor moves UI onto domain models).
+    // Frozen baseline = the UI files that couple to the data layer's DAO/entity/database types
+    // today (DAO access and/or direct Room-entity imports). Repositories are the *sanctioned*
+    // access path ("route through a repository"), so *Repository imports are excluded. Any new UI
+    // declaration (a file under presentation/, or a ViewModel / *Screen) that references a
+    // DAO/entity type fails. Baseline burns down at M3 (MVVM/repository refactor moves UI onto
+    // domain/state models).
     private val r3UiDataBaseline = setOf(
-        "ui/AppListViewModel.kt",
-        "privacy/ui/IntruderLogViewModel.kt",
-        "privacy/ui/IntruderLogScreen.kt",
-        "vault/VaultViewModel.kt",
-        "vault/ui/VaultScreen.kt",
+        "presentation/applist/AppListViewModel.kt",
+        "presentation/intruder/IntruderLogViewModel.kt",
+        "presentation/intruder/IntruderLogScreen.kt",
+        "presentation/vault/VaultViewModel.kt",
+        "presentation/vault/VaultScreen.kt",
     )
 
     @Test
@@ -95,37 +163,47 @@ class ArchitectureRulesTest {
     private fun isUiFile(file: KoFileDeclaration): Boolean {
         val p = file.path.replace('\\', '/')
         val name = p.substringAfterLast('/')
-        return "/ui/" in p || name.endsWith("ViewModel.kt") || name.endsWith("Screen.kt")
+        return "/com/applock/presentation/" in p ||
+            name.endsWith("ViewModel.kt") || name.endsWith("Screen.kt")
     }
 
+    // DAO/entity/database types (com.applock.data), excluding the repositories (the sanctioned
+    // UI access path). Repositories end in "Repository"; DAOs/entities/AppLockDatabase do not.
     private fun referencesDataLayer(file: KoFileDeclaration): Boolean =
-        file.imports.any { it.name.startsWith("com.applock.core.database") } ||
-            file.text.contains("Graph.database")
+        file.imports.any { it.name.startsWith("com.applock.data.") && !it.name.endsWith("Repository") }
 
-    // ---- R2 — layer dependency direction (ADR-001/011) — DORMANT until WP6 ----------------
-    @Ignore(
-        "Dormant until WP6 (ADR-016): the target layer packages (domain/ service/ data/ " +
-            "presentation/) do not exist pre-realignment. Flip to enforced when WP6 lands.",
+    // ---- R4 — Android entry points only in platform/ or presentation/ (ADR-011/018) -------
+    //
+    // Every Activity/Service/BroadcastReceiver must reside under platform/ or presentation/, so the
+    // Android surface stays out of the core layers. EXCEPT the two ADR-018 FQCN-pinned components,
+    // which stay at their original packages permanently — renaming them breaks the persisted
+    // accessibility grant / device-admin registration on upgrade. Detected by directly-declared
+    // supertype (Konsist reads source; that is exactly the component base class in this codebase).
+    private val r4PinnedEntryPoints = setOf(
+        "applocker/service/AppDetectionService.kt",
+        "applocker/admin/UninstallProtectionReceiver.kt",
     )
-    @Test
-    fun `R2 - inner layers do not depend on outer layers`() {
-        // WP6: assert with Konsist's architecture DSL that
-        //   presentation -> service/domain,  service -> domain/data/security,  data -> domain,
-        //   domain depends on nothing outward. (domain/service/data/presentation not yet created.)
-        assertTrue("placeholder — implemented at WP6", true)
-    }
+    private val entryPointSupertype = Regex(
+        ":\\s*(Activity|ComponentActivity|FragmentActivity|AppCompatActivity|Service|" +
+            "AccessibilityService|BroadcastReceiver|DeviceAdminReceiver)\\b",
+    )
 
-    // ---- R4 — platform entry points only in platform//presentation/ — DORMANT until WP6 ---
-    @Ignore(
-        "Dormant until WP6 (ADR-016): entry points still live in applocker/service, admin/, " +
-            "ui/, authentication/ui/ pre-realignment. Flip to enforced when WP6 lands, EXEMPTING " +
-            "the two FQCN-pinned components (AppDetectionService, UninstallProtectionReceiver; ADR-018).",
-    )
     @Test
     fun `R4 - Android entry points reside only in platform or presentation`() {
-        // WP6: services/receivers/activities must reside in platform/ or presentation/, EXCEPT
-        // com.applock.applocker.service.AppDetectionService and
-        // com.applock.applocker.admin.UninstallProtectionReceiver, which are FQCN-pinned (ADR-018).
-        assertTrue("placeholder — implemented at WP6", true)
+        val offenders = productionFiles()
+            .filter { entryPointSupertype.containsMatchIn(it.text) }
+            .filterNot { file -> r4PinnedEntryPoints.any { file.residesAt(it) } }
+            .filterNot { file ->
+                val p = file.path.replace('\\', '/')
+                "/com/applock/platform/" in p || "/com/applock/presentation/" in p
+            }
+            .map { it.relPath() }
+
+        assertTrue(
+            "ADR-011/018 R4: Android entry points (Activity/Service/Receiver) must reside in " +
+                "platform/ or presentation/ (except the two ADR-018 FQCN-pinned components). " +
+                "Offending:\n" + offenders.joinToString("\n") { "  - $it" },
+            offenders.isEmpty(),
+        )
     }
 }
