@@ -17,7 +17,9 @@ export MSYS_NO_PATHCONV=1   # Git Bash must not mangle device paths like /sdcard
 : "${PIN:=1234}"                           # test PIN (campaign baseline)
 : "${A11Y_CLASS:=com.applock.applocker.service.AppDetectionService}"  # FQCN pinned (ADR-013)
 LOCK_ACTIVITY_MATCH="LockScreenActivity"   # substring identifying the lock screen activity
-MAIN_ACTIVITY="${APP_ID}/com.applock.ui.MainActivity"
+# MainActivity moved to presentation/applist in WP6; kept here for reference only —
+# launch_main() resolves the launcher activity dynamically so package moves don't stale it out.
+MAIN_ACTIVITY="${APP_ID}/com.applock.presentation.applist.MainActivity"
 A11Y_COMPONENT="${APP_ID}/${A11Y_CLASS}"
 # UI text signals (from res/values/strings.xml):
 UI_APPLIST_SIGNAL="Open vault"             # content-desc present ONLY in the unlocked App List
@@ -145,7 +147,7 @@ launch_pkg() { # resolve the launcher activity and am-start it (more reliable th
   if [ -n "$comp" ] && printf '%s' "$comp" | grep -q '/'; then sh_ am start -n "$comp" >/dev/null
   else sh_ monkey -p "$1" -c android.intent.category.LAUNCHER 1 >/dev/null; fi
 }
-launch_main() { sh_ am start -n "$MAIN_ACTIVITY" >/dev/null; }
+launch_main() { launch_pkg "$APP_ID"; }  # resolves MainActivity dynamically (survives package moves)
 dismiss_anr() { # tap "Wait"/"Close app" ANR dialogs that this slow emulator throws
   ui_has "isn't responding" && { sh_ input keyevent KEYCODE_BACK; sleep 1; }
   return 0

@@ -4,6 +4,27 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M1/WP6 device exit — Moto G 2025 gating harness + ADR-018 upgrade drill   (2026-08-11)
+-------------------------------------------------------------------------------------
+Closed the WP6 device exit on the physical Moto G 2025 (Android 15 / arm64). Both criteria green:
+- ADR-018 upgrade-install drill: provisioned a pre-WP6 build (0eb0aad, PIN 1234 + Clock protected),
+  then `install -r` the WP6 build (830685b) over it — the accessibility grant string stayed valid
+  and Clock kept locking with NO re-grant (the top LockScreenActivity FQCN shifting
+  authentication.ui -> presentation.authentication confirms the WP6 binary is servicing the lock).
+  MainActivity moved (ui -> presentation.applist) while the two pinned FQCNs (AppDetectionService,
+  UninstallProtectionReceiver) stayed byte-identical (aapt-confirmed) — so the persisted
+  a11y/device-admin component strings survived. Encrypted DB + PIN survived. Device-admin pin
+  confirmed statically (identical FQCN); its runtime drill deferred (opt-in, low-stakes).
+- Gating regression: `run_all.sh --skip-setup -n 2` on the upgraded WP6 install ->
+  smoke/OV-3/OV-4/F3 all PASS 2/2. OV-4 clean on real hardware (R-002 is an emulator-timing flake).
+  Matches the pre-move WP5/WP2 baselines -> no gating regression from the package move.
+- Harness fix: scripts/e2e/lib.sh launch_main() repointed to the dynamic launcher resolver
+  (launch_pkg); the old hardcoded com.applock.ui.MainActivity went stale when WP6 moved MainActivity.
+  A WP6 follow-up miss, shipped here.
+Evidence: docs/reports/campaigns/2026-08-11_wp6-device-exit_moto-g-2025.md. WP6 CLOSED -> WP7
+unblocked. RTM batch stays deferred to the WP8 M1-gate (M1_PLAN §5).
+
+
 M1/WP6 — package realignment into the ADR-001/011 layers   (2026-08-11)
 ----------------------------------------------------------------------
 Mechanical relocation of the single-module source into the target layer packages
