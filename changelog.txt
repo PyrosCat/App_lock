@@ -4,6 +4,25 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+ADR-013B — 1.0.0 detection scope: overlay-presented UsageStats baseline, accessibility → 2.0.0   (2026-08-14)
+-----------------------------------------------------------------------------------------------------------
+Superseded ADR-013A for the year-end 1.0.0 release scope. 1.0.0 ships the Usage Access +
+SYSTEM_ALERT_WINDOW overlay baseline ONLY, with the overlay permission MANDATORY (sole
+lock-presentation mechanism; precondition for a Protected state). The optional AccessibilityService
+enhancement from ADR-013A is deferred to 2.0.0 — no App Lock accessibility service ships in 1.0.0.
+The two-tier target is re-sequenced, not abandoned.
+- Rationale: narrows 1.0.0 to the smallest verifiable product; removes the R-001a/R-001b
+  accessibility exposure from the release; the mandatory overlay is also the R-002 remediation
+  (a drawn overlay resists the rapid-relaunch window race a slide-over Activity loses).
+- TAS deviation (accessibility components absent in 1.0.0) recorded in ADR-013B per GOVERNANCE §2.2;
+  full TAS revision deferred. ADR-018 FQCN pin stays binding for the 2.0.0 accessibility return.
+- Same-commit companions (GOVERNANCE §2.4): ADR index + ADR-013A status flipped to Superseded;
+  RTM FR-043/FR-045/FR-253 → descoped-v1 citing ADR-013B; RISK_REGISTER R-001 (accessibility now
+  out of 1.0.0) and R-002 (overlay remediation committed) annotated 2026-08-14.
+- Next: align the New docs/1.0.0 Draft SRS/NFR/SDS/Threat-Model proposal to ADR-013B — name the
+  overlay permission explicitly and add the NFR-PERF-012 poll-interval detection-delay target.
+
+
 M1/WP6 device exit — Moto G 2025 gating harness + ADR-018 upgrade drill   (2026-08-11)
 -------------------------------------------------------------------------------------
 Closed the WP6 device exit on the physical Moto G 2025 (Android 15 / arm64). Both criteria green:

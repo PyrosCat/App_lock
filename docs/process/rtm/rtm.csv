@@ -41,9 +41,9 @@ FR-039,Multi-Window Support,LockEngine,FR,Medium,review,,,core detection/lock/re
 FR-040,Picture-in-Picture Handling,LockEngine,FR,Medium,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-041,Recent Applications Protection,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-042,Lock Policy Evaluation,LockEngine,FR,Critical,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
-FR-043,Accessibility Event Monitoring,LockEngine,FR,Critical,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
+FR-043,Accessibility Event Monitoring,LockEngine,FR,Critical,descoped-v1,,,"deferred beyond 1.0.0 per ADR-013B (2026-08-14); no App Lock AccessibilityService in 1.0.0 — detection uses the Usage Access baseline (FR-026). Current a11y detection is transitional pending the M2 UsageStats+overlay baseline; a11y event monitoring targeted for 2.0.0"
 FR-044,Overlay Permission Verification,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
-FR-045,Accessibility Permission Verification,LockEngine,FR,Critical,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
+FR-045,Accessibility Permission Verification,LockEngine,FR,Critical,descoped-v1,,,"deferred beyond 1.0.0 per ADR-013B (2026-08-14); no App Lock AccessibilityService in 1.0.0. 1.0.0 verifies the overlay lock-presentation capability instead (FR-044); a11y permission verification targeted for 2.0.0"
 FR-046,Lock Engine Failure Recovery,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-047,Duplicate Overlay Prevention,LockEngine,FR,Medium,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-048,Overlay Timeout,LockEngine,FR,Medium,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
@@ -251,7 +251,7 @@ FR-249,Production Readiness Verification,ProductionReadiness,FR,,not-started,,,
 FR-250,Production Acceptance Gate,ProductionReadiness,FR,,not-started,,,
 FR-251,Automatic Service Recovery,OperationalResilience,FR,,not-started,,,
 FR-252,Foreground Service Monitoring,OperationalResilience,FR,,not-started,,,
-FR-253,Accessibility Service Recovery,OperationalResilience,FR,,partial,applocker/service/ProtectionWatchdogService.kt,,watchdog revocation alert exists (FR-179 lineage)
+FR-253,Accessibility Service Recovery,OperationalResilience,FR,,descoped-v1,,,"deferred beyond 1.0.0 per ADR-013B (2026-08-14); accessibility deferred to 2.0.0, so a11y-service recovery does not apply to 1.0.0. ProtectionWatchdogService remains for FR-179 protection-health (Usage Access + overlay in 1.0.0); a11y recovery targeted for 2.0.0 with the a11y tier"
 FR-254,Notification Service Recovery,OperationalResilience,FR,,not-started,,,
 FR-255,Permission Change Detection,OperationalResilience,FR,,not-started,,,
 FR-256,Graceful Degradation,OperationalResilience,FR,,not-started,,,

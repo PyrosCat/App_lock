@@ -1,9 +1,11 @@
 # ADR-013A — Two-Tier Foreground Detection: UsageStatsManager Baseline, Accessibility Optional
 
-**Status:** Accepted — implementation deferred to M2 (Core Security Platform). The current build
-remains accessibility-only until then. · **Date:** 2026-08-04 · **Source/authority:** Product
-decision (project lead), 2026-08-04 — Google Play Store compliance requirement ·
-**Supersedes:** ADR-013
+**Status:** Superseded by ADR-013B (2026-08-14) — for the 1.0.0 release the optional
+accessibility tier is deferred to 2.0.0 and the UsageStats + overlay baseline is retained and
+made mandatory; the two-tier target is re-sequenced, not abandoned. (Accepted 2026-08-04.) The
+current build remains accessibility-only until the M2 baseline build lands. · **Date:** 2026-08-04
+· **Source/authority:** Product decision (project lead), 2026-08-04 — Google Play Store compliance
+requirement · **Supersedes:** ADR-013 · **Superseded-by:** ADR-013B
 
 ## Context
 Lock enforcement currently detects protected-app launches **only** through an

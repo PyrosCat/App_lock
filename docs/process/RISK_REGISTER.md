@@ -52,7 +52,7 @@ a pre-existing impact *range* is involved. Worked examples: R-002 (Medium × Hig
 · **Severity:** High · **Status:** Open · **Opened:** 2026-07-23 · **Owner:** project lead
 **Affected gate(s):** M2 — IS Phase-1 gate (two-tier baseline per ADR-013A is the remediation)
 · M6 — Play-compliance review (R-001b verification, NFR-COMPY-002/003)
-**Related:** ADR-013 → superseded by **ADR-013A** · FR-179, FR-231, FR-233, FR-242, FR-253 ·
+**Related:** ADR-013 → **ADR-013A** → **ADR-013B** (2026-08-14) · FR-179, FR-231, FR-233, FR-242, FR-253 ·
 NFR-PERF-012 · NFR-COMPY-002/003, NFR-COMP-001
 · evidence: `docs/reports/campaigns/2026-07-23_wp2-regression_moto-g-2025.md`
 
@@ -64,6 +64,18 @@ to the optional path. The risk remains **Open** at **High** because the shipping
 accessibility-only — the baseline is not built until M2, so the exposure persists until then.
 A new consideration also opens: the baseline depends on Usage Access + overlay, each with its own
 permission-loss/health story (extends FR-179).
+
+**Update 2026-08-14 — ADR-013B defers accessibility out of the 1.0.0 release.** The year-end 1.0.0
+scope decision (ADR-013B, superseding ADR-013A) removes the accessibility tier from the release
+entirely: 1.0.0 ships the Usage Access + overlay baseline **only**, with the optional
+AccessibilityService deferred to 2.0.0. Consequently **R-001a and R-001b no longer apply to 1.0.0**
+— there is no accessibility service in the release for Restricted Settings to block or Play to
+scrutinise; both move with the tier to the 2.0.0 Play-compliance review. The residual 1.0.0
+exposure is the baseline's own two grants — Usage Access (itself Restricted-Settings-gated for
+sideloaded Android 13+) and the now-mandatory overlay — and the fact that the shipping build stays
+accessibility-only until the M2 baseline lands. Stays **Open** pending that build and a full
+re-scope of this entry (likelihood/impact re-rating) at its next touch. RTM FR-043/FR-045/FR-253 →
+`descoped-v1` in the same change.
 
 ### Description
 The app detects protected-app launches via `AccessibilityService` (ADR-013). Real-hardware
@@ -123,8 +135,17 @@ updates, and the M2 and M6 gates.
 **Affected gate(s):** M2 — IS Phase-1 gate (the overlay-vs-activity presentation decision, ADR-013A/AS-020,
 is the remediation path; TM §14.10 applies). Not an M1 gate item — WP5/WP6 regression gates only
 require the race to be *unchanged*, which the 2026-08-09 post-Hilt matrix confirmed.
-**Related:** TM THR-ENF-004 (enforcement race during application switching), HF-002 (fast-relaunch bypass — remediation shown incomplete), HF-003, §9.15 control, §12.41 residual register (fail-open enforcement) · ADR-013A / AS-020 (baseline lock-interface presentation) · `ApplicationLockEngine.kt:61` + `:123`
+**Related:** TM THR-ENF-004 (enforcement race during application switching), HF-002 (fast-relaunch bypass — remediation shown incomplete), HF-003, §9.15 control, §12.41 residual register (fail-open enforcement) · ADR-013A → **ADR-013B** / AS-020 (baseline lock-interface presentation) · `ApplicationLockEngine.kt:61` + `:123`
 · evidence: `docs/reports/campaigns/2026-07-23_wp2-matrix_nucbox-g5.md`
+
+**Update 2026-08-14 — the overlay remediation is now committed 1.0.0 scope (ADR-013B).** ADR-013B
+makes the drawn `SYSTEM_ALERT_WINDOW` overlay the **mandatory, sole** lock-presentation mechanism
+for 1.0.0 (accessibility deferred to 2.0.0). This converts planned action #2 — the
+overlay-vs-activity-launch presentation choice — from an open M2 decision into a **decided**
+remediation path for R-002: a drawn overlay sits on top of the foreground task rather than as a
+slide-over-able `noHistory` Activity that loses the window race by construction. The race is not
+closed until the baseline is built and re-validated on hardware (planned action #1), so the risk
+stays **Open**.
 
 ### Description
 The WP2 emulator-matrix campaign (NucBox, API 26/29/33/35) found the F4 rapid-relaunch defense

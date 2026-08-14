@@ -26,7 +26,8 @@ beneath its root (GOVERNANCE §2.4).
 | [ADR-011](ADR-011-single-module-layout.md) | Retain Single-Module :app with Package-Enforced Layering | Accepted |
 | [ADR-012](ADR-012-sqlcipher-room.md) | SQLCipher (net.zetetic) as the Room-"(or equivalent)" Encrypted Persistence | Accepted (as built) |
 | [ADR-013](ADR-013-accessibility-detection.md) | Accessibility-Service-Based Foreground App Detection | Superseded by ADR-013A |
-| [ADR-013A](ADR-013A-two-tier-detection.md) | Two-Tier Foreground Detection: UsageStatsManager Baseline, Accessibility Optional | Accepted — implementation in M2 |
+| [ADR-013A](ADR-013A-two-tier-detection.md) | Two-Tier Foreground Detection: UsageStatsManager Baseline, Accessibility Optional | Superseded by ADR-013B |
+| [ADR-013B](ADR-013B-v1-baseline-only-detection.md) | Version 1.0.0 Detection Scope: Overlay-Presented UsageStats Baseline, Accessibility Deferred to 2.0.0 | Accepted — 1.0.0 scope; baseline build in M2 |
 | [ADR-014](ADR-014-api-range.md) | Supported API Range: minSdk 26, targetSdk 35, Forward-Compatible to Future Levels | Accepted |
 | [ADR-015](ADR-015-hilt-adoption.md) | Hilt Adoption Plan (Replacing the Graph Service Locator) | Accepted — execution in M1 |
 | [ADR-016](ADR-016-konsist-architecture-enforcement.md) | Konsist for Automated Architecture-Rule Enforcement | Accepted — execution in M1 (WP3) |
