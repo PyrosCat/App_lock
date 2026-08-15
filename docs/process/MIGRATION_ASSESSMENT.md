@@ -16,6 +16,12 @@ existing project migrates to it while preserving the maximum amount of validated
 > rating in particular is no longer current) · **gap execution → `M1_PLAN.md` + `rtm/rtm.csv`**
 > (see the Phase 10 annotation). Original text below is unedited; all annotations are marked
 > **[2026-08-10]**.
+>
+> **[2026-08-15 — version split]** The M0–M6 milestone model and the full-spec scope this assessment
+> plans against were re-cut by **ADR-019** (2026-08-14): the client-approved **1.0.0** baseline
+> (`docs/v1.0.0/`) is now active with its own milestone line **M7–M10**, and the full spec became the
+> **2.0.0** target (`docs/v2.0.0/`). Treat this document's scope and milestone framing as pre-split
+> history; the live plan is `ROADMAP.md`.
 
 ---
 

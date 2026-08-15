@@ -18,46 +18,52 @@ core locking (accessibility detection, PIN + biometric auth, relock policies), s
 hardening (Argon2id, SQLCipher, lockout, watchdog, opt-in uninstall protection), encrypted
 vault, and intruder selfie.
 
-Lifecycle position under the new Implementation Strategy (phases 0–6):
+Lifecycle position after the **v1.0.0 / v2.0.0 split** (ADR-019, 2026-08-14): the client-approved
+1.0.0 spec (`docs/v1.0.0/`) is the active baseline; the full spec (`docs/v2.0.0/`) is the 2.0.0
+target. Detection scope is fixed by ADR-013B — Usage Access + a mandatory system overlay, **no
+accessibility service in 1.0.0**.
 
-| IS Phase | Scope | Status |
+| Milestone | Line | Status |
 |---|---|---|
-| 0 Foundation | CI/CD, static analysis, Hilt DI, build variants, docs governance | **← current** (migration M1; WP1–WP5 done, WP6 next) |
-| 1 Core Security Platform | Auth, crypto, lock engine, sessions | Built; formal gate review pending (M2) |
-| 2 Core App Features (MVP) | Protected apps ✓, vault ✓, settings ◐, backup ✗, onboarding ✗ | Partial (M3) |
-| 3 Automation | Schedules, Wi-Fi/Bluetooth/location rules, rule engine | Planned (M4; design input in docs/process/PHASE4_PLAN.md) |
-| 4 Production Hardening | Observability, resilience, data lifecycle, scalability | Planned (M5) |
-| 5–6 Security Hardening & Release | Verification campaigns, release governance, v1.0.0 | Planned (M6) |
+| M0 Baseline & governance | foundation | 🟢 Done |
+| M1 Foundation retrofit (IS Phase 0) | foundation | 🟡 Current — WP1–WP6 done, WP7 next |
+| M7 Detection & enforcement replacement | 1.0.0 | 🔵 Up next — the accessibility exit (Usage Access + overlay) |
+| M8 Product & conformance | 1.0.0 | ⚪ Planned — UI/UX surfaces; vault/intruder removed from the 1.0.0 line |
+| M9 Hardening & verification | 1.0.0 | ⚪ Planned |
+| M10 Release | 1.0.0 | ⚪ Planned — signed v1.0.0 |
+| M2–M6 | 2.0.0 (deferred) | ⚪ Frozen — the 2.0.0 lineage: vault, intruder, automation, observability, … |
 
 ### Roadmap — where the project stands
 
-Execution runs on the migration path **M0 → M6** (live status: [ROADMAP.md](docs/process/ROADMAP.md);
-baseline analysis: [MIGRATION_ASSESSMENT.md](docs/process/MIGRATION_ASSESSMENT.md));
-M1 (foundation retrofit = IS Phase 0) is broken into work packages WP1–WP8
-([M1_PLAN.md](docs/process/M1_PLAN.md)).
+Live status: [ROADMAP.md](docs/process/ROADMAP.md); baseline analysis (frozen snapshot):
+[MIGRATION_ASSESSMENT.md](docs/process/MIGRATION_ASSESSMENT.md). The **1.0.0 line is M0–M1 → M7–M10**
+(ADR-019 re-cut); the earlier M2–M6 scope is frozen as the deferred 2.0.0 lineage. M1 (foundation
+retrofit = IS Phase 0) is broken into work packages WP1–WP8 ([M1_PLAN.md](docs/process/M1_PLAN.md)).
 
 **Legend:** 🟢 done · 🟡 current · 🔵 next · ⚪ planned.
 
-The milestone spine, **M0 → M6**:
+The 1.0.0 milestone spine:
 
 ```mermaid
 flowchart LR
     classDef done fill:#c9efd4,stroke:#248a3d,color:#14532d
     classDef current fill:#ffe6a1,stroke:#c99700,color:#6b5200
+    classDef next fill:#bde3ec,stroke:#1592a8,color:#0c4a56
     classDef todo fill:#e6e8ea,stroke:#8a9199,color:#3a4149
 
     M0["M0<br/>Baseline and governance"]:::done
     M1["M1<br/>Foundation retrofit<br/>(IS Phase 0)"]:::current
-    M2["M2<br/>Security gate:<br/>two-tier detection"]:::todo
-    M3["M3<br/>MVP: backup,<br/>onboarding, MVVM"]:::todo
-    M4["M4<br/>Automation"]:::todo
-    M5["M5<br/>Production hardening"]:::todo
-    M6["M6<br/>Hardening and release<br/>v1.0.0"]:::todo
+    M7["M7<br/>Detection and enforcement<br/>(accessibility exit)"]:::next
+    M8["M8<br/>Product and<br/>conformance"]:::todo
+    M9["M9<br/>Hardening and<br/>verification"]:::todo
+    M10["M10<br/>v1.0.0 release"]:::todo
 
-    M0 --> M1 --> M2 --> M3 --> M4 --> M5 --> M6
+    M0 --> M1 --> M7 --> M8 --> M9 --> M10
 ```
 
-**M1 (current)** breaks into eight work packages — WP1–WP5 done, WP6 next:
+The deferred **M2–M6** scope (vault, intruder capture, automation, observability, …) becomes the **2.0.0** lineage.
+
+**M1 (current)** breaks into eight work packages — WP1–WP6 done, WP7 next:
 
 ```mermaid
 flowchart LR
@@ -70,19 +76,21 @@ flowchart LR
     WP3["WP3<br/>Static analysis"]:::done
     WP4["WP4<br/>Build variants"]:::done
     WP5["WP5<br/>Hilt migration"]:::done
-    WP6["WP6<br/>Package realign"]:::next
-    WP7["WP7<br/>DB fail-safe"]:::todo
+    WP6["WP6<br/>Package realign"]:::done
+    WP7["WP7<br/>DB fail-safe"]:::next
     WP8["WP8<br/>Instrumentation and gate"]:::todo
 
     WP1 --> WP2 --> WP3 --> WP4 --> WP5 --> WP6 --> WP7 --> WP8
 ```
 
-**WP5 (Hilt) is complete** — 71 unit tests, R8 release build clean, zero `Graph` references, and the
-on-device gating-regression gate is **green on both real hardware (Moto G 2025, 2/2) and the NucBox
-API 26/29/33/35 emulator matrix** — ADR-015 validated. WP6 (package realignment) is next.
+**WP6 (package realignment) is complete** — the ADR-018 FQCN pins held on the upgrade-install drill;
+Konsist layer rules active. WP7 (data-safe migrations — re-scoped: remove the destructive fallback,
+and **delete** the legacy plaintext path since nothing has shipped) is next, then WP8
+(instrumentation seed + IS Phase-0 gate record).
 
-Pre-rebaseline **Phases 1–3 are already built and E2E-validated** (see above) — they underlie the
-M1 foundation and get their formal security-gate review in M2.
+Pre-rebaseline **Phases 1–3 are built and E2E-validated** — PIN/biometric auth, encryption, and
+brute-force defense carry into 1.0.0. The **vault and intruder capture are reserved for 2.0.0**
+(descoped from the 1.0.0 line per ADR-019; code preserved for reinstatement).
 
 ## Documentation map
 

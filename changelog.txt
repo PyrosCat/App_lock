@@ -4,6 +4,29 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs sweep: refresh stale milestone framing (root README + MIGRATION_ASSESSMENT)   (2026-08-15)
+----------------------------------------------------------------------------------------------
+Post-ADR-019 staleness sweep of tracked docs. Fixed the root README.md milestone/roadmap section
+(the one block missed in the earlier pass): the IS-Phase-0–6 table and M0→M6 Mermaid spine became
+the 1.0.0 line (M0–M1 → M7–M10) with WP6-done/WP7-next; detection reframed as Usage Access +
+overlay; vault/intruder marked reserved-for-2.0.0. Added a dated version-split banner annotation to
+the frozen MIGRATION_ASSESSMENT.md (GOVERNANCE §5.1 snapshot rule). Verified no other living doc
+carries the old model as active — the PHASE3/4 plans are already banner'd non-active (re-base when
+2.0.0 automation begins); remaining old-path / M0–M6 hits are history, migration description, or
+annotated snapshots.
+
+
+Roadmap showcase: refocus docs/roadmap.html to the two-track v1.0.0 / v2.0.0 model   (2026-08-15)
+------------------------------------------------------------------------------------------------
+Updated the client-facing roadmap (stale since 0eb0aad) to the post-ADR-019 plan. Replaced the old
+"Seven milestones (M0–M6) to v1.0.0" framing with a focused v1.0.0 line — M0–M1 foundation → M7
+Play-compliant protection engine → M8 product/conformance → M9 hardening → M10 release — plus a new
+"v2.0.0 horizon" section carrying vault, intruder capture, automation, and the optional accessibility
+enhancement (vault + intruder shown as already-prototyped, reserved for 2.0.0). Corrected the
+detection story (Usage Access + overlay, not accessibility), foundation progress (6/8, WP7 next),
+and the status date. Design/CSS/JS preserved verbatim.
+
+
 ADR-013B amendment — milestone pointers M2 → M7 (post-ADR-019 re-cut)   (2026-08-15)
 -----------------------------------------------------------------------------------
 Dated factual amendment to ADR-013B (decision content unchanged; §2.3 factual/impl-status update).

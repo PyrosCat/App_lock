@@ -198,7 +198,7 @@
     font-weight:700; color:var(--current);
   }
 
-  /* ---------- delivered grid ---------- */
+  /* ---------- delivered / horizon grid ---------- */
   .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
   @media (max-width:820px){ .cards { grid-template-columns:repeat(2,1fr); } }
   @media (max-width:520px){ .cards { grid-template-columns:1fr; } }
@@ -209,6 +209,13 @@
   .card .ic { width:34px; height:34px; margin-bottom:14px; color:var(--accent); }
   .card h3 { font-size:16.5px; font-weight:660; margin:0 0 7px; letter-spacing:-.01em; }
   .card p { color:var(--ink-soft); margin:0; font-size:14.5px; line-height:1.55; }
+  .card .tag {
+    display:inline-block; margin-top:12px; font-family:var(--mono); font-size:9.5px;
+    letter-spacing:.09em; text-transform:uppercase; font-weight:700;
+    color:var(--next); background:var(--next-soft); border:1px solid var(--next-line);
+    border-radius:999px; padding:3px 9px;
+  }
+  .card--horizon .ic { color:var(--next); }
 
   /* ---------- next callout ---------- */
   .callout {
@@ -246,25 +253,25 @@
 
   <header class="hero">
     <p class="eyebrow">App Lock &nbsp;·&nbsp; Product roadmap</p>
-    <h1>The security foundation is built. <span class="thin">Now hardening toward release.</span></h1>
-    <p class="lede">App Lock keeps your apps and media private on your own device — PIN and biometric locking, an encrypted vault, and silent intruder capture, with <strong>everything encrypted at rest and nothing leaving the phone</strong>. The core protection is implemented and <strong>validated on real hardware</strong>; work now focuses on the engineering platform that carries it to a v1.0.0 release.</p>
+    <h1>The security core is built. <span class="thin">Now on a focused path to v1.0.0.</span></h1>
+    <p class="lede">App Lock keeps the apps on your phone private — PIN and biometric locking, encrypted on your own device, with <strong>nothing leaving the phone</strong>. The security core is implemented and <strong>validated on real hardware</strong>. v1.0.0 is now a <strong>tight, fully-verified release</strong> built on a Google&nbsp;Play–compliant protection engine; the fuller vision — a private vault, intruder capture, and automation — moves to the <strong>v2.0.0</strong> track.</p>
     <div class="hero-meta">
-      <span><b>Status as of</b> 11 August 2026</span>
-      <span><b>Phase</b> Foundation (M1 of M0–M6)</span>
-      <span><b>Target</b> v1.0.0</span>
+      <span><b>Status as of</b> 15 August 2026</span>
+      <span><b>Now</b> Foundation → v1.0.0 line</span>
+      <span><b>Target</b> Focused v1.0.0</span>
     </div>
 
     <div class="stats">
       <div class="stat stat--accent">
-        <p class="k">Current phase</p>
+        <p class="k">Current focus</p>
         <p class="v">Foundation<small>Engineering platform retrofit</small></p>
       </div>
       <div class="stat">
         <p class="k">Foundation progress</p>
-        <p class="v"><span class="num">5</span> / <span class="num">8</span><small>work packages complete</small></p>
+        <p class="v"><span class="num">6</span> / <span class="num">8</span><small>work packages complete</small></p>
       </div>
       <div class="stat">
-        <p class="k">Core security</p>
+        <p class="k">Security core</p>
         <p class="v">Validated<small>on device + emulator matrix</small></p>
       </div>
       <div class="stat">
@@ -276,8 +283,8 @@
 
   <section id="roadmap">
     <p class="sec-eyebrow">The plan</p>
-    <h2>Seven milestones to v1.0.0</h2>
-    <p class="sec-sub">Delivery runs as a sealed sequence — each milestone is completed and reviewed before the next begins. Two are behind us; the foundation milestone is underway now.</p>
+    <h2>A tighter path to v1.0.0</h2>
+    <p class="sec-sub">The plan has been refocused around a small, fully-verifiable v1.0.0. The foundation (M0–M1) stands; the release line ahead is M7–M10. The broader scope once planned mid-sequence is now the v2.0.0 horizon, further below. Delivery still runs as a sealed sequence — each milestone completed and reviewed before the next begins.</p>
 
     <div class="spine">
 
@@ -301,7 +308,7 @@
             <h3 class="ms__title">Foundation</h3>
             <span class="chip chip--current">In progress</span>
           </div>
-          <p class="ms__desc">The engineering foundation beneath the product: automated builds and testing, an on-device security regression harness that guards the locking behaviour, and a modern, layered architecture. <strong style="color:var(--ink)">Five of eight work packages are complete.</strong></p>
+          <p class="ms__desc">The engineering foundation beneath the product: automated builds and testing, an on-device security regression harness that guards the locking behaviour, and a modern, layered architecture. <strong style="color:var(--ink)">Six of eight work packages are complete.</strong></p>
 
           <div class="subtrack">
             <p class="st-label">Foundation work packages</p>
@@ -311,8 +318,8 @@
               <div class="wp wp--done"><div class="wp-code">WP3 <span class="tick">✓</span></div><div class="wp-name">Code-quality gates</div></div>
               <div class="wp wp--done"><div class="wp-code">WP4 <span class="tick">✓</span></div><div class="wp-name">Build environments</div></div>
               <div class="wp wp--done"><div class="wp-code">WP5 <span class="tick">✓</span></div><div class="wp-name">Dependency architecture</div></div>
-              <div class="wp wp--next"><div class="wp-code">WP6 <span class="wp-flag">Next</span></div><div class="wp-name">Layered architecture</div></div>
-              <div class="wp"><div class="wp-code">WP7</div><div class="wp-name">Data-safe migrations</div></div>
+              <div class="wp wp--done"><div class="wp-code">WP6 <span class="tick">✓</span></div><div class="wp-name">Layered architecture</div></div>
+              <div class="wp wp--next"><div class="wp-code">WP7 <span class="wp-flag">Next</span></div><div class="wp-name">Data-safe migrations</div></div>
               <div class="wp"><div class="wp-code">WP8</div><div class="wp-name">Test suite &amp; phase gate</div></div>
             </div>
           </div>
@@ -320,62 +327,50 @@
       </article>
 
       <article class="ms ms--planned reveal">
-        <div class="ms__rail"><span class="ms__dot">M2</span></div>
+        <div class="ms__rail"><span class="ms__dot">M7</span></div>
         <div class="ms__body">
           <div class="ms__head">
-            <span class="ms__code">M2</span>
-            <h3 class="ms__title">Security platform</h3>
+            <span class="ms__code">M7</span>
+            <h3 class="ms__title">Play-compliant protection engine</h3>
             <span class="chip chip--next">Up next</span>
           </div>
-          <p class="ms__desc">Play-compliant two-tier app detection — so protection holds reliably within Google Play policy — plus centralized security services for encryption and keys.</p>
+          <p class="ms__desc">Reliable app-launch detection through Android Usage Access, presented over the app with a secure system overlay — so protection holds within Google Play policy. Built fail-secure and resilient by design.</p>
         </div>
       </article>
 
       <article class="ms ms--planned reveal">
-        <div class="ms__rail"><span class="ms__dot">M3</span></div>
+        <div class="ms__rail"><span class="ms__dot">M8</span></div>
         <div class="ms__body">
           <div class="ms__head">
-            <span class="ms__code">M3</span>
-            <h3 class="ms__title">Core app experience</h3>
+            <span class="ms__code">M8</span>
+            <h3 class="ms__title">Product &amp; conformance</h3>
             <span class="chip chip--planned">Planned</span>
           </div>
-          <p class="ms__desc">Backup &amp; restore, guided first-run onboarding, and the complete day-to-day app experience.</p>
+          <p class="ms__desc">The complete v1.0.0 experience — guided onboarding, honest protection-health states, permission recovery, and settings — conformed to the client-approved v1.0.0 specification.</p>
         </div>
       </article>
 
       <article class="ms ms--planned reveal">
-        <div class="ms__rail"><span class="ms__dot">M4</span></div>
+        <div class="ms__rail"><span class="ms__dot">M9</span></div>
         <div class="ms__body">
           <div class="ms__head">
-            <span class="ms__code">M4</span>
-            <h3 class="ms__title">Automation</h3>
+            <span class="ms__code">M9</span>
+            <h3 class="ms__title">Hardening &amp; verification</h3>
             <span class="chip chip--planned">Planned</span>
           </div>
-          <p class="ms__desc">Smart locking rules — schedules and Wi-Fi, Bluetooth, or location triggers that lock and unlock automatically.</p>
+          <p class="ms__desc">Security hardening against the threat model, performance benchmarks, accessibility, and an independent verification pass.</p>
         </div>
       </article>
 
       <article class="ms ms--planned reveal">
-        <div class="ms__rail"><span class="ms__dot">M5</span></div>
+        <div class="ms__rail"><span class="ms__dot">M10</span></div>
         <div class="ms__body">
           <div class="ms__head">
-            <span class="ms__code">M5</span>
-            <h3 class="ms__title">Production hardening</h3>
+            <span class="ms__code">M10</span>
+            <h3 class="ms__title">v1.0.0 release</h3>
             <span class="chip chip--planned">Planned</span>
           </div>
-          <p class="ms__desc">Observability, resilience, and performance — making the app dependable and efficient under real-world use.</p>
-        </div>
-      </article>
-
-      <article class="ms ms--planned reveal">
-        <div class="ms__rail"><span class="ms__dot">M6</span></div>
-        <div class="ms__body">
-          <div class="ms__head">
-            <span class="ms__code">M6</span>
-            <h3 class="ms__title">Security hardening &amp; release</h3>
-            <span class="chip chip--planned">Planned</span>
-          </div>
-          <p class="ms__desc">Final security hardening, a full independent verification campaign, and the signed <strong style="color:var(--ink)">v1.0.0</strong> release.</p>
+          <p class="ms__desc">A full acceptance campaign against the approved specification, then the signed <strong style="color:var(--ink)">v1.0.0</strong> release to Google Play.</p>
         </div>
       </article>
 
@@ -384,8 +379,8 @@
 
   <section id="delivered">
     <p class="sec-eyebrow">Already delivered</p>
-    <h2>Built and validated</h2>
-    <p class="sec-sub">The protection users rely on is implemented today — and its core locking behaviour is checked by an automated regression gate on real hardware.</p>
+    <h2>The v1.0.0 core, built</h2>
+    <p class="sec-sub">The protection at the heart of v1.0.0 is implemented today, and its core locking behaviour is checked by an automated regression gate on real hardware.</p>
 
     <div class="cards">
       <div class="card reveal">
@@ -394,19 +389,14 @@
         <p>Passcodes are hashed with Argon2id at OWASP-recommended strength and verified in constant time. Biometric unlock with a PIN fallback.</p>
       </div>
       <div class="card reveal">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6z"/><path d="M9.2 12l1.9 1.9L15 10"/></svg>
-        <h3>Encrypted vault</h3>
-        <p>Move photos and files into a private vault sealed with AES-256-GCM over a SQLCipher database. Byte-identical export and secure delete.</p>
-      </div>
-      <div class="card reveal">
-        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1L9 4h6l1.5 2h1A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.4" r="3.1"/></svg>
-        <h3>Intruder capture</h3>
-        <p>After repeated failed unlock attempts, a silent front-camera photo is taken and stored encrypted, with a timestamped record for review.</p>
-      </div>
-      <div class="card reveal">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6z"/><path d="M12 8.5v4"/><circle cx="12" cy="15.4" r="0.6" fill="currentColor"/></svg>
         <h3>Brute-force defense</h3>
         <p>Escalating lockout with persisted counters after repeated failures, plus a watchdog that alerts if protection is switched off.</p>
+      </div>
+      <div class="card reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6z"/><path d="M9.2 12l1.9 1.9L15 10"/></svg>
+        <h3>Encrypted at rest</h3>
+        <p>Credentials and local data are sealed with Argon2id, SQLCipher, and AES-256-GCM under the Android Keystore — encrypted from first launch.</p>
       </div>
       <div class="card reveal">
         <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="3" width="12" height="18" rx="2.4"/><path d="M9.4 6.2l1.5 1.5 3.7-3.6" transform="translate(-0.2 0.4)"/><path d="M10.5 18h3"/></svg>
@@ -418,22 +408,60 @@
         <h3>Modern engineering</h3>
         <p>Continuous integration, automated code-quality gates, dependency governance, and a dependency-injected, layered architecture.</p>
       </div>
+      <div class="card reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.6"/><path d="M10.3 18.4h3.4"/><path d="M9.6 6h4.8"/></svg>
+        <h3>Local-first &amp; private</h3>
+        <p>No accounts, no cloud, no analytics. Everything stays on the device — nothing about your protected apps ever leaves the phone.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="horizon">
+    <p class="sec-eyebrow">The v2.0.0 horizon</p>
+    <h2>The fuller vision, next</h2>
+    <p class="sec-sub">Deliberately held back so v1.0.0 can ship focused and fully verified. Several of these are already prototyped and reserved for the v2.0.0 line.</p>
+
+    <div class="cards">
+      <div class="card card--horizon reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6z"/><path d="M9.2 12l1.9 1.9L15 10"/></svg>
+        <h3>Private encrypted vault</h3>
+        <p>Move photos and files into a private vault sealed with AES-256-GCM over SQLCipher, with byte-identical export and secure delete.</p>
+        <span class="tag">Prototyped · v2.0.0</span>
+      </div>
+      <div class="card card--horizon reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1L9 4h6l1.5 2h1A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"/><circle cx="12" cy="12.4" r="3.1"/></svg>
+        <h3>Intruder capture</h3>
+        <p>After repeated failed unlocks, a silent front-camera photo stored encrypted, with a timestamped record for review.</p>
+        <span class="tag">Prototyped · v2.0.0</span>
+      </div>
+      <div class="card card--horizon reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M12 7.6V12l2.8 1.7"/></svg>
+        <h3>Smart automation</h3>
+        <p>Schedules and Wi-Fi, Bluetooth, or location triggers that lock and unlock protected apps automatically.</p>
+        <span class="tag">Planned · v2.0.0</span>
+      </div>
+      <div class="card card--horizon reveal">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 13h5l-1 8 8-10h-5z"/></svg>
+        <h3>Faster optional detection</h3>
+        <p>An opt-in accessibility enhancement for lower-latency locking, layered on the Play-compliant baseline for users who want it.</p>
+        <span class="tag">Planned · v2.0.0</span>
+      </div>
     </div>
   </section>
 
   <section id="next" style="padding-top:0;">
     <div class="callout reveal">
-      <span class="cta-code">M2</span>
+      <span class="cta-code">M7</span>
       <div>
         <h3>What comes next</h3>
-        <p>The security platform milestone: a Play-compliant two-tier detection model so the app locks reliably within Google Play policy, alongside centralized security and key-management services — the gateway to completing the app experience.</p>
+        <p>The Play-compliant protection engine — Android Usage Access detection presented through a secure system overlay, built fail-secure — the gateway to the v1.0.0 product build.</p>
       </div>
     </div>
   </section>
 
   <footer>
-    <b>App Lock</b> — local-first Android security · app locking, encrypted vault, intruder capture.<br>
-    In active development. Status as of <b>11 August 2026</b>; the roadmap is indicative and is reviewed at each phase gate.
+    <b>App Lock</b> — local-first Android security · a focused v1.0.0, with vault, intruder capture, and automation on the v2.0.0 track.<br>
+    In active development. Status as of <b>15 August 2026</b>; the roadmap is indicative and reviewed at each milestone gate.
   </footer>
 
 </div>
