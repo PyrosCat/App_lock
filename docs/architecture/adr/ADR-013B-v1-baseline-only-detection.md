@@ -4,6 +4,12 @@
 lead), 2026-08-14 — year-end 1.0.0 scope narrowing (smallest verifiable product; full feature
 set targeted for 2.0.0) · **Supersedes:** ADR-013A
 
+**Amendment 2026-08-15:** milestone pointers below updated **M2 → M7** following the ADR-019
+version-split re-cut — the 1.0.0 detection/enforcement replacement is now milestone **M7**
+(`ROADMAP.md`); the old M2–M6 are frozen as the 2.0.0 lineage. Factual correction only; the
+decision is unchanged. (Historical mentions of ADR-013A's *original* M2 scheduling are retained
+as history.)
+
 ## Context
 ADR-013A adopted a **two-tier** foreground-detection model — a `UsageStatsManager` + overlay
 (`SYSTEM_ALERT_WINDOW`) Play-compliant **baseline** plus an **optional** opt-in
@@ -82,7 +88,7 @@ Positive:
 - The **mandatory overlay is also the R-002 remediation.** A drawn `SYSTEM_ALERT_WINDOW` sits on
   top of the foreground task rather than as a slide-over-able `noHistory` Activity, so it resists
   the rapid-relaunch window-ordering race that the Activity-launch presentation loses (R-002
-  planned action #2). Making it mandatory converts that "open M2 presentation choice" into
+  planned action #2). Making it mandatory converts that "open presentation choice" into
   committed 1.0.0 scope.
 - **Single detection mode simplifies NFR-PERF-012** — no baseline-vs-accessibility tiering; one
   polling-latency profile to state and verify.
@@ -98,8 +104,8 @@ Negative / costs:
   mandatory user grant. The 1.0.0 exposure is "two special grants the user must complete," not
   "zero."
 - The current **accessibility-only build must be replaced** by the Usage Access + overlay baseline
-  before 1.0.0 (the M2 baseline build under ADR-013A stays on the critical path; only the optional
-  tier leaves it).
+  before 1.0.0 (the M7 baseline build stays on the critical path; only the optional accessibility
+  tier leaves it, deferred to 2.0.0).
 - Protection-health monitoring (FR-179) monitors **Usage Access + overlay** loss in 1.0.0, not
   accessibility.
 
@@ -117,7 +123,7 @@ Related ADRs: **supersedes ADR-013A** (lineage ADR-013 → 013A → 013B); **ADR
 still binding for the 2.0.0 accessibility return); **ADR-014** (supported API range).
 
 ## Implementation status
-**Not yet implemented.** The 1.0.0 baseline (Usage Access + overlay) is the M2 build; the current
+**Not yet implemented.** The 1.0.0 baseline (Usage Access + overlay) is the M7 build; the current
 shipping build remains accessibility-only until then. This ADR fixes the **1.0.0 detection scope**;
 the `New docs/1.0.0 Draft` SRS/NFR/SDS/Threat-Model revision (a proposal, not yet adopted) is being
 aligned to it — including naming the overlay permission explicitly and adding the NFR-PERF-012

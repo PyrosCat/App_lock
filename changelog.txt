@@ -4,6 +4,15 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+ADR-013B amendment — milestone pointers M2 → M7 (post-ADR-019 re-cut)   (2026-08-15)
+-----------------------------------------------------------------------------------
+Dated factual amendment to ADR-013B (decision content unchanged; §2.3 factual/impl-status update).
+The 1.0.0 detection/enforcement build it describes now maps to milestone M7 — the ADR-019 re-cut
+froze M2–M6 as the deferred 2.0.0 lineage. Updated the two forward "M2 build" pointers (Consequences
++ Implementation status) to M7 and dropped a stale "open M2 presentation choice" tag; ADR-013A's
+original M2 scheduling retained as history. No ADR index/status change.
+
+
 Milestone re-cut M7–M10 + RTM re-base onto the 1.0.0 baseline (migration Phases C+D)   (2026-08-14)
 --------------------------------------------------------------------------------------------------
 Executed the governance/RTM half of the ADR-019 migration. Decisions (user-approved 2026-08-14):
