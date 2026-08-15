@@ -17,7 +17,7 @@ compensating treatment.
 | [R-001](#r-001) | Detection-permission exposure (was: accessibility; now Usage Access + overlay grants — a11y left 1.0.0 per ADR-013B) | **High** | M7 · M10 | Open |
 | [R-002](#r-002) | Lock-engine rapid-relaunch window-ordering race (protected app outruns the lock screen) | **High** (pending real-hardware) | M7 | Open |
 | [R-003](#r-003) | Schedule/capacity: enterprise-scale baseline vs solo-developer cadence | **High** | all (pacing) | Open |
-| [R-004](#r-004) | `fallbackToDestructiveMigration` — silent data-loss trap on schema mismatch | **High** | M1 (WP7) | Open |
+| [R-004](#r-004) | `fallbackToDestructiveMigration` — silent data-loss trap on schema mismatch | **High** | M1 (WP7) | Open — code remediation landed (WP7(a)); closure pending device drill |
 | [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** | M7 | Open |
 | [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **Medium** | M1/WP7 | Closed (2026-08-15) — eliminated by WP7(b) path deletion |
 
@@ -256,15 +256,25 @@ any material scope addition (new spec revisions, new mandated deliverables).
 ## R-004 — `fallbackToDestructiveMigration`: silent data-loss trap on schema mismatch
 
 **Category:** Reliability / Data integrity · **Likelihood:** Medium · **Impact:** High
-· **Severity:** High · **Status:** Open — remediation scheduled (M1/WP7) · **Opened:**
+· **Severity:** High · **Status:** Open — remediation implemented (WP7(a)), closure pending the deliberate-failure drill · **Opened:**
 2026-08-10 (promoted; risk first recorded 2026-07-19) · **Owner:** project lead
 **Affected gate(s):** M1 — WP7 is the in-phase remediation; the IS Phase-0 (M1) gate record
 (WP8) verifies closure. Exposure compounds if carried into M2/M3 schema work.
 **Provenance:** `MIGRATION_ASSESSMENT.md` Phase 11 "Migration risk" (Medium, 2026-07-19
 snapshot), promoted per GOVERNANCE.md §5.2 with Impact re-rated High (vault/security data).
-**Related:** FR-228, FR-229 · ADR-007, ADR-012 · `AppLockDatabase.kt` (builder retains
-`fallbackToDestructiveMigration()`) · DDS Vol IV (operations/lifecycle) · TS_GAP_ANALYSIS
+**Related:** FR-228, FR-229 · ADR-007, ADR-012 · `AppLockDatabase.kt` (`fallbackToDestructiveMigration()` removed WP7(a); fail-safe open + quick_check added) · DDS Vol IV (operations/lifecycle) · TS_GAP_ANALYSIS
 G-05 (deliberate-failure dataset, WP7 seed).
+
+**Update 2026-08-15 — code remediation landed (WP7(a)).** `fallbackToDestructiveMigration()` is
+removed from `AppLockDatabase.build`; an open/verify failure (missing migration, schema mismatch,
+corrupt file, or a non-`ok` `PRAGMA quick_check`) now moves the unreadable database aside as a
+timestamped `.recovery-*.bak` (bytes preserved — never a silent wipe), creates a fresh encrypted
+database so protection never crash-loops, raises a persistent notification, and records a
+`DATABASE_RECOVERED` audit event. The fail-safe decision logic is unit-tested (`DatabaseRecoveryTest`)
+and the encryption boundary is unchanged (FR-164 unaffected). RTM FR-228 → `implemented`, FR-229 →
+`partial` in the same change. **Stays Open:** the plan's deliberate-failure drill (upgrade-install to
+a future schema version → fail-safe engages, `.bak` present, app usable) runs on-device at WP8 and is
+the closure evidence; FR-228 moves to `implemented-verified` then.
 
 ### Description
 `AppLockDatabase.build` still chains `.fallbackToDestructiveMigration()`: any schema
@@ -287,8 +297,9 @@ configuration with no error surfaced.
 - The B-1-style upgrade test (data survives version bump) is part of campaign practice.
 
 ### Planned actions
-1. **M1/WP7:** remove the fallback; replace with a fail-safe policy (refuse-to-open +
-   surface recovery guidance rather than destroy), plus the FR-229 integrity check.
+1. **M1/WP7 — done 2026-08-15 (WP7(a)):** removed the fallback; replaced with a fail-safe policy that
+   preserves the unreadable DB (`.recovery-*.bak`) and starts fresh with a persistent notification
+   rather than destroying data, plus the FR-229 `quick_check` integrity seed.
 2. WP7 deliberate-failure drill: corrupted/mismatched-schema dataset proving the fail-safe
    path (feeds TS_GAP G-05 and the WP8 instrumentation seed).
 3. Close this risk on the WP7 campaign evidence; cite it here and in the RTM rows

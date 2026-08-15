@@ -4,6 +4,33 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+WP7(a): fail-safe database open replaces destructive migration fallback (R-004 remediation)   (2026-08-15)
+---------------------------------------------------------------------------------------------------------
+M1/WP7 fix (a) of two (fix (b) landed in c9ebcae). Removed fallbackToDestructiveMigration() from
+AppLockDatabase.build: a missing migration, schema mismatch, unreadable/corrupt file, or a non-ok
+PRAGMA quick_check no longer silently wipes the encrypted database. Instead the unreadable database is
+moved aside as a timestamped .recovery-<ts>.bak (bytes preserved for recovery), a fresh encrypted
+database is created so the detection service never crash-loops, a persistent notification informs the
+user, and a DATABASE_RECOVERED security event is logged (FR-228 recovery + FR-229 quick_check integrity
+seed). The encryption boundary is unchanged -- both the normal and recovery databases use the same
+SQLCipher factory, so FR-162/FR-164 (encryption at rest) are unaffected.
+- New data/DatabaseRecovery.kt holds the pure fail-safe decision logic (backup naming, quick_check
+  interpretation, move-aside preserving the db + clearing wal/shm), unit-tested in DatabaseRecoveryTest
+  (plain JVM, no Android/SQLCipher types).
+- The recovery notification uses a launcher intent (getLaunchIntentForPackage), not a MainActivity
+  reference, so the data layer takes no presentation dependency (Konsist R2 stays green). notify() is
+  guarded by areNotificationsEnabled() + an explicit catch (SecurityException) for the revocable
+  POST_NOTIFICATIONS, and the whole notify step is best-effort so it can never abort startup.
+- SecurityEventType.DATABASE_RECOVERED added; three db_recovery_* strings added.
+- RTM: FR-228 partial -> implemented (impl pointer corrected core/database -> data/); FR-229
+  not-started -> partial. RISK_REGISTER: R-004 code remediation recorded, stays Open pending the
+  on-device deliberate-failure drill (WP8) which provides closure evidence and lifts FR-228 to
+  implemented-verified.
+Verified: full local gate green -- testProdDebugUnitTest (unit suite incl. DatabaseRecoveryTest +
+Konsist R1-R4), detekt, lintProdDebug, assembleProdRelease (R8). On-device drills (WP7 exit check a/b)
+remain for the WP8 device session.
+
+
 WP7(b): delete the legacy plaintext->encrypted migration path (R-006 closed by elimination)   (2026-08-15)
 ---------------------------------------------------------------------------------------------------------
 M1/WP7 fix (b) of two (one commit each for regression isolation; fix (a) destructive-fallback removal

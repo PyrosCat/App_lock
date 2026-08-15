@@ -29,6 +29,7 @@ object SecurityEventType {
     const val BOOT_COMPLETED = "BOOT_COMPLETED"
     const val PROTECTION_DISABLED = "PROTECTION_DISABLED"
     const val INTRUDER_CAPTURED = "INTRUDER_CAPTURED"
+    const val DATABASE_RECOVERED = "DATABASE_RECOVERED"
 }
 
 /**

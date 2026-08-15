@@ -226,8 +226,8 @@ FR-224,Application Repair Function,AdministrationDiagnosticsMaintenance,FR,Mediu
 FR-225,Administrator Security Controls,AdministrationDiagnosticsMaintenance,FR,Low,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-226,Build Configuration Separation,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-227,Secure Configuration Management,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
-FR-228,Database Migration Management,ProductionReadiness,FR,,partial,core/database/AppLockDatabase.kt,,hand-written migrations exist; destructive fallback removal pending (ADR-007)
-FR-229,Database Integrity Verification,ProductionReadiness,FR,,not-started,,,
+FR-228,Database Migration Management,ProductionReadiness,FR,,implemented,data/AppLockDatabase.kt,,"WP7(a): fail-safe open replaces destructive fallback (R-004) — unreadable/mismatched DB moved aside as .recovery-*.bak (preserved) then fresh encrypted DB + persistent notice + DATABASE_RECOVERED audit; MIGRATION_1_2 retained. Deliberate-failure device drill pending (WP8) to reach implemented-verified and close R-004"
+FR-229,Database Integrity Verification,ProductionReadiness,FR,,partial,data/AppLockDatabase.kt,,"WP7(a): PRAGMA quick_check on every open (integrity seed) routes failure to the fail-safe recovery path; fuller integrity framework deferred to the M7+ engine work"
 FR-230,Background Processing,ProductionReadiness,FR,,not-started,,,
 FR-231,Startup Health Check,ProductionReadiness,FR,,not-started,,,
 FR-232,Dependency Validation,ProductionReadiness,FR,,not-started,,,

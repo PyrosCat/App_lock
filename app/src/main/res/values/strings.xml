@@ -38,6 +38,11 @@
     <string name="protection_lost_title">App protection is OFF</string>
     <string name="protection_lost_body">The Accessibility permission was turned off. Tap to re-enable App Lock protection.</string>
 
+    <!-- Database integrity recovery (FR-228/FR-229, R-004) -->
+    <string name="db_recovery_channel_name">Data recovery</string>
+    <string name="db_recovery_title">App Lock reset its protected data</string>
+    <string name="db_recovery_body">Your saved settings couldn\'t be opened, so they were set aside and App Lock started fresh. Open the app to set up protection again.</string>
+
     <!-- Intruder selfie (FR-081..085) -->
     <string name="intruder_channel_name">Intruder alerts</string>
     <string name="intruder_notification_title">Intruder alert</string>
