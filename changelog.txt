@@ -4,6 +4,23 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+ADR-019 + migration plan — version-split documentation baseline (1.0.0 active / 2.0.0 target)   (2026-08-14)
+----------------------------------------------------------------------------------------------------------
+Client approved the reduced 1.0.0 specification (2026-08-14), which unblocks adopting it as the
+active baseline. ADR-019 records the version-split decision; VERSION_BASELINE_MIGRATION_PLAN.md is
+the phased execution. Design only in this change — NO files moved yet, product code untouched.
+- Decision: version-namespace the spec baselines — docs/v1.0.0/ (active; client-approved SRS/NFR/
+  SDS/DDS/TM/UI-UX + build source, promoted from gitignored New docs/1.0.0 Draft/) and docs/v2.0.0/
+  (future target; the existing full spec set via git mv, history preserved). Active baseline = 1.0.0.
+- Reviewed-content-only: the 2.0.0 UI/UX draft is unreviewed → stays in gitignored scratch until
+  reviewed (so docs/v2.0.0/ has no UI/UX yet). Identifier reuse guarded by version paths + a new
+  version-qualified citation rule (v1.0.0 SRS §8).
+- Follow-on (in the migration, not yet done): RTM re-base onto 1.0.0 — descope per SRS v1.0.0
+  Appendix A (Vault FR-106-125 + intruder FR-081-085 move implemented-verified → descoped-v1; code
+  retained), GOVERNANCE §5.1 + citation rule, doc map, ROADMAP milestone/version reconciliation.
+- Same-commit companions: ADR index row for ADR-019.
+
+
 ADR-013B — 1.0.0 detection scope: overlay-presented UsageStats baseline, accessibility → 2.0.0   (2026-08-14)
 -----------------------------------------------------------------------------------------------------------
 Superseded ADR-013A for the year-end 1.0.0 release scope. 1.0.0 ships the Usage Access +
