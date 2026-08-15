@@ -4,6 +4,22 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+WP7(b): delete the legacy plaintext->encrypted migration path (R-006 closed by elimination)   (2026-08-15)
+---------------------------------------------------------------------------------------------------------
+M1/WP7 fix (b) of two (one commit each for regression isolation; fix (a) destructive-fallback removal
+follows in its own commit). Removed the one-time Phase-1 plaintext->SQLCipher conversion from
+AppLockDatabase: snapshotAndRemovePlaintext, importLegacyRows, isPlaintextSqlite, the LegacySnapshot
+holder, and the legacy-detect branch of build(). Rationale (decided 2026-08-14 with the ADR-019
+version split): no 1.0.0 install ever shipped a plaintext database, so there is no field population to
+convert; the non-atomic import's interrupted-conversion data-loss window (R-006 / review CR-003)
+therefore has neither a code path nor a population and closes BY ELIMINATION, not by an atomic-import
+rewrite. A stray dev-only plaintext applock.db is simply not opened as if it were current (DDS v1.0.0
+section 16.5). build() is now load-lib -> key -> encrypted Room builder; MIGRATION_1_2 (intruder_events
++ vault_items) is retained. RISK_REGISTER R-006 -> Closed. No RTM row status change here (FR-228
+completes with fix (a)). fallbackToDestructiveMigration is deliberately still present -- it is removed
+in fix (a). Verified: testProdDebugUnitTest green (unit suite + Konsist R1-R4).
+
+
 Docs sweep: refresh stale milestone framing (root README + MIGRATION_ASSESSMENT)   (2026-08-15)
 ----------------------------------------------------------------------------------------------
 Post-ADR-019 staleness sweep of tracked docs. Fixed the root README.md milestone/roadmap section

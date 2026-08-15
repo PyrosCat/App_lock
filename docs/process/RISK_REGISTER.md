@@ -19,7 +19,7 @@ compensating treatment.
 | [R-003](#r-003) | Schedule/capacity: enterprise-scale baseline vs solo-developer cadence | **High** | all (pacing) | Open |
 | [R-004](#r-004) | `fallbackToDestructiveMigration` — silent data-loss trap on schema mismatch | **High** | M1 (WP7) | Open |
 | [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** | M7 | Open |
-| [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **Medium** | M1/WP7 | Open — closing by path deletion (2026-08-14) |
+| [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **Medium** | M1/WP7 | Closed (2026-08-15) — eliminated by WP7(b) path deletion |
 
 *Gate identifiers re-pointed 2026-08-14 to the 1.0.0 milestone line M7–M10 (ADR-019 / `ROADMAP.md`):
 old M2-gate risks now block M7 (the detection/enforcement replacement); Play-compliance review moved
@@ -347,7 +347,7 @@ the M1 gate record (as an open-risk input, not an M1 blocker).
 ## R-006 — Non-atomic legacy plaintext→encrypted migration (rollback source removed before commit)
 
 **Category:** Reliability / Data integrity / Security-policy preservation · **Likelihood:** Low
-· **Impact:** High · **Severity:** **Medium** · **Status:** Open · **Opened:** 2026-08-11
+· **Impact:** High · **Severity:** **Medium** · **Status:** **Closed** (2026-08-15) · **Opened:** 2026-08-11
 · **Owner:** project lead
 **Affected gate(s):** **M1/WP7** — folded into the fail-safe migration work alongside R-004 (same
 `AppLockDatabase` file, same class of fix, one deliberate-failure drill), confirmed 2026-08-11.
@@ -360,6 +360,17 @@ likelihood is Low. Remediated in WP7 regardless of severity.
 **Related:** FR-163, FR-164, FR-228, FR-262, FR-372 · `AppLockDatabase.kt:107-144`
 (`snapshotAndRemovePlaintext` reads legacy rows into memory, then `check(dbFile.delete())`) ·
 `:90-99` (encrypted DB opened + `importLegacyRows` **after** source removal).
+
+**Closed 2026-08-15 — eliminated by WP7(b).** The legacy plaintext→encrypted conversion
+(`snapshotAndRemovePlaintext` / `importLegacyRows`, the `LegacySnapshot` holder, and the
+legacy-detect branch of `AppLockDatabase.build`) is **deleted**. With no import code and no shipped
+plaintext install to convert, the interrupted-import window this risk describes has neither a code
+path nor a population — it cannot fire. A stray dev-only plaintext `applock.db` is no longer opened
+as if it were current (DDS v1.0.0 §16.5). Resolving reference: the WP7(b) deletion commit on `main`
+(see `changelog.txt` 2026-08-15). The fresh-install / stray-plaintext confirmation drill (WP7 exit
+check b) is owed as confirming evidence at the WP8 device session but does **not** gate this
+by-elimination closure. The `AppLockDatabase.kt:107-144` / `:90-99` citations above are retained as
+historical provenance of the removed code.
 
 ### Description
 The one-time Phase-1 plaintext→SQLCipher migration reads legacy rows into an **in-memory** snapshot,
