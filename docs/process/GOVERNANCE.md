@@ -230,7 +230,7 @@ Every `docs/` artifact belongs to exactly one class, which fixes how it may chan
 
 | Class | Examples | Change rule |
 |---|---|---|
-| **Spec (client-received)** | `srs/` `nfr/` `tas/` `sds/` `dds/` `tsp/` `security/tm/` | Preserved verbatim; changes arrive only as new revisions (docs/README.md convention 7). |
+| **Spec (client-received / client-approved)** | `v1.0.0/` (active baseline, client-approved — ADR-019) · `v2.0.0/{srs,nfr,tas,sds,dds,tsp,tm}` (full spec, 2.0.0 target) | Preserved verbatim; changes arrive only as new revisions (docs/README.md convention 7). v1.0.0 revisions are produced via its governed pipeline (`docs/v1.0.0/source/`), never by hand-editing outputs. |
 | **Living** | `ROADMAP.md`, `RISK_REGISTER.md`, `M*_PLAN.md`, `rtm.csv`, this document, READMEs | Updated in place; **MUST** reflect current truth at all times. |
 | **Snapshot** | `MIGRATION_ASSESSMENT.md`, `TS_GAP_ANALYSIS.md`, dated analyses | Frozen at their stated date. Original text **MUST NOT** be rewritten; dated annotations **MAY** be added to correct a reading or point at living successors. |
 | **Evidence** | `docs/reports/**` | Immutable per `docs/reports/README.md`. |
@@ -259,11 +259,20 @@ risks**.
 
 ### 5.3 Milestones and phase citation
 
-`docs/process/ROADMAP.md` owns the canonical mapping **migration milestones M0–M6 ↔
-Implementation Strategy Phases 0–6** and their current status. Because the IS numbers its
-phases **0–6** while the Test Specification lists the same sequence **1–7** (TSP §11.7), a
-bare "Phase N" is ambiguous: phase references in project-authored docs **MUST** be written
-as `IS Phase N (Mx)` — e.g. "IS Phase 1 (M2)".
+`docs/process/ROADMAP.md` owns the canonical milestone model: the active **1.0.0 line M7–M10**
+(adopted 2026-08-14, ADR-019 — M2–M6 are frozen as the deferred 2.0.0 lineage and are never
+re-meant) plus the legacy mapping **M0–M6 ↔ Implementation Strategy Phases 0–6**. Because the IS
+numbers its phases **0–6** while the Test Specification lists the same sequence **1–7**
+(TSP §11.7), a bare "Phase N" is ambiguous: phase references in project-authored docs **MUST** be
+written as `IS Phase N (Mx)` — e.g. "IS Phase 1 (M2)". M7–M10 have no IS-phase aliases and are
+cited bare.
+
+**Version-qualified spec citations (adopted 2026-08-14, ADR-019):** the v1.0.0 and v2.0.0
+baselines deliberately share FR/NFR identifiers (reserved, with narrowed 1.0.0 meanings) and
+overlapping section numbering, so a bare `SRS §8` or unqualified `FR-042` reading is ambiguous
+where the meanings differ. Spec cross-references **MUST** be version-qualified when ambiguous —
+`v1.0.0 SRS §8`, `v2.0.0 TAS Part 3`. Pre-existing bare references are corrected when next
+touched (§6), not retroactively.
 
 ### 5.4 Classification vocabularies
 

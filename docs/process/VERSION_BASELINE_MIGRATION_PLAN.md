@@ -1,7 +1,14 @@
 # Version-Baseline Migration Plan (1.0.0 active / 2.0.0 target)
 
 **Class:** Living plan (GOVERNANCE.md §5.1). **Decision of record:** [ADR-019](../architecture/adr/ADR-019-version-split-baseline.md).
-**Trigger:** client approval of the reduced 1.0.0 specification, 2026-08-14. **Status:** Not started.
+**Trigger:** client approval of the reduced 1.0.0 specification, 2026-08-14.
+**Status:** **Executed 2026-08-14** — Phases A+B committed with the structure move (incl. the
+post-approval de-draft: outputs renamed `*_v1.0.0.*`, "Draft" status lines removed); Phases C+D
+executed with the milestone re-cut to **M7–M10** (`ROADMAP.md`, decision recorded there and in
+ADR-019's lineage) — doc map, GOVERNANCE §5.1/§5.3, path references, risk-register gate
+re-pointing, and the RTM re-base (232 rows `descoped-v1` per the v1.0.0 SRS/NFR Appendix A lists)
+all landed; Phase E verification green (pipeline rebuild + audit, RTM parse, reference sweep).
+Checklist below retained as the execution record.
 
 Executes the version-split adopted in ADR-019: promote the client-approved **1.0.0** specs into
 `docs/v1.0.0/` as the **active baseline**, reposition the existing full spec as the **2.0.0** target

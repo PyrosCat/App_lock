@@ -25,24 +25,36 @@ The **git repository is the only shared state** between them. Therefore:
 ```
 docs/
 ├── README.md            ← you are here: the map + placement rules
-├── srs/                 Software Requirements Specification — sections 1–18 (FR-001..375)
-├── nfr/                 Non-Functional Requirements — sections 0–13 (171 NFRs)
-├── architecture/
+├── v1.0.0/              ★ ACTIVE BASELINE (ADR-019; client-approved 2026-08-14):
+│   │                      1.0.0 SRS, NFR, SDS, DDS, Threat Model, UI/UX — consolidated DOCX
+│   │                      + markdown/ mirrors + sections/ splits
+│   └── source/          the package's self-contained build pipeline (staging/*.md = the
+│                          only hand-edited source; python rebuild.py regenerates everything)
+├── v2.0.0/              2.0.0 TARGET — the full client-received spec set (moved 2026-08-14):
+│   ├── srs/             Software Requirements Specification — sections 1–18 (FR-001..375)
+│   ├── nfr/             Non-Functional Requirements — sections 0–13 (171 NFRs)
 │   ├── tas/             Technical Architecture Specification — parts 1–9 (+ README §↔part index)
-│   └── adr/             Architecture Decision Records — ADR-001..NNN (+ README index)
-├── design/
 │   ├── sds/             Software Design Specification — sections 1–20
-│   └── dds/             Database Design Specification — volumes I–IV
-├── process/             How the project is run and evolves (plans, assessment, RTM, setup)
-├── security/            Security governance & analysis — Threat Model + Secure Coding Standard
-│   └── tm/              Threat Model — v2, 16 sections (fully two-tier reconciled; see VERSION.md)
+│   ├── dds/             Database Design Specification — volumes I–IV
+│   ├── tsp/             Test Specification — client-received spec (V-I sections 1–15, V-II)
+│   └── tm/              Threat Model — v2, 16 sections (two-tier reconciled; see VERSION.md)
+├── architecture/
+│   └── adr/             Architecture Decision Records — ADR-001..NNN (+ README index; shared, version-aware)
+├── process/             How the project is run and evolves (ROADMAP, plans, RTM, risk register, setup)
+├── security/            Secure Coding Standard (authored, living)
 ├── testing/             Test PLANS (what we intend to verify and how)
-│   └── tsp/             Test Specification — client-received spec (V-I sections 1–15, V-II)
 ├── reports/             EVIDENCE: dated, immutable records of what actually happened
 │                        (fleet status, campaign results, gate reviews, benchmarks,
 │                        security reviews, release records — see reports/README.md)
 └── archive/             Superseded documents (do NOT use as current guidance)
 ```
+
+**The version split (ADR-019, 2026-08-14):** the client-approved **1.0.0** package in `v1.0.0/` is
+the **active baseline** — code, RTM, tests, and gates trace to it. The pre-split full spec in
+`v2.0.0/` is the **2.0.0 target** (frozen reference until 2.0.0 work begins). The two baselines
+deliberately share FR/NFR identifiers with narrowed 1.0.0 meanings, so cite version-qualified when
+ambiguous: `v1.0.0 SRS §8` (GOVERNANCE.md §5.3). The unreviewed 2.0.0 UI/UX draft stays in
+gitignored scratch until reviewed (reviewed-content-only rule).
 
 Every spec area (`srs/`, `nfr/`, `architecture/tas/`, `design/sds/`, `design/dds/`,
 `testing/tsp/`, plus `process/`'s docx) also has an **`md/` subfolder**: derived Markdown
@@ -56,14 +68,15 @@ stay one line. `scripts/` holds tooling (e.g. `extract_docx.py`). `app/` is the 
 
 | Area | Holds | Nature | Put a new doc here if… |
 |---|---|---|---|
-| `srs/` `nfr/` | The authoritative requirement baseline — *what* the app must do and *how well*. | Read-mostly spec. Authored as `.docx`. | …only when the requirement baseline itself changes (rare; governed). |
-| `architecture/tas/` | *How* the system is organized (layers, boundaries, runtime, data, ops). | Read-mostly spec (`.docx`). | …an architectural structure changes (via an ADR first). |
+| `v1.0.0/` | **The active baseline**: client-approved 1.0.0 SRS, NFR, SDS, DDS, TM, UI/UX + its build pipeline (`source/`). | Spec (client-approved). Derived outputs; edit only `source/staging/` + rebuild. | …only via a governed 1.0.0 revision through the pipeline (never hand-edit outputs). |
+| `v2.0.0/srs/` `v2.0.0/nfr/` | The full requirement corpus — the 2.0.0 target; identifier authority for reserved FR/NFR ids. | Read-mostly spec. Authored as `.docx`. | …only when that baseline itself changes (rare; governed). |
+| `v2.0.0/tas/` | *How* the system is organized (layers, boundaries, runtime, data, ops) — 2.0.0 lineage (1.0.0 has no TAS; its deviations are ADR-recorded, see ADR-013B/019). | Read-mostly spec (`.docx`). | …an architectural structure changes (via an ADR first). |
 | `architecture/adr/` | Individual **decisions** with rationale + consequences, numbered, dated. | Append-only; each is small (`.md`). | …you made or are recording a significant decision (tech choice, boundary, constraint). One file `ADR-NNN-<slug>.md`; add a row to `adr/README.md`. |
-| `design/sds/` | *How* components are designed internally (per-subsystem). | Read-mostly spec (`.docx`). | …component-level design is specified/changed. |
-| `design/dds/` | *How* the database is designed — architecture, logical, physical, operations volumes. | Read-mostly spec (`.docx`). | …database design is specified/changed. |
+| `v2.0.0/sds/` | *How* components are designed internally (per-subsystem) — 2.0.0 lineage. | Read-mostly spec (`.docx`). | …component-level design is specified/changed. |
+| `v2.0.0/dds/` | *How* the database is designed — architecture, logical, physical, operations volumes — 2.0.0 lineage. | Read-mostly spec (`.docx`). | …database design is specified/changed. |
 | `process/` | **How the project is run and evolves**: Implementation Strategy, the roadmap (milestone status), migration assessment (frozen snapshot), phase plans (M0/M1…), the RTM, the risk register, environment setup, governance/gate records, **operational & machine/fleet status**. | Living working docs (`.md`); snapshots frozen per GOVERNANCE.md §5.1. | …it's a plan, a process/governance record, a tracked risk, a dev-environment or **fleet/machine status report**, or anything about *running the project* rather than the product spec. |
-| `security/` | **Security governance & analysis**: the **Threat Model** (`tm/`, 16 sections — *what we defend against*; **v2**, fully reconciled to the two-tier model, see `tm/VERSION.md`) and the authored **Secure Coding Standard** (*how we write secure code*). | `tm/`: read-mostly spec (`.docx` + `md/`). SCS: living (`.md`). | …it's a security governance/analysis doc: Threat Model in `tm/`; the authored SCS at the area root. Security *requirements* stay in `srs/` §8, security *architecture* in `tas/` Part III, the risk register in `process/`. |
-| `testing/` | Test **plans** (`.md`, area root): what to verify, procedures, harness specs. `tsp/`: the client-received **Test Specification** volumes. | Plans: living (`.md`). `tsp/`: read-mostly spec (`.docx`). | …it defines how something will be tested (plans at root; only client-received Test Spec revisions go in `tsp/`). Results go to `reports/campaigns/`. |
+| `security/` | The authored **Secure Coding Standard** (*how we write secure code*). Threat Models live with their baselines: active 1.0.0 TM in `v1.0.0/`, the 16-section v2 TM in `v2.0.0/tm/`. | SCS: living (`.md`). | …it's the SCS or a security governance note. Security *requirements* stay in the version SRS §8/§4.8, the risk register in `process/`. |
+| `testing/` | Test **plans** (`.md`, area root): what to verify, procedures, harness specs. (The client-received Test Specification volumes live at `v2.0.0/tsp/`.) | Plans: living (`.md`). | …it defines how something will be tested (plans at root; Test Spec revisions go to `v2.0.0/tsp/`). Results go to `reports/campaigns/`. |
 | `reports/` | **Evidence**: dated, immutable records — fleet/machine status, executed campaign results, gate reviews, benchmarks, security reviews, release records. | Append-only, never edited (`.md`). | …you are recording **what happened**: an observation, measurement, review, or test execution. See `reports/README.md` for categories + naming (`YYYY-MM-DD_topic_host.md`). |
 | `archive/` | Superseded docs, kept for history with supersession notes. | Frozen. | …never author new work here; only retire old docs (with a note). |
 
@@ -85,7 +98,7 @@ The general split: **plan** ("how we'll test/set up") → `process/` or `testing
 
 ## Conventions to follow when adding a doc
 
-1. **Format:** specs (srs/nfr/tas/sds/dds/tsp) are `.docx`, each with derived Markdown
+1. **Format:** specs (`v1.0.0/`, `v2.0.0/{srs,nfr,tas,sds,dds,tsp,tm}`) are `.docx`, each with derived Markdown
    mirrors under the area's `md/` subfolder (convention 7); working docs in `process/`,
    `testing/`, `adr/`, and this map are authored Markdown.
 2. **Naming:** `UPPER_SNAKE_CASE.md` for process/testing docs (e.g. `M1_PLAN.md`,
@@ -100,15 +113,16 @@ The general split: **plan** ("how we'll test/set up") → `process/` or `testing
 6. **Cross-references:** a `§N` pointing at *another* document **must name that document**
    (e.g. `GOVERNANCE.md §3.2`, `TAS §71`) — a bare `§3.2` is only acceptable when it refers
    to a section of the same document it appears in.
-7. **Specs are client-received originals; `md/` mirrors are derived.** The `.docx` files
-   under `srs/`, `nfr/`, `tas/`, `sds/`, `dds/`, `tsp/` (and the archived ones) are
-   preserved verbatim — original content **and filename** — and remain the authoritative
-   baseline. Do **not** edit, rename, reformat, or drop working docs into these folders.
-   Each area's `md/` subfolder holds Markdown mirrors generated by `scripts/docx_to_md.py`
-   (conversion executed 2026-08-03, superseding M0 decision D2's "no markdown mirrors"
-   with user approval) for in-repo reading, diffing, and search. **Never hand-edit `md/`
-   content** — when a spec revision arrives as `.docx`, re-run the script and commit the
-   regenerated mirrors; `python scripts/docx_to_md.py --check` verifies they are current.
+7. **Specs are client-received/approved originals; markdown mirrors are derived.** The `.docx`
+   files under `v2.0.0/{srs,nfr,tas,sds,dds,tsp,tm}` (and the archived ones) are preserved
+   verbatim — original content **and filename**. Do **not** edit, rename, reformat, or drop
+   working docs into these folders. Each `v2.0.0` area's `md/` subfolder holds Markdown mirrors
+   generated by `scripts/docx_to_md.py`; **never hand-edit `md/` content** — when a spec revision
+   arrives as `.docx`, re-run the script and commit the regenerated mirrors
+   (`python scripts/docx_to_md.py --check` verifies currency). The `v1.0.0/` package flows the
+   **other way**: `v1.0.0/source/staging/*.md` is the hand-edited source and everything else
+   (DOCX + markdown + sections) is generated by `python docs/v1.0.0/source/rebuild.py` — never
+   hand-edit its outputs either.
 
 ## Orientation shortcuts (read these first on a new machine)
 

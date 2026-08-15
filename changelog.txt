@@ -4,6 +4,49 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Milestone re-cut M7–M10 + RTM re-base onto the 1.0.0 baseline (migration Phases C+D)   (2026-08-14)
+--------------------------------------------------------------------------------------------------
+Executed the governance/RTM half of the ADR-019 migration. Decisions (user-approved 2026-08-14):
+new milestone identifiers M7–M10 for the 1.0.0 line (M2–M6 frozen as the deferred 2.0.0 lineage,
+never re-meant); vault/intruder code REMOVED from the 1.0.0 line in M8 (git history + pre-removal
+tag preserve it for 2.0.0); WP7(b) re-scoped from hardening to DELETING the legacy plaintext→
+encrypted migration path (zero shipped installs → R-006 closes by elimination).
+- ROADMAP.md rewritten: M7 Detection & Enforcement Replacement ("the accessibility exit" — UsageStats
+  + overlay engine, a11y service + CAMERA out of manifest, closes R-002/R-005, harness rework
+  in-scope) → M8 1.0.0 Product Conformance (UI/UX surfaces, descoped-feature removal, v1.0.0 DDS
+  schema) → M9 Hardening & Verification → M10 Release. M0–M6 kept as history/frozen lineage.
+- GOVERNANCE §5.1 spec paths → v1.0.0/v2.0.0; §5.3 adds the version-qualified spec-citation rule
+  (v1.0.0 SRS §8) and the M7–M10 model ownership.
+- docs/README.md doc map rewritten for the version split; root README table; RTM.md header;
+  SECURE_CODING_STANDARD paths (+ TM-reconciliation note); TS_GAP_ANALYSIS dated annotation;
+  scripts/docx_to_md.py AREAS → docs/v2.0.0 (v1.0.0 has its own pipeline).
+- M1_PLAN WP7 re-scoped (original text struck, kept for CR-003 traceability).
+- RISK_REGISTER: gates re-pointed (R-001 M2/M6→M7/M10, R-002/R-005 M2→M7); R-006 deletion decision
+  recorded; defects CR-005→M9, CR-006→resolves-by-elimination at M8.
+- RTM re-base: 229 rows newly descoped-v1 (204 FR per v1.0.0 SRS Appendix A §A.19 + 28 NFR per
+  v1.0.0 NFR Appendix A; parsed from the appendix files, not hand-typed) — prior statuses
+  168 not-started / 46 review / 15 implemented-verified (vault+intruder Phase-3 work, honestly
+  annotated: implementation retained pending M8 removal). Narrowed-meaning notes on retained
+  FR-026/042/044/049. Total descoped-v1 now 232/546; 3 pre-existing (ADR-013B) untouched.
+- Migration plan status → Executed; checklist retained as the execution record.
+
+
+Docs restructure — promote approved 1.0.0 to docs/v1.0.0, full spec to docs/v2.0.0 (Phases A+B)   (2026-08-14)
+-------------------------------------------------------------------------------------------------------------
+Structure half of the ADR-019 migration (committed separately, before the C+D pass above).
+- docs/v1.0.0/: client-approved package promoted into version control — 6 consolidated DOCX +
+  markdown mirrors + 118/118 section DOCX/MD + the self-contained build pipeline (source/staging =
+  the only hand-edited source; rebuild.py regenerates all outputs; style template tracked and
+  stripped of unreviewed-2.0.0 content).
+- Post-approval de-draft: "Draft" removed from content status lines (TM status → Approved), output
+  filenames (*_v1.0.0.docx/.md), staging source names, and all pipeline references; audit gate
+  updated accordingly and green.
+- docs/v2.0.0/: srs, nfr, tas, sds, dds, tsp, tm moved with git mv (203 renames, history
+  preserved); emptied docs/design removed.
+- .gitignore: v1.0.0 build intermediates (split-staging/, split-docx/, __pycache__/) excluded;
+  New docs/ stays ignored (holds the unreviewed 2.0.0 UI/UX draft — reviewed-content-only rule).
+
+
 ADR-019 + migration plan — version-split documentation baseline (1.0.0 active / 2.0.0 target)   (2026-08-14)
 ----------------------------------------------------------------------------------------------------------
 Client approved the reduced 1.0.0 specification (2026-08-14), which unblocks adopting it as the

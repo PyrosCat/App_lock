@@ -1,41 +1,82 @@
-# Roadmap — Migration Milestones M0–M6
+# Roadmap — 1.0.0 Release Line (M7–M10) · Legacy Milestones M0–M6
 
-**Class:** living (GOVERNANCE.md §5.1) · **Owns:** the canonical milestone ↔ IS-phase mapping
-and current milestone status (GOVERNANCE.md §5.3).
-**Provenance:** extracted 2026-08-10 from `MIGRATION_ASSESSMENT.md` Phase 12 (frozen
-2026-07-19 snapshot), which retains the original scoping rationale and effort estimates.
-Update this file when milestone/WP status changes or a gate record lands; per-milestone
-detail lives in the milestone plans (`M0_PLAN.md`, `M1_PLAN.md`, …).
+**Class:** living (GOVERNANCE.md §5.1) · **Owns:** the canonical milestone model — the active
+1.0.0 line **M7–M10**, the legacy **M0–M6 ↔ IS-phase** mapping, and current milestone status
+(GOVERNANCE.md §5.3).
+**Re-cut 2026-08-14 per [ADR-019](../architecture/adr/ADR-019-version-split-baseline.md):** the
+client approved the reduced 1.0.0 specification (`docs/v1.0.0/`, the active baseline); the full
+spec became the 2.0.0 target (`docs/v2.0.0/`). Milestones M2–M6 were defined by FR ranges that are
+now 2.0.0 scope, so they are **frozen as the deferred 2.0.0 lineage** — never re-meant — and the
+1.0.0 execution line continues with **new identifiers M7–M10** (identifiers are never reused,
+consistent with ADR/FR practice). This scope cut is also the principal mitigation of risk R-003
+(enterprise-scale baseline vs solo cadence).
 
-## Canonical phase mapping
+## Current status
 
-The Implementation Strategy numbers its phases **0–6**; the Test Specification lists the
-same sequence **1–7** (TSP §11.7). To avoid the off-by-one, cite phases as
-`IS Phase N (Mx)` (GOVERNANCE.md §5.3).
+| Milestone | Line | Status |
+|---|---|---|
+| M0 Baseline & governance | foundation | **Done** (2026-07-19) |
+| M1 Foundation retrofit | foundation | **Current** — WP1–WP6 done; WP7 (re-scoped 2026-08-14) + WP8 remain |
+| **M7 Detection & Enforcement Replacement** | 1.0.0 | Planned — starts on M1 close |
+| **M8 1.0.0 Product Conformance** | 1.0.0 | Planned |
+| **M9 Hardening & Verification** | 1.0.0 | Planned |
+| **M10 Release** | 1.0.0 | Planned |
+| M2–M6 | 2.0.0 (deferred) | **Frozen** — see "Legacy milestones" below |
 
-| Milestone | IS phase | TSP §11.7 ordinal | Name |
+## The 1.0.0 line — M7–M10
+
+The 1.0.0 baseline (`docs/v1.0.0/`) governs: SRS/NFR/TM/UI-UX/SDS/DDS v1.0.0. Detection scope is
+fixed by ADR-013B: **Usage Access detection + mandatory "Display over other apps" overlay
+presentation; no App Lock accessibility service in the release.** The current build is the inverse
+(accessibility-only detection, Activity lock screen, CAMERA/intruder/vault built), which makes M7
+the pivotal milestone: the app's core engine is replaced, not extended.
+
+| Milestone | Scope | Gate / exit evidence |
+|---|---|---|
+| **M7 — Detection & Enforcement Replacement** ("the accessibility exit") | UsageStatsManager polling detector behind the SDS §8 trigger-processor seam; overlay (`SYSTEM_ALERT_WINDOW`) lock surface replacing the Activity path; **remove `AppDetectionService` + the accessibility manifest declaration** (clean — nothing shipped; the ADR-018 FQCN pin stays dormant-binding for the 2.0.0 return); fail-secure policy initialization (closes **R-005**); overlay presentation resists the relaunch race (closes **R-002** on re-validation); FR-179-lineage protection health re-pointed to Usage Access + overlay loss; **WP2 harness rework in-scope** (resumed-activity assertions and a11y rebind steps die with the old engine — window/overlay-based assertions replace them) | Device + emulator matrix green with the new engine (incl. OV-4 burst re-run on hardware for R-002); poll-interval benchmark per v1.0.0 NFR-PERF-012 (end-to-end transition→lock figure recorded); no accessibility declaration in the merged manifest |
+| **M8 — 1.0.0 Product Conformance** | Build the v1.0.0 UI/UX-spec surfaces (onboarding SCR-001.., two-grant setup checklist, protection-health states, permission recovery, settings, help, destructive reset); **remove descoped features from the 1.0.0 line** (vault/, privacy/ intruder capture, their screens, CAMERA permission, DB tables — decision 2026-08-14: removal, not dormancy; git history + a pre-removal tag preserve the code for 2.0.0); schema conformance to v1.0.0 DDS; truthful protection-state model end-to-end | All v1.0.0 SRS retained-FR acceptance criteria demonstrable; manifest/permission audit = exactly the v1.0.0 permission matrix (UI/UX Appendix D); RTM rows updated with evidence |
+| **M9 — Hardening & Verification** | v1.0.0 Threat Model controls (SC-*), tapjacking/obscured-input defense (THR-UI-001/003 — hostile *third-party* overlays), lockout + biometric failure accounting (resolves defect CR-005), bounded diagnostics, NFR benchmark set (v1.0.0 NFR-PERF-015), UI-accessibility audit (NFR-UX-007..014), Play-listing pre-check (data-safety, permission declarations) | v1.0.0 TM §8 verification activities (VA-*) executed and recorded; benchmark report filed; no Critical/High finding open |
+| **M10 — Release** | Full acceptance campaign per v1.0.0 SRS §5 + TM §8; release engineering (signed build, store assets); store submission | Acceptance evidence complete; signed 1.0.0; Play review passed |
+
+Gate-blocking risks by milestone (authoritative list: `RISK_REGISTER.md`): M7 — R-002, R-005 (and
+R-004/R-006 must be closed in M1/WP7 before M7's schema work); M10 — the Usage-Access/overlay
+successor of R-001 (Play + sideload grant friction; distribution-model decision still open).
+
+## Foundation close-out (M1, unchanged identifiers)
+
+M1 finishes under its original plan (`M1_PLAN.md`) with WP7 **re-scoped 2026-08-14**: the legacy
+plaintext→encrypted migration path is **deleted** rather than hardened (zero shipped installs — the
+path only ever served dev devices; **R-006 closes by elimination**), and the WP7 fail-safe work
+narrows to removing `fallbackToDestructiveMigration` (**R-004**). WP8 (instrumentation seed, GMD
+matrix, defect-record convention, IS Phase-0 gate record) is unchanged; its gate record doubles as
+the adoption record of the 1.0.0 baseline for execution purposes.
+
+## Legacy milestones M2–M6 — frozen 2.0.0 lineage
+
+Definitions frozen as written pre-split (content below unchanged from the 2026-08-10 extraction;
+per-FR scope in `MIGRATION_ASSESSMENT.md` Phase 12). They resume, re-planned, when 2.0.0 work
+begins — likely re-cut against the 2.0.0 baseline rather than executed verbatim.
+
+| Milestone | IS phase | TSP §11.7 ordinal | Name / scope (condensed) |
 |---|---|---|---|
-| M0 | — (pre-phase) | — | Baseline & governance |
-| M1 | Phase 0 | 1 | Foundation (retrofit) |
-| M2 | Phase 1 | 2 | Core Security Platform |
-| M3 | Phase 2 | 3 | Core Application Features (MVP) |
-| M4 | Phase 3 | 4 | Automation & Intelligent Operations |
-| M5 | Phase 4 | 5 | Production Hardening |
-| M6 | Phase 5 + 6 | 6 + 7 | Security Hardening → Release Readiness |
+| M2 | Phase 1 | 2 | Core Security Platform — security-service facade; two-tier detection (ADR-013A); a11y-health self-test (FR-231/242/253); key rotation (FR-317..319) — *the detection line is executed in 1.0.0 as M7 (baseline-only per ADR-013B); the optional a11y tier returns here* |
+| M3 | Phase 2 | 3 | Core Application Features (MVP) — backup/restore (FR-196..205, 244/245); config service + feature flags (FR-236..238); onboarding/dashboard/diagnostics UI |
+| M4 | Phase 3 | 4 | Automation & Intelligent Operations — schedules, Wi-Fi/Bluetooth/location rules, rule engine (FR-126..145) |
+| M5 | Phase 4 | 5 | Production Hardening — observability (FR-276..300), resilience (FR-251..275), data lifecycle (FR-301..325), scalability (FR-326..350) |
+| M6 | Phase 5+6 | 6+7 | Security Hardening → Release Readiness — secure-dev processes (FR-351..375), full verification, release acceptance |
 
-## Milestone status
+**2.0.0 backlog additions** (beyond frozen M2–M6): vault + intruder-capture reinstatement (code
+preserved at the M8 pre-removal tag); optional accessibility tier return (ADR-013B; ADR-018 FQCN
+pin binds the service name); TAS revision for the post-1.0.0 architecture; review + promotion of
+the 2.0.0 UI/UX draft (unreviewed, in gitignored scratch — ADR-019).
 
-| Milestone | Status | Scope (condensed) | Gate / evidence |
-|---|---|---|---|
-| **M0** | **Done** (2026-07-19) | docs restructure + archive with FR-226..250 renumbering notice, SRS dedup, RTM seed (546 rows), ADR-001..010 backfill + ADR-011..014 | `M0_PLAN.md`; changelog 2026-07-19 |
-| **M1** | **Current** — WP1–WP5 done, WP6 next | WP1 CI freeze ✓ · WP2 device regression harness ✓ · WP3 detekt/ktlint/Konsist ✓ · WP4 build variants + dependency governance ✓ (ADR-017) · WP5 Hilt replacing `Graph` ✓ (ADR-015; device gate green on real hardware **and** emulator matrix) · WP6 package realignment (ADR-018 FQCN pins) · WP7 migration hardening — remove destructive fallback (R-004) + atomic legacy conversion (R-006) · WP8 instrumentation seed + GMD matrix + RTM batch + **defect-record convention decision** (TS_GAP G-04 — holds the 2026-08-11 review defects CR-005/CR-006, RISK_REGISTER §Defects) + **IS Phase-0 (M1) gate record** | `M1_PLAN.md`; WP5 evidence: `reports/campaigns/2026-08-08_wp5-harness_moto-g-2025.md` + `2026-08-09_wp5-matrix_nucbox-g5.md`; gate record owed at WP8 |
-| **M2** | Planned | Centralized Security Service facade; **two-tier detection per ADR-013A** (UsageStats + overlay baseline, optional accessibility); accessibility-health self-test (FR-231/242/253); key-rotation design (FR-317..319); threat-model-driven security tests in CI | IS Phase-1 (M2) gate review. **Gate-blocking risks: R-001, R-002 — both High** (TM §14.10; see `RISK_REGISTER.md`) |
-| **M3** | Planned | Backup/restore (FR-196..205, 244/245); Configuration Service + feature flags (FR-236..238); onboarding/dashboard/diagnostics UI; navigation coordinator (completes MVVM refactor); instrumentation growth | All MVP FRs + functional regression pass (TSP §11.10/§11.19) |
-| **M4** | Planned | Schedules, Wi-Fi/Bluetooth/location rules, rule engine (FR-141 priority/override), automation logging; battery impact assessment | Battery + reliability objectives (TSP §11.20); Bluetooth needs real hardware (Moto G) |
-| **M5** | Planned | Observability platform (FR-276..300); resilience framework (FR-251..275); data lifecycle (FR-301..325); scalability (FR-326..350); NFR benchmark harness | Performance + reliability objectives demonstrated |
-| **M6** | Planned | Secure-development processes (FR-351..375); dependency/vulnerability review; full verification campaign; release checklist + readiness + acceptance (FR-248..250); signed v1.0.0 | Critical **and** High vulnerabilities resolved (TSP §11.18); Play compliance review (R-001b); production approval |
+## Phase-citation rules
+
+The IS/TSP phase numbering applies to the **2.0.0 lineage only** (the 1.0.0 doc set has no
+Implementation Strategy): cite as `IS Phase N (Mx)` (GOVERNANCE.md §5.3). M7–M10 have no IS-phase
+aliases — cite them bare (`M7`). Spec citations must be version-qualified where ambiguous —
+`v1.0.0 SRS §8` (GOVERNANCE.md §5.3).
 
 Open risks and their affected gates: `RISK_REGISTER.md` (authoritative — GOVERNANCE.md §5.2).
-Requirement-level status: `rtm/rtm.csv`. Phase-gate evaluation dimensions: Implementation
-Strategy §5 / TSP §11.22 — a green regression run is evidence for one dimension, not a gate
-pass by itself (TSP §11.15).
+Requirement-level status: `rtm/rtm.csv`. A green regression run is evidence for one gate
+dimension, not a gate pass by itself (TSP §11.15).

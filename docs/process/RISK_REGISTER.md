@@ -14,12 +14,16 @@ compensating treatment.
 
 | ID | Risk | Severity | Affected gate(s) | Status |
 |----|------|----------|------------------|--------|
-| [R-001](#r-001) | Accessibility-based detection: platform lockdown, Play policy, silent failure | **High** | M2 · M6 | Open |
-| [R-002](#r-002) | Lock-engine rapid-relaunch window-ordering race (protected app outruns the lock screen) | **High** (pending real-hardware) | M2 | Open |
+| [R-001](#r-001) | Detection-permission exposure (was: accessibility; now Usage Access + overlay grants — a11y left 1.0.0 per ADR-013B) | **High** | M7 · M10 | Open |
+| [R-002](#r-002) | Lock-engine rapid-relaunch window-ordering race (protected app outruns the lock screen) | **High** (pending real-hardware) | M7 | Open |
 | [R-003](#r-003) | Schedule/capacity: enterprise-scale baseline vs solo-developer cadence | **High** | all (pacing) | Open |
 | [R-004](#r-004) | `fallbackToDestructiveMigration` — silent data-loss trap on schema mismatch | **High** | M1 (WP7) | Open |
-| [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** | M2 | Open |
-| [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **Medium** | M1/WP7 | Open |
+| [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** | M7 | Open |
+| [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **Medium** | M1/WP7 | Open — closing by path deletion (2026-08-14) |
+
+*Gate identifiers re-pointed 2026-08-14 to the 1.0.0 milestone line M7–M10 (ADR-019 / `ROADMAP.md`):
+old M2-gate risks now block M7 (the detection/enforcement replacement); Play-compliance review moved
+M6 → M10. Frozen M2–M6 remain the 2.0.0 lineage.*
 
 **Defects — not tracked as risks** (2026-08-11 review, decision 2026-08-11): CR-005 biometric failure
 accounting (Major, M2) · CR-006 orphaned vault/intruder blob on delete (Major, M3/M5). Held pending a
@@ -50,8 +54,9 @@ a pre-existing impact *range* is involved. Worked examples: R-002 (Medium × Hig
 
 **Category:** Architecture / Compliance / Security · **Likelihood:** High · **Impact:** High–Critical
 · **Severity:** High · **Status:** Open · **Opened:** 2026-07-23 · **Owner:** project lead
-**Affected gate(s):** M2 — IS Phase-1 gate (two-tier baseline per ADR-013A is the remediation)
-· M6 — Play-compliance review (R-001b verification, NFR-COMPY-002/003)
+**Affected gate(s):** **M7** — detection/enforcement replacement (baseline build per ADR-013B is the
+remediation) · **M10** — Play-compliance review for the Usage Access + overlay grant story
+(NFR-COMPY-002/003). *(Re-pointed 2026-08-14 from M2/M6 — ADR-019 milestone re-cut.)*
 **Related:** ADR-013 → **ADR-013A** → **ADR-013B** (2026-08-14) · FR-179, FR-231, FR-233, FR-242, FR-253 ·
 NFR-PERF-012 · NFR-COMPY-002/003, NFR-COMP-001
 · evidence: `docs/reports/campaigns/2026-07-23_wp2-regression_moto-g-2025.md`
@@ -132,9 +137,10 @@ updates, and the M2 and M6 gates.
 
 **Category:** Security / Enforcement · **Likelihood:** Medium (pending real-hardware) · **Impact:** High
 · **Severity:** High · **Status:** Open · **Opened:** 2026-08-06 · **Owner:** project lead
-**Affected gate(s):** M2 — IS Phase-1 gate (the overlay-vs-activity presentation decision, ADR-013A/AS-020,
-is the remediation path; TM §14.10 applies). Not an M1 gate item — WP5/WP6 regression gates only
-require the race to be *unchanged*, which the 2026-08-09 post-Hilt matrix confirmed.
+**Affected gate(s):** **M7** — detection/enforcement replacement (the mandatory overlay presentation,
+ADR-013B, is the decided remediation; TM §14.10 applies; re-pointed 2026-08-14 from M2 — ADR-019
+milestone re-cut). Not an M1 gate item — WP5/WP6 regression gates only require the race to be
+*unchanged*, which the 2026-08-09 post-Hilt matrix confirmed.
 **Related:** TM THR-ENF-004 (enforcement race during application switching), HF-002 (fast-relaunch bypass — remediation shown incomplete), HF-003, §9.15 control, §12.41 residual register (fail-open enforcement) · ADR-013A → **ADR-013B** / AS-020 (baseline lock-interface presentation) · `ApplicationLockEngine.kt:61` + `:123`
 · evidence: `docs/reports/campaigns/2026-07-23_wp2-matrix_nucbox-g5.md`
 
@@ -299,8 +305,10 @@ flavor that adds an upgrade path.
 **Category:** Security / Enforcement / Initialization · **Likelihood:** Medium · **Impact:** High
 · **Severity:** **High** (Medium × High per the scoring rubric) · **Status:** Open
 · **Opened:** 2026-08-11 · **Owner:** project lead
-**Affected gate(s):** M2 — IS Phase-1 security gate (fail-secure initialization is core-security
-scope). Not an M1 item (no review-driven M1 logic; review §5.5).
+**Affected gate(s):** **M7** — the replacement engine builds fail-secure initialization in from the
+start (re-pointed 2026-08-14 from M2 — ADR-019 milestone re-cut; the new detector/policy path MUST
+model loading/ready/failed states rather than patch the old engine). Not an M1 item (no
+review-driven M1 logic; review §5.5).
 **Provenance:** 2026-08-11 code review **CR-002** (Critical defect). NEW risk — not previously tracked.
 **Related:** FR-001, FR-017, FR-179 · `LockPolicyManager.kt:21-40` (empty-set init + async fill;
 absence read as "not protected", no loading/failed state) · `ApplicationLockEngine.kt:54-57`
@@ -372,12 +380,15 @@ builder — this is the plaintext-import atomicity gap.
 - No move-before-convert / commit-before-delete ordering exists — that absence is the risk.
 
 ### Planned actions (phase per the WP7 scope decision)
-1. **Decide scope:** fold into M1/WP7's fail-safe work (alongside R-004) or assign to M2 — and update
-   `M1_PLAN.md`, `ROADMAP.md`, this entry, and M1 exit criteria accordingly (living-doc decision; the
-   review does not silently expand WP7).
-2. Durable backup / move-before-convert; commit + validate before removing the source; idempotent
-   restart at each stage; row-count / schema / protected-policy verification.
-3. Interrupted-conversion deliberate-failure test (pairs with the R-004 / TS_GAP G-05 drill).
+**Decided 2026-08-14 (with the ADR-019 version split): the legacy plaintext→encrypted path is
+DELETED in M1/WP7, not hardened.** Zero installs have shipped; the Phase-1 plaintext DB exists only
+on dev devices, so the interruption window this risk describes has no production population — the
+risk closes **by elimination** when the deletion commit lands (cite it here). `M1_PLAN.md` WP7(b)
+re-scoped accordingly. Superseded original actions, kept for history:
+1. ~~Decide scope: fold into M1/WP7 or assign to M2.~~ (Decided: WP7 deletion.)
+2. ~~Durable backup / move-before-convert; commit + validate before removing the source.~~
+3. Replacement drill: fresh install is encrypted-from-birth; a stray plaintext `app.db` is ignored,
+   not imported (WP7 exit check b).
 
 ### Review triggers
 The WP7 scope decision; any change to `AppLockDatabase` migration; M3 backup/restore design.
@@ -393,8 +404,8 @@ evidence `docs/reports/reviews/2026-08-11_formal-code-review.md`.
 
 | Defect | Finding | Severity | Affected gate |
 |---|---|---|---|
-| CR-005 | Biometric non-matches skip product lockout / intruder / audit accounting (`LockScreenActivity.kt:208-212` — not routed to `ApplicationLockEngine.onUnlockFailure`, `:90-103`). Platform biometric lockout + counted PIN fallback are partial compensating controls; the gap is intruder-capture + cross-method audit. | **Major** | M2 (auth controls) |
-| CR-006 | Vault/intruder delete removes the index row before (and ignoring) blob deletion → orphaned ciphertext reported as success (`VaultRepository.kt:78-81`; `IntruderLogViewModel.kt:35-40`). Data-lifecycle / secure-delete consistency gap; the blob stays encrypted (no confidentiality breach). | **Major** | M3 (Vault) or M5 (data lifecycle) — lead chooses |
+| CR-005 | Biometric non-matches skip product lockout / intruder / audit accounting (`LockScreenActivity.kt:208-212` — not routed to `ApplicationLockEngine.onUnlockFailure`, `:90-103`). Platform biometric lockout + counted PIN fallback are partial compensating controls; the residual 1.0.0 gap is cross-method failure accounting (intruder capture itself left 1.0.0 scope). | **Major** | **M9** (1.0.0 auth hardening; re-pointed 2026-08-14, was M2) |
+| CR-006 | Vault/intruder delete removes the index row before (and ignoring) blob deletion → orphaned ciphertext reported as success (`VaultRepository.kt:78-81`; `IntruderLogViewModel.kt:35-40`). Data-lifecycle / secure-delete consistency gap; the blob stays encrypted (no confidentiality breach). | **Major** | **M8** — expected to resolve by elimination: vault/intruder code is removed from the 1.0.0 line there (decision 2026-08-14). If 2.0.0 reinstates the code, this defect reopens with it. |
 
 Related requirements: CR-005 → FR-009/010/014/081/174; CR-006 → FR-085/115.
 When the defect-record convention lands, migrate these (and future defects) into it and retire this

@@ -18,8 +18,8 @@ architecture (TAS Part III).)*
 
 - **SRS §8 (FR-161..180)** — the security requirements these rules implement.
 - **TAS Part III — Security Architecture (§13–20; Cryptographic = §16)** — the architecture the
-  rules must uphold. (Use `docs/architecture/tas/README.md` for §→part lookups.)
-- **Threat Model** (`docs/security/tm/`, client-delivered 2026-08-05, 16 sections) — the threats each rule mitigates; rules trace to its threat IDs (THR-*).
+  rules must uphold. (Use `docs/v2.0.0/tas/README.md` for §→part lookups.)
+- **Threat Model** (`docs/v2.0.0/tm/`, client-delivered 2026-08-05, 16 sections) — the threats each rule mitigates; rules trace to its threat IDs (THR-*). *(Paths per the ADR-019 version split, 2026-08-14; the active 1.0.0 baseline carries its own Threat Model at `docs/v1.0.0/` — reconciling this standard's threat-ID traces to it is future work on this document.)*
 - **Test Specification (§7.10 Security Testing; §8.23–8.25 security/pen/fuzz)** — how conformance is verified.
 - **RTM** — each rule's verification status.
 - **GOVERNANCE.md** — change control for this document.

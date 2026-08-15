@@ -3,6 +3,11 @@
 **Filed:** 2026-08-03 · **Baseline:** commit `9714931` (TS filed + md mirrors) · **Status:** living
 document — update at each phase gate and whenever a new TS volume arrives.
 
+> **Annotation 2026-08-14 (ADR-019 version split):** spec paths cited below moved — `docs/testing/tsp/`
+> is now `docs/v2.0.0/tsp/`, `docs/design/dds/` is now `docs/v2.0.0/dds/`. The TSP belongs to the
+> full-spec (2.0.0) lineage; the active baseline is the client-approved 1.0.0 set at `docs/v1.0.0/`,
+> and the 1.0.0 execution line is milestones M7–M10 (`ROADMAP.md`). Original text below is unchanged.
+
 Maps the requirements of the client-delivered Test Specification Volume I (Test Strategy &
 Governance, `docs/testing/tsp/`, filed 2026-08-03) against what the project actually implements
 today, and assigns each gap a landing zone in the migration plan

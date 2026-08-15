@@ -2,8 +2,8 @@ id,title,section,type,priority,status,implementation,verification,notes
 FR-001,Initial Authentication Setup,Authentication,FR,Critical,review,,,
 FR-002,Biometric Authentication,Authentication,FR,Critical,implemented-verified,"authentication/, core/security/",PHASE3_TEST_PLAN,Phase 1–3 campaigns
 FR-003,PIN Authentication,Authentication,FR,Critical,implemented-verified,"authentication/, core/security/",PHASE3_TEST_PLAN,Phase 1–3 campaigns
-FR-004,Pattern Authentication,Authentication,FR,High,not-started,,,
-FR-005,Knock Code Authentication,Authentication,FR,Medium,not-started,,,
+FR-004,Pattern Authentication,Authentication,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-005,Knock Code Authentication,Authentication,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-006,Multiple Authentication Methods,Authentication,FR,High,review,,,
 FR-007,Authentication Fallback,Authentication,FR,Critical,review,,,
 FR-008,Authentication Timeout,Authentication,FR,High,review,,,
@@ -14,17 +14,17 @@ FR-012,Android Keystore Integration,Authentication,FR,Critical,review,,,
 FR-013,Authentication Logging,Authentication,FR,Medium,review,,,
 FR-014,Failed Authentication Logging,Authentication,FR,High,review,,,
 FR-015,Biometric Enrollment Detection,Authentication,FR,Medium,implemented-verified,"authentication/, core/security/",PHASE3_TEST_PLAN,Phase 1–3 campaigns
-FR-016,Device Credential Integration,Authentication,FR,Medium,review,,,
+FR-016,Device Credential Integration,Authentication,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-017,Authentication Session Management,Authentication,FR,High,review,,,
 FR-018,Authentication Cancellation,Authentication,FR,Medium,review,,,
 FR-019,Authentication Method Change,Authentication,FR,High,review,,,
 FR-020,Authentication Recovery,Authentication,FR,High,not-started,,,
-FR-021,Randomized Numeric Keypad,Authentication,FR,High,review,,,
+FR-021,Randomized Numeric Keypad,Authentication,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-022,Authentication Accessibility Support,Authentication,FR,Medium,review,,,
 FR-023,Authentication Performance,Authentication,FR,High,review,,,
 FR-024,Offline Authentication,Authentication,FR,Critical,review,,,
-FR-025,Authentication Audit Trail,Authentication,FR,Medium,review,,,
-FR-026,Foreground Application Detection,LockEngine,FR,Critical,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
+FR-025,Authentication Audit Trail,Authentication,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-026,Foreground Application Detection,LockEngine,FR,Critical,review,,,"core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate; 1.0.0 meaning narrowed per v1.0.0 SRS (ADR-019): Usage Access is the sole detection baseline, no a11y service — the as-built a11y detector does not satisfy the v1.0.0 criteria; replacement engine is M7"
 FR-027,Lock Screen Display,LockEngine,FR,Critical,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-028,Overlay Security,LockEngine,FR,Critical,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-029,Unlock Session Validation,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
@@ -35,19 +35,19 @@ FR-033,Device Restart Protection,LockEngine,FR,Critical,review,,,core detection/
 FR-034,Lock Engine Initialization,LockEngine,FR,Critical,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-035,Background Service Persistence,LockEngine,FR,Critical,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-036,Protected Application List Monitoring,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
-FR-037,Newly Installed Application Detection,LockEngine,FR,Medium,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
+FR-037,Newly Installed Application Detection,LockEngine,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate]
 FR-038,Application Removal Detection,LockEngine,FR,Medium,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-039,Multi-Window Support,LockEngine,FR,Medium,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-040,Picture-in-Picture Handling,LockEngine,FR,Medium,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-041,Recent Applications Protection,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
-FR-042,Lock Policy Evaluation,LockEngine,FR,Critical,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
-FR-043,Accessibility Event Monitoring,LockEngine,FR,Critical,descoped-v1,,,"deferred beyond 1.0.0 per ADR-013B (2026-08-14); no App Lock AccessibilityService in 1.0.0 — detection uses the Usage Access baseline (FR-026). Current a11y detection is transitional pending the M2 UsageStats+overlay baseline; a11y event monitoring targeted for 2.0.0"
-FR-044,Overlay Permission Verification,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
-FR-045,Accessibility Permission Verification,LockEngine,FR,Critical,descoped-v1,,,"deferred beyond 1.0.0 per ADR-013B (2026-08-14); no App Lock AccessibilityService in 1.0.0. 1.0.0 verifies the overlay lock-presentation capability instead (FR-044); a11y permission verification targeted for 2.0.0"
+FR-042,Lock Policy Evaluation,LockEngine,FR,Critical,review,,,"core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate; 1.0.0 meaning narrowed per v1.0.0 SRS (ADR-019): policy inputs are enabled-state/session/global-relock/health only — no schedule, location, network, or per-app policy"
+FR-043,Accessibility Event Monitoring,LockEngine,FR,Critical,descoped-v1,,,deferred beyond 1.0.0 per ADR-013B (2026-08-14); no App Lock AccessibilityService in 1.0.0 — detection uses the Usage Access baseline (FR-026). Current a11y detection is transitional pending the M2 UsageStats+overlay baseline; a11y event monitoring targeted for 2.0.0
+FR-044,Overlay Permission Verification,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate; 1.0.0 meaning per v1.0.0 SRS (ADR-019): verification of the mandatory 'Display over other apps' overlay permission (ADR-013B); build lands with the M7 engine
+FR-045,Accessibility Permission Verification,LockEngine,FR,Critical,descoped-v1,,,deferred beyond 1.0.0 per ADR-013B (2026-08-14); no App Lock AccessibilityService in 1.0.0. 1.0.0 verifies the overlay lock-presentation capability instead (FR-044); a11y permission verification targeted for 2.0.0
 FR-046,Lock Engine Failure Recovery,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-047,Duplicate Overlay Prevention,LockEngine,FR,Medium,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-048,Overlay Timeout,LockEngine,FR,Medium,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
-FR-049,Lock Engine Performance,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
+FR-049,Lock Engine Performance,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate; 1.0.0 meaning narrowed per v1.0.0 SRS (ADR-019): numeric targets live in v1.0.0 NFR-PERF-012 (poll-interval detection delay + 250 ms enforcement response); benchmark at M7 exit
 FR-050,Lock Engine Battery Optimization,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-051,Application Switching Detection,LockEngine,FR,High,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-052,Home Screen Transition Handling,LockEngine,FR,Medium,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
@@ -56,125 +56,125 @@ FR-054,Lock Event Logging,LockEngine,FR,Medium,review,,,core detection/lock/relo
 FR-055,Lock Engine Health Monitoring,LockEngine,FR,Medium,review,,,core detection/lock/relock verified (PHASE3 §OV); classify per-FR at M1 gate
 FR-056,Protected Application Selection,ProtectedApplicationsManagement,FR,Critical,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
 FR-057,Application Search,ProtectedApplicationsManagement,FR,High,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-058,Application Categorization,ProtectedApplicationsManagement,FR,Medium,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-059,Individual Lock Policies,ProtectedApplicationsManagement,FR,Critical,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
+FR-058,Application Categorization,ProtectedApplicationsManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-059,Individual Lock Policies,ProtectedApplicationsManagement,FR,Critical,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
 FR-060,Enable/Disable Protection,ProtectedApplicationsManagement,FR,High,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-061,Bulk Protection,ProtectedApplicationsManagement,FR,High,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-062,Bulk Removal,ProtectedApplicationsManagement,FR,Medium,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-063,Default Protection Profile,ProtectedApplicationsManagement,FR,Medium,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-064,Application Profiles,ProtectedApplicationsManagement,FR,High,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-065,Profile Assignment,ProtectedApplicationsManagement,FR,High,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-066,Per-App Authentication Method,ProtectedApplicationsManagement,FR,High,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-067,Per-App Timeout,ProtectedApplicationsManagement,FR,High,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-068,Per-App Lock Schedule,ProtectedApplicationsManagement,FR,High,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-069,Favorite Applications,ProtectedApplicationsManagement,FR,Low,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-070,Automatic Protection Recommendation,ProtectedApplicationsManagement,FR,Medium,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-071,Newly Installed Application Wizard,ProtectedApplicationsManagement,FR,Medium,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
+FR-061,Bulk Protection,ProtectedApplicationsManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-062,Bulk Removal,ProtectedApplicationsManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-063,Default Protection Profile,ProtectedApplicationsManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-064,Application Profiles,ProtectedApplicationsManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-065,Profile Assignment,ProtectedApplicationsManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-066,Per-App Authentication Method,ProtectedApplicationsManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-067,Per-App Timeout,ProtectedApplicationsManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-068,Per-App Lock Schedule,ProtectedApplicationsManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-069,Favorite Applications,ProtectedApplicationsManagement,FR,Low,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-070,Automatic Protection Recommendation,ProtectedApplicationsManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-071,Newly Installed Application Wizard,ProtectedApplicationsManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
 FR-072,Protected Application Icons,ProtectedApplicationsManagement,FR,Low,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
 FR-073,Application Information,ProtectedApplicationsManagement,FR,Low,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-074,Application Exclusions,ProtectedApplicationsManagement,FR,Medium,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-075,Hidden Applications,ProtectedApplicationsManagement,FR,High,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-076,Work Profile Support,ProtectedApplicationsManagement,FR,High,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-077,Clone Application Support,ProtectedApplicationsManagement,FR,Medium,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
+FR-074,Application Exclusions,ProtectedApplicationsManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-075,Hidden Applications,ProtectedApplicationsManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-076,Work Profile Support,ProtectedApplicationsManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-077,Clone Application Support,ProtectedApplicationsManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
 FR-078,Application Removal Cleanup,ProtectedApplicationsManagement,FR,Medium,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-079,Application Usage Statistics,ProtectedApplicationsManagement,FR,Low,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-080,Protection Configuration Export,ProtectedApplicationsManagement,FR,Medium,review,,,basic protect/unprotect/persist verified; classify per-FR at M1 gate
-FR-081,Intruder Selfie Capture,Privacy&Concealment,FR,High,implemented-verified,privacy/,PHASE3 campaign,
-FR-082,Intruder Event Logging,Privacy&Concealment,FR,High,implemented-verified,privacy/,PHASE3 campaign,
-FR-083,Intruder Location Capture,Privacy&Concealment,FR,Medium,not-started,,,intruder location not built
-FR-084,Intruder Notification,Privacy&Concealment,FR,Medium,implemented-verified,privacy/,PHASE3 campaign,
-FR-085,Intruder History Viewer,Privacy&Concealment,FR,Medium,implemented-verified,privacy/,PHASE3 campaign,
-FR-086,Calculator Disguise Mode,Privacy&Concealment,FR,High,not-started,,,
-FR-087,Alternative Application Disguises,Privacy&Concealment,FR,Medium,not-started,,,
-FR-088,Launcher Icon Camouflage,Privacy&Concealment,FR,High,not-started,,,
-FR-089,Application Name Camouflage,Privacy&Concealment,FR,High,not-started,,,
-FR-090,Fake Crash Screen,Privacy&Concealment,FR,High,not-started,,,
-FR-091,Fake Error Message Customization,Privacy&Concealment,FR,Low,not-started,,,
-FR-092,Hidden Unlock Gesture,Privacy&Concealment,FR,High,review,,,
-FR-093,Notification Masking,Privacy&Concealment,FR,High,review,,,
-FR-094,Notification Category Masking,Privacy&Concealment,FR,Medium,review,,,
+FR-079,Application Usage Statistics,ProtectedApplicationsManagement,FR,Low,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-080,Protection Configuration Export,ProtectedApplicationsManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: basic protect/unprotect/persist verified; classify per-FR at M1 gate]
+FR-081,Intruder Selfie Capture,Privacy&Concealment,FR,High,descoped-v1,privacy/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-082,Intruder Event Logging,Privacy&Concealment,FR,High,descoped-v1,privacy/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-083,Intruder Location Capture,Privacy&Concealment,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: intruder location not built]
+FR-084,Intruder Notification,Privacy&Concealment,FR,Medium,descoped-v1,privacy/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-085,Intruder History Viewer,Privacy&Concealment,FR,Medium,descoped-v1,privacy/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-086,Calculator Disguise Mode,Privacy&Concealment,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-087,Alternative Application Disguises,Privacy&Concealment,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-088,Launcher Icon Camouflage,Privacy&Concealment,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-089,Application Name Camouflage,Privacy&Concealment,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-090,Fake Crash Screen,Privacy&Concealment,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-091,Fake Error Message Customization,Privacy&Concealment,FR,Low,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-092,Hidden Unlock Gesture,Privacy&Concealment,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-093,Notification Masking,Privacy&Concealment,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-094,Notification Category Masking,Privacy&Concealment,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-095,Recent Apps Preview Protection,Privacy&Concealment,FR,Critical,review,,,
 FR-096,Screenshot Prevention,Privacy&Concealment,FR,High,review,,,
-FR-097,Shoulder Surfing Protection,Privacy&Concealment,FR,High,review,,,
-FR-098,Invisible Pattern Mode,Privacy&Concealment,FR,Medium,review,,,
+FR-097,Shoulder Surfing Protection,Privacy&Concealment,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-098,Invisible Pattern Mode,Privacy&Concealment,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-099,Secure Keyboard Mode,Privacy&Concealment,FR,High,review,,,
 FR-100,Clipboard Protection,Privacy&Concealment,FR,Medium,review,,,
-FR-101,Privacy Dashboard,Privacy&Concealment,FR,Medium,review,,,
-FR-102,Stealth Mode,Privacy&Concealment,FR,High,not-started,,,
-FR-103,Secret Launch Methods,Privacy&Concealment,FR,High,review,,,
-FR-104,Decoy Authentication,Privacy&Concealment,FR,Medium,not-started,,,
+FR-101,Privacy Dashboard,Privacy&Concealment,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-102,Stealth Mode,Privacy&Concealment,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-103,Secret Launch Methods,Privacy&Concealment,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-104,Decoy Authentication,Privacy&Concealment,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-105,Privacy Feature Management,Privacy&Concealment,FR,Medium,review,,,
-FR-106,Secure Vault Creation,Vault,FR,Critical,implemented-verified,vault/,PHASE3 campaign,
-FR-107,Vault Encryption,Vault,FR,Critical,implemented-verified,vault/,PHASE3 campaign,
-FR-108,Vault Authentication,Vault,FR,Critical,implemented-verified,vault/,PHASE3 campaign; WP2 baseline API33 (docs/reports/campaigns/2026-07-22_wp2-regression-baseline_nucbox-g5.md); WP2 real-hardware API35 (docs/reports/campaigns/2026-07-23_wp2-regression_moto-g-2025.md); WP2 matrix API26/29/35-emu (docs/reports/campaigns/2026-07-23_wp2-matrix_nucbox-g5.md),"F3 self-gate verified across the matrix: f3_self_gate passed every run on API 26/29/33/35 (NucBox emulators) and API 35 (Moto G 2025, real hardware). Real devices >=API13 need a manual accessibility grant (Restricted Settings). Separately, the 2026-07-23 matrix run found an F4/OV-4 rapid-relaunch race in the LOCK ENGINE (see that report) — a different property, not this self-gate requirement."
-FR-109,Photo Import,Vault,FR,High,implemented-verified,vault/,PHASE3 campaign,
-FR-110,Video Import,Vault,FR,High,implemented-verified,vault/,PHASE3 campaign,
-FR-111,Document Import,Vault,FR,High,implemented-verified,vault/,PHASE3 campaign,
-FR-112,File Browser Integration,Vault,FR,Medium,implemented-verified,vault/,PHASE3 campaign,
-FR-113,Camera-to-Vault Capture,Vault,FR,Medium,not-started,,,
-FR-114,Automatic Gallery Removal,Vault,FR,High,implemented-verified,vault/,PHASE3 campaign,
-FR-115,Secure File Deletion,Vault,FR,High,implemented-verified,vault/,PHASE3 campaign,
-FR-116,Vault Organization,Vault,FR,Medium,not-started,,,
-FR-117,Vault Search,Vault,FR,Medium,not-started,,,
-FR-118,Vault File Preview,Vault,FR,Medium,implemented-verified,vault/,PHASE3 campaign,
-FR-119,Vault Export,Vault,FR,Medium,implemented-verified,vault/,PHASE3 campaign,
-FR-120,Vault Backup,Vault,FR,High,not-started,,,
-FR-121,Vault Restore,Vault,FR,High,not-started,,,
-FR-122,Vault Storage Statistics,Vault,FR,Low,review,,,
-FR-123,Vault Integrity Verification,Vault,FR,High,review,,,
-FR-124,Vault Session Timeout,Vault,FR,High,review,,,
-FR-125,Vault Configuration Management,Vault,FR,Medium,review,,,
-FR-126,Time-Based Lock Scheduling,Scheduling&Automation,FR,High,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-127,Schedule Creation,Scheduling&Automation,FR,High,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-128,Multiple Daily Time Ranges,Scheduling&Automation,FR,Medium,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-129,Day-of-Week Scheduling,Scheduling&Automation,FR,High,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-130,Date-Based Scheduling,Scheduling&Automation,FR,Medium,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-131,Wi-Fi Trusted Network Detection,Scheduling&Automation,FR,High,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-132,Wi-Fi Lock Policies,Scheduling&Automation,FR,High,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-133,Location-Based Locking,Scheduling&Automation,FR,High,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-134,Trusted Location Management,Scheduling&Automation,FR,Medium,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-135,Bluetooth Trusted Device Detection,Scheduling&Automation,FR,Medium,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-136,Charging State Automation,Scheduling&Automation,FR,Low,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-137,Device Idle Detection,Scheduling&Automation,FR,Medium,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-138,Screen State Automation,Scheduling&Automation,FR,High,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-139,Calendar-Based Lock Rules,Scheduling&Automation,FR,Low,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-140,Automation Profiles,Scheduling&Automation,FR,High,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-141,Automation Rule Priority,Scheduling&Automation,FR,High,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-142,Manual Override,Scheduling&Automation,FR,Medium,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-143,Automation Event Logging,Scheduling&Automation,FR,Medium,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-144,Intelligent Lock Recommendations,Scheduling&Automation,FR,Low,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
-FR-145,Automation Configuration Management,Scheduling&Automation,FR,Medium,not-started,,,design input: docs/process/PHASE4_PLAN.md (M4)
+FR-106,Secure Vault Creation,Vault,FR,Critical,descoped-v1,vault/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-107,Vault Encryption,Vault,FR,Critical,descoped-v1,vault/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-108,Vault Authentication,Vault,FR,Critical,descoped-v1,vault/,PHASE3 campaign; WP2 baseline API33 (docs/reports/campaigns/2026-07-22_wp2-regression-baseline_nucbox-g5.md); WP2 real-hardware API35 (docs/reports/campaigns/2026-07-23_wp2-regression_moto-g-2025.md); WP2 matrix API26/29/35-emu (docs/reports/campaigns/2026-07-23_wp2-matrix_nucbox-g5.md),"deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement) [prior note: F3 self-gate verified across the matrix: f3_self_gate passed every run on API 26/29/33/35 (NucBox emulators) and API 35 (Moto G 2025, real hardware). Real devices >=API13 need a manual accessibility grant (Restricted Settings). Separately, the 2026-07-23 matrix run found an F4/OV-4 rapid-relaunch race in the LOCK ENGINE (see that report) — a different property, not this self-gate requirement.]"
+FR-109,Photo Import,Vault,FR,High,descoped-v1,vault/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-110,Video Import,Vault,FR,High,descoped-v1,vault/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-111,Document Import,Vault,FR,High,descoped-v1,vault/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-112,File Browser Integration,Vault,FR,Medium,descoped-v1,vault/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-113,Camera-to-Vault Capture,Vault,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-114,Automatic Gallery Removal,Vault,FR,High,descoped-v1,vault/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-115,Secure File Deletion,Vault,FR,High,descoped-v1,vault/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-116,Vault Organization,Vault,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-117,Vault Search,Vault,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-118,Vault File Preview,Vault,FR,Medium,descoped-v1,vault/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-119,Vault Export,Vault,FR,Medium,descoped-v1,vault/,PHASE3 campaign,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14); prior implementation retained in tree — removal from the 1.0.0 line scheduled in M8 (code preserved in git history for 2.0.0 reinstatement)
+FR-120,Vault Backup,Vault,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-121,Vault Restore,Vault,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-122,Vault Storage Statistics,Vault,FR,Low,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-123,Vault Integrity Verification,Vault,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-124,Vault Session Timeout,Vault,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-125,Vault Configuration Management,Vault,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-126,Time-Based Lock Scheduling,Scheduling&Automation,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-127,Schedule Creation,Scheduling&Automation,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-128,Multiple Daily Time Ranges,Scheduling&Automation,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-129,Day-of-Week Scheduling,Scheduling&Automation,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-130,Date-Based Scheduling,Scheduling&Automation,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-131,Wi-Fi Trusted Network Detection,Scheduling&Automation,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-132,Wi-Fi Lock Policies,Scheduling&Automation,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-133,Location-Based Locking,Scheduling&Automation,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-134,Trusted Location Management,Scheduling&Automation,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-135,Bluetooth Trusted Device Detection,Scheduling&Automation,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-136,Charging State Automation,Scheduling&Automation,FR,Low,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-137,Device Idle Detection,Scheduling&Automation,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-138,Screen State Automation,Scheduling&Automation,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-139,Calendar-Based Lock Rules,Scheduling&Automation,FR,Low,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-140,Automation Profiles,Scheduling&Automation,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-141,Automation Rule Priority,Scheduling&Automation,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-142,Manual Override,Scheduling&Automation,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-143,Automation Event Logging,Scheduling&Automation,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-144,Intelligent Lock Recommendations,Scheduling&Automation,FR,Low,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
+FR-145,Automation Configuration Management,Scheduling&Automation,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: design input: docs/process/PHASE4_PLAN.md (M4)]
 FR-146,Notification Management System,Notifications&UX,FR,High,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
-FR-147,Lock Event Notifications,Notifications&UX,FR,Medium,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
-FR-148,Successful Unlock Notifications,Notifications&UX,FR,Low,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
-FR-149,Failed Authentication Notifications,Notifications&UX,FR,High,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
-FR-150,Intruder Detection Notifications,Notifications&UX,FR,High,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
-FR-151,Notification Content Masking,Notifications&UX,FR,Critical,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
-FR-152,Per-Application Notification Privacy Rules,Notifications&UX,FR,High,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
-FR-153,Notification Listener Integration,Notifications&UX,FR,Critical,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
-FR-154,Notification History,Notifications&UX,FR,Medium,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
+FR-147,Lock Event Notifications,Notifications&UX,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: watchdog + intruder notifications exist; classify per-FR at M3]
+FR-148,Successful Unlock Notifications,Notifications&UX,FR,Low,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: watchdog + intruder notifications exist; classify per-FR at M3]
+FR-149,Failed Authentication Notifications,Notifications&UX,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: watchdog + intruder notifications exist; classify per-FR at M3]
+FR-150,Intruder Detection Notifications,Notifications&UX,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: watchdog + intruder notifications exist; classify per-FR at M3]
+FR-151,Notification Content Masking,Notifications&UX,FR,Critical,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: watchdog + intruder notifications exist; classify per-FR at M3]
+FR-152,Per-Application Notification Privacy Rules,Notifications&UX,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: watchdog + intruder notifications exist; classify per-FR at M3]
+FR-153,Notification Listener Integration,Notifications&UX,FR,Critical,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: watchdog + intruder notifications exist; classify per-FR at M3]
+FR-154,Notification History,Notifications&UX,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: watchdog + intruder notifications exist; classify per-FR at M3]
 FR-155,Security Alerts,Notifications&UX,FR,High,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
 FR-156,First-Time User Onboarding,Notifications&UX,FR,High,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
 FR-157,Permission Setup Assistant,Notifications&UX,FR,Critical,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
 FR-158,Contextual Help System,Notifications&UX,FR,Medium,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
-FR-159,Application Theme Support,Notifications&UX,FR,Medium,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
-FR-160,User Experience Configuration,Notifications&UX,FR,Medium,not-started,,,watchdog + intruder notifications exist; classify per-FR at M3
+FR-159,Application Theme Support,Notifications&UX,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: watchdog + intruder notifications exist; classify per-FR at M3]
+FR-160,User Experience Configuration,Notifications&UX,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: watchdog + intruder notifications exist; classify per-FR at M3]
 FR-161,End-to-End Local Security Architecture,SecurityRequirements,FR,Critical,review,,,encryption/lockout core verified; classify per-FR at M2 gate
 FR-162,Secure Data Storage,SecurityRequirements,FR,Critical,implemented-verified,"core/security/, applocker/service/",Phase 2+3 campaigns,
 FR-163,Cryptographic Key Management,SecurityRequirements,FR,Critical,review,,,encryption/lockout core verified; classify per-FR at M2 gate
 FR-164,Data Encryption at Rest,SecurityRequirements,FR,Critical,implemented-verified,"core/security/, applocker/service/",Phase 2+3 campaigns,
-FR-165,Secure Communication Encryption,SecurityRequirements,FR,High,review,,,encryption/lockout core verified; classify per-FR at M2 gate
-FR-166,Certificate Pinning,SecurityRequirements,FR,Medium,review,,,encryption/lockout core verified; classify per-FR at M2 gate
-FR-167,Root Device Detection,SecurityRequirements,FR,High,not-started,,,root/tamper detection not built
-FR-168,Root Device Security Response,SecurityRequirements,FR,High,not-started,,,root/tamper detection not built
-FR-169,Application Tamper Detection,SecurityRequirements,FR,High,not-started,,,root/tamper detection not built
+FR-165,Secure Communication Encryption,SecurityRequirements,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: encryption/lockout core verified; classify per-FR at M2 gate]
+FR-166,Certificate Pinning,SecurityRequirements,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: encryption/lockout core verified; classify per-FR at M2 gate]
+FR-167,Root Device Detection,SecurityRequirements,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: root/tamper detection not built]
+FR-168,Root Device Security Response,SecurityRequirements,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: root/tamper detection not built]
+FR-169,Application Tamper Detection,SecurityRequirements,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: root/tamper detection not built]
 FR-170,Debug Protection,SecurityRequirements,FR,Medium,not-started,,,root/tamper detection not built
 FR-171,Screen Capture Protection,SecurityRequirements,FR,High,implemented-verified,"core/security/, applocker/service/",Phase 2+3 campaigns,
 FR-172,Clipboard Security,SecurityRequirements,FR,High,review,,,encryption/lockout core verified; classify per-FR at M2 gate
 FR-173,Secure Memory Handling,SecurityRequirements,FR,High,review,,,encryption/lockout core verified; classify per-FR at M2 gate
 FR-174,Authentication Brute Force Protection,SecurityRequirements,FR,Critical,implemented-verified,"core/security/, applocker/service/",Phase 2+3 campaigns,
-FR-175,Emergency Lock Mode,SecurityRequirements,FR,High,review,,,encryption/lockout core verified; classify per-FR at M2 gate
-FR-176,Secure Backup Encryption,SecurityRequirements,FR,Critical,review,,,encryption/lockout core verified; classify per-FR at M2 gate
+FR-175,Emergency Lock Mode,SecurityRequirements,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: encryption/lockout core verified; classify per-FR at M2 gate]
+FR-176,Secure Backup Encryption,SecurityRequirements,FR,Critical,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: encryption/lockout core verified; classify per-FR at M2 gate]
 FR-177,Data Privacy Controls,SecurityRequirements,FR,High,review,,,encryption/lockout core verified; classify per-FR at M2 gate
 FR-178,Security Audit Logs,SecurityRequirements,FR,Medium,review,,,encryption/lockout core verified; classify per-FR at M2 gate
 FR-179,Permission Change Detection,SecurityRequirements,FR,Critical,implemented-verified,"core/security/, applocker/service/",Phase 2+3 campaigns,
@@ -183,34 +183,34 @@ FR-181,Application Settings Dashboard,ApplicationSettings&ConfigurationManagemen
 FR-182,Security Settings Management,ApplicationSettings&ConfigurationManagement,FR,Critical,review,,,settings subset built; classify per-FR at M3
 FR-183,Privacy Settings Management,ApplicationSettings&ConfigurationManagement,FR,High,review,,,settings subset built; classify per-FR at M3
 FR-184,Application Default Settings,ApplicationSettings&ConfigurationManagement,FR,Medium,review,,,settings subset built; classify per-FR at M3
-FR-185,User Profile Management,ApplicationSettings&ConfigurationManagement,FR,Medium,review,,,settings subset built; classify per-FR at M3
-FR-186,Profile Switching,ApplicationSettings&ConfigurationManagement,FR,High,review,,,settings subset built; classify per-FR at M3
-FR-187,Theme Configuration,ApplicationSettings&ConfigurationManagement,FR,Medium,review,,,settings subset built; classify per-FR at M3
-FR-188,Language Configuration,ApplicationSettings&ConfigurationManagement,FR,Medium,review,,,settings subset built; classify per-FR at M3
-FR-189,Vibration and Sound Feedback Settings,ApplicationSettings&ConfigurationManagement,FR,Low,review,,,settings subset built; classify per-FR at M3
-FR-190,Backup Configuration Management,ApplicationSettings&ConfigurationManagement,FR,High,review,,,settings subset built; classify per-FR at M3
-FR-191,Import and Export Settings,ApplicationSettings&ConfigurationManagement,FR,High,review,,,settings subset built; classify per-FR at M3
+FR-185,User Profile Management,ApplicationSettings&ConfigurationManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: settings subset built; classify per-FR at M3]
+FR-186,Profile Switching,ApplicationSettings&ConfigurationManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: settings subset built; classify per-FR at M3]
+FR-187,Theme Configuration,ApplicationSettings&ConfigurationManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: settings subset built; classify per-FR at M3]
+FR-188,Language Configuration,ApplicationSettings&ConfigurationManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: settings subset built; classify per-FR at M3]
+FR-189,Vibration and Sound Feedback Settings,ApplicationSettings&ConfigurationManagement,FR,Low,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: settings subset built; classify per-FR at M3]
+FR-190,Backup Configuration Management,ApplicationSettings&ConfigurationManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: settings subset built; classify per-FR at M3]
+FR-191,Import and Export Settings,ApplicationSettings&ConfigurationManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: settings subset built; classify per-FR at M3]
 FR-192,Factory Reset,ApplicationSettings&ConfigurationManagement,FR,Critical,review,,,settings subset built; classify per-FR at M3
 FR-193,Data Management Controls,ApplicationSettings&ConfigurationManagement,FR,High,review,,,settings subset built; classify per-FR at M3
-FR-194,Advanced Settings Access Control,ApplicationSettings&ConfigurationManagement,FR,High,review,,,settings subset built; classify per-FR at M3
+FR-194,Advanced Settings Access Control,ApplicationSettings&ConfigurationManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14) [prior note: settings subset built; classify per-FR at M3]
 FR-195,Configuration Validation,ApplicationSettings&ConfigurationManagement,FR,High,review,,,settings subset built; classify per-FR at M3
-FR-196,Encrypted Backup Creation,Backup&RecoveryManagement,FR,Critical,not-started,,,
-FR-197,Backup Encryption Protection,Backup&RecoveryManagement,FR,Critical,not-started,,,
-FR-198,Automatic Backup Scheduling,Backup&RecoveryManagement,FR,High,not-started,,,
-FR-199,Local Backup Storage,Backup&RecoveryManagement,FR,High,not-started,,,
-FR-200,Cloud Backup Support,Backup&RecoveryManagement,FR,High,not-started,,,
-FR-201,Backup Restoration,Backup&RecoveryManagement,FR,Critical,not-started,,,
-FR-202,Device Migration Support,Backup&RecoveryManagement,FR,High,not-started,,,
-FR-203,Backup Verification,Backup&RecoveryManagement,FR,High,not-started,,,
-FR-204,Recovery Authentication,Backup&RecoveryManagement,FR,Critical,not-started,,,
-FR-205,Backup Retention Management,Backup&RecoveryManagement,FR,Medium,not-started,,,
+FR-196,Encrypted Backup Creation,Backup&RecoveryManagement,FR,Critical,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-197,Backup Encryption Protection,Backup&RecoveryManagement,FR,Critical,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-198,Automatic Backup Scheduling,Backup&RecoveryManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-199,Local Backup Storage,Backup&RecoveryManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-200,Cloud Backup Support,Backup&RecoveryManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-201,Backup Restoration,Backup&RecoveryManagement,FR,Critical,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-202,Device Migration Support,Backup&RecoveryManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-203,Backup Verification,Backup&RecoveryManagement,FR,High,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-204,Recovery Authentication,Backup&RecoveryManagement,FR,Critical,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-205,Backup Retention Management,Backup&RecoveryManagement,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-206,Application Startup Performance,Performance,FR,High,not-started,,,
 FR-207,Lock Detection Response Time,Performance,FR,Critical,not-started,,,
 FR-208,Memory Usage Optimization,Performance,FR,High,not-started,,,
 FR-209,CPU Usage Optimization,Performance,FR,High,not-started,,,
 FR-210,Battery Optimization Mode,Performance,FR,High,not-started,,,
 FR-211,Adaptive Background Monitoring,Performance,FR,High,not-started,,,
-FR-212,Large Vault Performance,Performance,FR,Medium,not-started,,,
+FR-212,Large Vault Performance,Performance,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-213,Application Stability,Performance,FR,Critical,not-started,,,
 FR-214,Service Recovery,Performance,FR,High,not-started,,,
 FR-215,Device Compatibility,Performance,FR,Critical,not-started,,,
@@ -220,12 +220,12 @@ FR-218,Permission Monitoring,AdministrationDiagnosticsMaintenance,FR,Critical,no
 FR-219,System Diagnostic Scan,AdministrationDiagnosticsMaintenance,FR,Medium,not-started,,,
 FR-220,Application Event Logging,AdministrationDiagnosticsMaintenance,FR,High,not-started,,,
 FR-221,Error Detection and Reporting,AdministrationDiagnosticsMaintenance,FR,High,not-started,,,
-FR-222,Secure Diagnostic Export,AdministrationDiagnosticsMaintenance,FR,Medium,not-started,,,
-FR-223,Maintenance Mode,AdministrationDiagnosticsMaintenance,FR,Medium,not-started,,,
+FR-222,Secure Diagnostic Export,AdministrationDiagnosticsMaintenance,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-223,Maintenance Mode,AdministrationDiagnosticsMaintenance,FR,Medium,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-224,Application Repair Function,AdministrationDiagnosticsMaintenance,FR,Medium,not-started,,,
-FR-225,Administrator Security Controls,AdministrationDiagnosticsMaintenance,FR,Low,not-started,,,
-FR-226,Build Configuration Separation,ProductionReadiness,FR,,not-started,,,
-FR-227,Secure Configuration Management,ProductionReadiness,FR,,not-started,,,
+FR-225,Administrator Security Controls,AdministrationDiagnosticsMaintenance,FR,Low,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-226,Build Configuration Separation,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-227,Secure Configuration Management,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-228,Database Migration Management,ProductionReadiness,FR,,partial,core/database/AppLockDatabase.kt,,hand-written migrations exist; destructive fallback removal pending (ADR-007)
 FR-229,Database Integrity Verification,ProductionReadiness,FR,,not-started,,,
 FR-230,Background Processing,ProductionReadiness,FR,,not-started,,,
@@ -234,7 +234,7 @@ FR-232,Dependency Validation,ProductionReadiness,FR,,not-started,,,
 FR-233,Permission Verification,ProductionReadiness,FR,,not-started,,,
 FR-234,Build Version Identification,ProductionReadiness,FR,,not-started,,,
 FR-235,Release Validation,ProductionReadiness,FR,,not-started,,,
-FR-236,Feature Flag Support,ProductionReadiness,FR,,not-started,,,
+FR-236,Feature Flag Support,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-237,Safe Default Configuration,ProductionReadiness,FR,,partial,,,"secure defaults as built (lock on, encryption on)"
 FR-238,Configuration Validation,ProductionReadiness,FR,,not-started,,,
 FR-239,Secure Error Handling,ProductionReadiness,FR,,partial,,,no internal details in user-facing errors as built; unaudited
@@ -242,13 +242,13 @@ FR-240,Graceful Failure,ProductionReadiness,FR,,not-started,,,
 FR-241,Application State Recovery,ProductionReadiness,FR,,partial,,,state recovery validated in P-1/P-3 (PHASE3 campaign)
 FR-242,Runtime Self-Test,ProductionReadiness,FR,,not-started,,,
 FR-243,Secure Update Compatibility,ProductionReadiness,FR,,not-started,,,
-FR-244,Backup Validation,ProductionReadiness,FR,,not-started,,,
-FR-245,Restore Validation,ProductionReadiness,FR,,not-started,,,
+FR-244,Backup Validation,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-245,Restore Validation,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-246,Production Logging Configuration,ProductionReadiness,FR,,not-started,,,
-FR-247,Dependency Inventory,ProductionReadiness,FR,,not-started,,,
-FR-248,Release Checklist Enforcement,ProductionReadiness,FR,,not-started,,,
-FR-249,Production Readiness Verification,ProductionReadiness,FR,,not-started,,,
-FR-250,Production Acceptance Gate,ProductionReadiness,FR,,not-started,,,
+FR-247,Dependency Inventory,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-248,Release Checklist Enforcement,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-249,Production Readiness Verification,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-250,Production Acceptance Gate,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-251,Automatic Service Recovery,OperationalResilience,FR,,not-started,,,
 FR-252,Foreground Service Monitoring,OperationalResilience,FR,,not-started,,,
 FR-253,Accessibility Service Recovery,OperationalResilience,FR,,descoped-v1,,,"deferred beyond 1.0.0 per ADR-013B (2026-08-14); accessibility deferred to 2.0.0, so a11y-service recovery does not apply to 1.0.0. ProtectionWatchdogService remains for FR-179 protection-health (Usage Access + overlay in 1.0.0); a11y recovery targeted for 2.0.0 with the a11y tier"
@@ -256,12 +256,12 @@ FR-254,Notification Service Recovery,OperationalResilience,FR,,not-started,,,
 FR-255,Permission Change Detection,OperationalResilience,FR,,not-started,,,
 FR-256,Graceful Degradation,OperationalResilience,FR,,not-started,,,
 FR-257,Transaction Rollback,OperationalResilience,FR,,not-started,,,
-FR-258,Interrupted Encryption Recovery,OperationalResilience,FR,,not-started,,,
+FR-258,Interrupted Encryption Recovery,OperationalResilience,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-259,Secure Temporary File Cleanup,OperationalResilience,FR,,not-started,,,
 FR-260,Startup Recovery,OperationalResilience,FR,,not-started,,,
 FR-261,Unexpected Shutdown Recovery,OperationalResilience,FR,,not-started,,,
 FR-262,Database Recovery,OperationalResilience,FR,,not-started,,,
-FR-263,Backup Recovery,OperationalResilience,FR,,not-started,,,
+FR-263,Backup Recovery,OperationalResilience,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-264,Configuration Recovery,OperationalResilience,FR,,not-started,,,
 FR-265,Retry Policy,OperationalResilience,FR,,not-started,,,
 FR-266,Resource Exhaustion Protection,OperationalResilience,FR,,not-started,,,
@@ -269,67 +269,67 @@ FR-267,Storage Capacity Monitoring,OperationalResilience,FR,,not-started,,,
 FR-268,Watchdog Monitoring,OperationalResilience,FR,,not-started,,,
 FR-269,Self-Diagnostics,OperationalResilience,FR,,not-started,,,
 FR-270,Recovery Logging,OperationalResilience,FR,,not-started,,,
-FR-271,Safe Mode Operation,OperationalResilience,FR,,not-started,,,
+FR-271,Safe Mode Operation,OperationalResilience,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-272,Security Policy Preservation,OperationalResilience,FR,,not-started,,,
 FR-273,Recovery Verification,OperationalResilience,FR,,not-started,,,
 FR-274,Failure Notification,OperationalResilience,FR,,not-started,,,
 FR-275,Operational Readiness Confirmation,OperationalResilience,FR,,not-started,,,
 FR-276,Structured Logging,Observability&Monitoring,FR,,not-started,,,
-FR-277,Security Audit Logging,Observability&Monitoring,FR,,not-started,,,
-FR-278,Performance Metrics Collection,Observability&Monitoring,FR,,not-started,,,
+FR-277,Security Audit Logging,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-278,Performance Metrics Collection,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-279,Service Health Monitoring,Observability&Monitoring,FR,,not-started,,,
 FR-280,Health Status Reporting,Observability&Monitoring,FR,,not-started,,,
-FR-281,Diagnostic Report Generation,Observability&Monitoring,FR,,not-started,,,
-FR-282,Log Level Configuration,Observability&Monitoring,FR,,not-started,,,
+FR-281,Diagnostic Report Generation,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-282,Log Level Configuration,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-283,Log Rotation,Observability&Monitoring,FR,,not-started,,,
-FR-284,Log Export,Observability&Monitoring,FR,,not-started,,,
-FR-285,Event Correlation,Observability&Monitoring,FR,,not-started,,,
-FR-286,Database Performance Monitoring,Observability&Monitoring,FR,,not-started,,,
-FR-287,Background Task Monitoring,Observability&Monitoring,FR,,not-started,,,
-FR-288,Resource Usage Monitoring,Observability&Monitoring,FR,,not-started,,,
+FR-284,Log Export,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-285,Event Correlation,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-286,Database Performance Monitoring,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-287,Background Task Monitoring,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-288,Resource Usage Monitoring,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-289,Security Event Monitoring,Observability&Monitoring,FR,,not-started,,,
 FR-290,Notification of Critical Events,Observability&Monitoring,FR,,not-started,,,
-FR-291,Application Startup Metrics,Observability&Monitoring,FR,,not-started,,,
-FR-292,Historical Metrics Retention,Observability&Monitoring,FR,,not-started,,,
+FR-291,Application Startup Metrics,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-292,Historical Metrics Retention,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-293,Integrity Monitoring,Observability&Monitoring,FR,,not-started,,,
 FR-294,Diagnostic Self-Test,Observability&Monitoring,FR,,not-started,,,
-FR-295,Observability Dashboard,Observability&Monitoring,FR,,not-started,,,
+FR-295,Observability Dashboard,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-296,Exception Monitoring,Observability&Monitoring,FR,,not-started,,,
-FR-297,Alert Threshold Management,Observability&Monitoring,FR,,not-started,,,
-FR-298,Audit Trail Integrity,Observability&Monitoring,FR,,not-started,,,
-FR-299,Operational Report Generation,Observability&Monitoring,FR,,not-started,,,
-FR-300,Observability Readiness Verification,Observability&Monitoring,FR,,not-started,,,
+FR-297,Alert Threshold Management,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-298,Audit Trail Integrity,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-299,Operational Report Generation,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-300,Observability Readiness Verification,Observability&Monitoring,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-301,Data Classification,DataLifecycleManagement,FR,,not-started,,,
-FR-302,Data Ownership Tracking,DataLifecycleManagement,FR,,not-started,,,
-FR-303,Data Creation Auditing,DataLifecycleManagement,FR,,not-started,,,
-FR-304,Data Modification Auditing,DataLifecycleManagement,FR,,not-started,,,
+FR-302,Data Ownership Tracking,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-303,Data Creation Auditing,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-304,Data Modification Auditing,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-305,Data Retention Policies,DataLifecycleManagement,FR,,not-started,,,
 FR-306,Data Expiration Management,DataLifecycleManagement,FR,,not-started,,,
-FR-307,Secure Data Archiving,DataLifecycleManagement,FR,,not-started,,,
+FR-307,Secure Data Archiving,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-308,Secure Deletion,DataLifecycleManagement,FR,,partial,vault/VaultRepository.kt,,vault secure delete verified; classification-wide deletion pending
-FR-309,Vault Data Lifecycle Management,DataLifecycleManagement,FR,,not-started,,,
+FR-309,Vault Data Lifecycle Management,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-310,Temporary Data Lifecycle Control,DataLifecycleManagement,FR,,not-started,,,
 FR-311,Metadata Consistency Verification,DataLifecycleManagement,FR,,not-started,,,
 FR-312,Orphaned Data Detection,DataLifecycleManagement,FR,,not-started,,,
 FR-313,Data Integrity Verification,DataLifecycleManagement,FR,,not-started,,,
-FR-314,Backup Lifecycle Management,DataLifecycleManagement,FR,,not-started,,,
-FR-315,Backup Version Tracking,DataLifecycleManagement,FR,,not-started,,,
-FR-316,Backup Expiration Enforcement,DataLifecycleManagement,FR,,not-started,,,
+FR-314,Backup Lifecycle Management,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-315,Backup Version Tracking,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-316,Backup Expiration Enforcement,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-317,Cryptographic Key Lifecycle Management,DataLifecycleManagement,FR,,not-started,,,
-FR-318,Key Rotation Support,DataLifecycleManagement,FR,,not-started,,,
-FR-319,Key Retirement Management,DataLifecycleManagement,FR,,not-started,,,
-FR-320,Storage Capacity Forecasting,DataLifecycleManagement,FR,,not-started,,,
+FR-318,Key Rotation Support,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-319,Key Retirement Management,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-320,Storage Capacity Forecasting,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-321,Cache Lifecycle Management,DataLifecycleManagement,FR,,not-started,,,
 FR-322,Data Migration Management,DataLifecycleManagement,FR,,not-started,,,
 FR-323,Data Recovery Validation,DataLifecycleManagement,FR,,not-started,,,
-FR-324,Data Lifecycle Reporting,DataLifecycleManagement,FR,,not-started,,,
+FR-324,Data Lifecycle Reporting,DataLifecycleManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-325,Data Lifecycle Readiness Verification,DataLifecycleManagement,FR,,not-started,,,
 FR-326,Scalable Application Management,Scalability&ResourceManagement,FR,,not-started,,,
-FR-327,Scalable Vault Management,Scalability&ResourceManagement,FR,,not-started,,,
-FR-328,Audit Log Scalability,Scalability&ResourceManagement,FR,,not-started,,,
-FR-329,Incremental Data Loading,Scalability&ResourceManagement,FR,,not-started,,,
-FR-330,Pagination Support,Scalability&ResourceManagement,FR,,not-started,,,
-FR-331,Lazy Resource Initialization,Scalability&ResourceManagement,FR,,not-started,,,
+FR-327,Scalable Vault Management,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-328,Audit Log Scalability,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-329,Incremental Data Loading,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-330,Pagination Support,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-331,Lazy Resource Initialization,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-332,Background Processing for Intensive Operations,Scalability&ResourceManagement,FR,,not-started,,,
 FR-333,Resource Prioritization,Scalability&ResourceManagement,FR,,not-started,,,
 FR-334,Memory Management,Scalability&ResourceManagement,FR,,not-started,,,
@@ -337,50 +337,50 @@ FR-335,Storage Capacity Monitoring,Scalability&ResourceManagement,FR,,not-starte
 FR-336,Storage Optimization,Scalability&ResourceManagement,FR,,not-started,,,
 FR-337,Database Optimization,Scalability&ResourceManagement,FR,,not-started,,,
 FR-338,Efficient Search Operations,Scalability&ResourceManagement,FR,,not-started,,,
-FR-339,Background Maintenance Scheduler,Scalability&ResourceManagement,FR,,not-started,,,
-FR-340,Resource Usage Reporting,Scalability&ResourceManagement,FR,,not-started,,,
-FR-341,Capacity Forecasting,Scalability&ResourceManagement,FR,,not-started,,,
+FR-339,Background Maintenance Scheduler,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-340,Resource Usage Reporting,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-341,Capacity Forecasting,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-342,Concurrent Operation Management,Scalability&ResourceManagement,FR,,not-started,,,
 FR-343,Resource Limit Enforcement,Scalability&ResourceManagement,FR,,not-started,,,
-FR-344,Performance Degradation Detection,Scalability&ResourceManagement,FR,,not-started,,,
-FR-345,Scalability Validation,Scalability&ResourceManagement,FR,,not-started,,,
+FR-344,Performance Degradation Detection,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-345,Scalability Validation,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-346,Battery-Aware Operation,Scalability&ResourceManagement,FR,,not-started,,,
 FR-347,Android Resource Compliance,Scalability&ResourceManagement,FR,,not-started,,,
 FR-348,Thread Management,Scalability&ResourceManagement,FR,,not-started,,,
-FR-349,Scalability Readiness Assessment,Scalability&ResourceManagement,FR,,not-started,,,
-FR-350,Scalability & Resource Management Verification,Scalability&ResourceManagement,FR,,not-started,,,
-FR-351,Modular Architecture,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-352,Separation of Concerns,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-353,Interface-Based Design,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-354,Centralized Security Services,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-355,Secure Dependency Management,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-356,Dependency Update Management,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-357,Secure Build Process,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-358,Static Analysis Verification,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-359,Coding Standards Compliance,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-360,Source Documentation,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-361,Version Control Compatibility,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-362,Code Review Support,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-363,Automated Testing Integration,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-364,Documentation Versioning,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-365,Secure Configuration Management,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-366,Vulnerability Management,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-367,Release Approval Process,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-368,Secure Release Packaging,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-369,Secure Issue Tracking,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-370,Technical Debt Management,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-371,Refactoring Support,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-372,Long-Term Maintainability,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-373,Secure Development Verification,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-374,Maintenance Readiness Assessment,SecureDevelopment&Maintenance,FR,,not-started,,,
-FR-375,Secure Development & Maintenance Verification,SecureDevelopment&Maintenance,FR,,not-started,,,
+FR-349,Scalability Readiness Assessment,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-350,Scalability & Resource Management Verification,Scalability&ResourceManagement,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-351,Modular Architecture,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-352,Separation of Concerns,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-353,Interface-Based Design,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-354,Centralized Security Services,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-355,Secure Dependency Management,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-356,Dependency Update Management,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-357,Secure Build Process,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-358,Static Analysis Verification,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-359,Coding Standards Compliance,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-360,Source Documentation,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-361,Version Control Compatibility,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-362,Code Review Support,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-363,Automated Testing Integration,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-364,Documentation Versioning,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-365,Secure Configuration Management,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-366,Vulnerability Management,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-367,Release Approval Process,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-368,Secure Release Packaging,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-369,Secure Issue Tracking,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-370,Technical Debt Management,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-371,Refactoring Support,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-372,Long-Term Maintainability,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-373,Secure Development Verification,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-374,Maintenance Readiness Assessment,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
+FR-375,Secure Development & Maintenance Verification,SecureDevelopment&Maintenance,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 NFR-PERF-001,Application Startup Time,Performance,NFR,,not-started,,,
 NFR-PERF-002,Warm Startup Time,Performance,NFR,,not-started,,,
 NFR-PERF-003,User Interface Responsiveness,Performance,NFR,,not-started,,,
 NFR-PERF-004,Frame Rendering Performance,Performance,NFR,,not-started,,,
 NFR-PERF-005,Database Query Performance,Performance,NFR,,not-started,,,
 NFR-PERF-006,Search Performance,Performance,NFR,,not-started,,,
-NFR-PERF-007,Secure Vault Loading Performance,Performance,NFR,,not-started,,,
+NFR-PERF-007,Secure Vault Loading Performance,Performance,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-PERF-008,Background Task Scheduling,Performance,NFR,,not-started,,,
 NFR-PERF-009,Memory Allocation Efficiency,Performance,NFR,,not-started,,,
 NFR-PERF-010,Storage I/O Performance,Performance,NFR,,not-started,,,
@@ -390,13 +390,13 @@ NFR-PERF-013,Concurrent Operation Performance,Performance,NFR,,not-started,,,
 NFR-PERF-014,Performance Regression Control,Performance,NFR,,not-started,,,
 NFR-PERF-015,Performance Benchmarking,Performance,NFR,,not-started,,,
 NFR-REL-001,Operational Stability,Reliability,NFR,,not-started,,,
-NFR-REL-002,Mean Time Between Failures (MTBF),Reliability,NFR,,not-started,,,
+NFR-REL-002,Mean Time Between Failures (MTBF),Reliability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-REL-003,Mean Time to Recovery (MTTR),Reliability,NFR,,not-started,,,
-NFR-REL-004,Crash-Free Operation,Reliability,NFR,,not-started,,,
+NFR-REL-004,Crash-Free Operation,Reliability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-REL-005,Data Integrity,Reliability,NFR,,not-started,,,
 NFR-REL-006,Transaction Consistency,Reliability,NFR,,not-started,,,
 NFR-REL-007,State Consistency,Reliability,NFR,,not-started,,,
-NFR-REL-008,Long-Term Operational Reliability,Reliability,NFR,,not-started,,,
+NFR-REL-008,Long-Term Operational Reliability,Reliability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-REL-009,Fault Isolation,Reliability,NFR,,not-started,,,
 NFR-REL-010,Consistent Functional Behavior,Reliability,NFR,,not-started,,,
 NFR-REL-011,Reliability Regression Control,Reliability,NFR,,not-started,,,
@@ -435,15 +435,15 @@ NFR-SEC-008,Attack Surface Minimization,SecurityQuality,NFR,,not-started,,,
 NFR-SEC-009,Secure Failure Behavior,SecurityQuality,NFR,,not-started,,,
 NFR-SEC-010,Security Logging Quality,SecurityQuality,NFR,,not-started,,,
 NFR-SEC-011,Dependency Security,SecurityQuality,NFR,,not-started,,,
-NFR-SEC-012,Static Security Analysis,SecurityQuality,NFR,,not-started,,,
-NFR-SEC-013,Dynamic Security Testing,SecurityQuality,NFR,,not-started,,,
+NFR-SEC-012,Static Security Analysis,SecurityQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
+NFR-SEC-013,Dynamic Security Testing,SecurityQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-SEC-014,Vulnerability Remediation,SecurityQuality,NFR,,not-started,,,
 NFR-SEC-015,Security Regression Prevention,SecurityQuality,NFR,,not-started,,,
 NFR-SEC-016,Secure Build Integrity,SecurityQuality,NFR,,not-started,,,
 NFR-SEC-017,Security Documentation,SecurityQuality,NFR,,not-started,,,
-NFR-SEC-018,Independent Security Assessment,SecurityQuality,NFR,,not-started,,,
-NFR-SEC-019,Security Metrics,SecurityQuality,NFR,,not-started,,,
-NFR-SEC-020,Continuous Security Improvement,SecurityQuality,NFR,,not-started,,,
+NFR-SEC-018,Independent Security Assessment,SecurityQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
+NFR-SEC-019,Security Metrics,SecurityQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
+NFR-SEC-020,Continuous Security Improvement,SecurityQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-PRIV-001,Data Minimization,PrivacyQuality,NFR,,not-started,,,
 NFR-PRIV-002,Purpose Limitation,PrivacyQuality,NFR,,not-started,,,
 NFR-PRIV-003,Local Processing Preference,PrivacyQuality,NFR,,not-started,,,
@@ -461,14 +461,14 @@ NFR-MNT-004,Code Readability,Maintainability,NFR,,not-started,,,
 NFR-MNT-005,Documentation Quality,Maintainability,NFR,,not-started,,,
 NFR-MNT-006,Change Traceability,Maintainability,NFR,,not-started,,,
 NFR-MNT-007,Dependency Management,Maintainability,NFR,,not-started,,,
-NFR-MNT-008,Technical Debt Management,Maintainability,NFR,,not-started,,,
+NFR-MNT-008,Technical Debt Management,Maintainability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-MNT-009,Configuration Management,Maintainability,NFR,,not-started,,,
 NFR-MNT-010,Backward Compatibility,Maintainability,NFR,,not-started,,,
 NFR-MNT-011,Build Maintainability,Maintainability,NFR,,not-started,,,
 NFR-MNT-012,Refactoring Quality,Maintainability,NFR,,not-started,,,
-NFR-MNT-013,Knowledge Transfer,Maintainability,NFR,,not-started,,,
-NFR-MNT-014,Maintainability Assessment,Maintainability,NFR,,not-started,,,
-NFR-MNT-015,Continuous Maintainability Improvement,Maintainability,NFR,,not-started,,,
+NFR-MNT-013,Knowledge Transfer,Maintainability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
+NFR-MNT-014,Maintainability Assessment,Maintainability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
+NFR-MNT-015,Continuous Maintainability Improvement,Maintainability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-TEST-001,Testable Architecture,Testability,NFR,,partial,,,injectable clocks/policies in domain logic; 67 JVM tests
 NFR-TEST-002,Automated Testing,Testability,NFR,,not-started,,,
 NFR-TEST-003,Unit Test Coverage,Testability,NFR,,not-started,,,
@@ -480,7 +480,7 @@ NFR-TEST-008,Test Data Management,Testability,NFR,,not-started,,,
 NFR-TEST-009,Continuous Quality Verification,Testability,NFR,,not-started,,,
 NFR-TEST-010,Defect Verification,Testability,NFR,,not-started,,,
 NFR-TEST-011,Test Coverage Assessment,Testability,NFR,,not-started,,,
-NFR-TEST-012,Test Process Improvement,Testability,NFR,,not-started,,,
+NFR-TEST-012,Test Process Improvement,Testability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-OBS-001,Telemetry Consistency,Observability,NFR,,not-started,,,
 NFR-OBS-002,Timestamp Accuracy,Observability,NFR,,not-started,,,
 NFR-OBS-003,Diagnostic Completeness,Observability,NFR,,not-started,,,
@@ -491,8 +491,8 @@ NFR-OBS-007,Information Classification,Observability,NFR,,not-started,,,
 NFR-OBS-008,Retention Governance,Observability,NFR,,not-started,,,
 NFR-OBS-009,Diagnostic Availability,Observability,NFR,,not-started,,,
 NFR-OBS-010,Observability Validation,Observability,NFR,,not-started,,,
-NFR-OBS-011,Operational Trend Analysis,Observability,NFR,,not-started,,,
-NFR-OBS-012,Continuous Observability Improvement,Observability,NFR,,not-started,,,
+NFR-OBS-011,Operational Trend Analysis,Observability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
+NFR-OBS-012,Continuous Observability Improvement,Observability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-UX-001,User Interface Consistency,Usability&Accessibility,NFR,,not-started,,,
 NFR-UX-002,Learnability,Usability&Accessibility,NFR,,not-started,,,
 NFR-UX-003,User Interaction Efficiency,Usability&Accessibility,NFR,,not-started,,,
@@ -505,9 +505,9 @@ NFR-UX-009,Visual Accessibility,Usability&Accessibility,NFR,,not-started,,,
 NFR-UX-010,Touch Accessibility,Usability&Accessibility,NFR,,not-started,,,
 NFR-UX-011,Adaptive User Interface,Usability&Accessibility,NFR,,not-started,,,
 NFR-UX-012,Localization Readiness,Usability&Accessibility,NFR,,not-started,,,
-NFR-UX-013,User Satisfaction Assessment,Usability&Accessibility,NFR,,not-started,,,
+NFR-UX-013,User Satisfaction Assessment,Usability&Accessibility,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-UX-014,Accessibility Verification,Usability&Accessibility,NFR,,not-started,,,
-NFR-UX-015,Continuous Usability Improvement,Usability&Accessibility,NFR,,not-started,,,
+NFR-UX-015,Continuous Usability Improvement,Usability&Accessibility,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-COMP-001,Android Platform Compatibility,Compatibility&Portability,NFR,,not-started,,,ADR-014: CI device matrix (API 26/29/33/35) is the M1 evidence path
 NFR-COMP-002,Device Compatibility,Compatibility&Portability,NFR,,not-started,,,
 NFR-COMP-003,Display Compatibility,Compatibility&Portability,NFR,,not-started,,,
@@ -519,7 +519,7 @@ NFR-COMP-008,Data Portability,Compatibility&Portability,NFR,,not-started,,,
 NFR-COMP-009,Forward Compatibility,Compatibility&Portability,NFR,,not-started,,,
 NFR-COMP-010,Dependency Portability,Compatibility&Portability,NFR,,not-started,,,
 NFR-COMP-011,Release Compatibility Verification,Compatibility&Portability,NFR,,not-started,,,
-NFR-COMP-012,Continuous Compatibility Improvement,Compatibility&Portability,NFR,,not-started,,,
+NFR-COMP-012,Continuous Compatibility Improvement,Compatibility&Portability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-COMPY-001,Regulatory Compliance,Compliance,NFR,,not-started,,,
 NFR-COMPY-002,Google Play Compliance,Compliance,NFR,,not-started,,,
 NFR-COMPY-003,Android Platform Compliance,Compliance,NFR,,not-started,,,
@@ -527,21 +527,21 @@ NFR-COMPY-004,Security Standards Compliance,Compliance,NFR,,not-started,,,
 NFR-COMPY-005,Privacy Compliance,Compliance,NFR,,not-started,,,
 NFR-COMPY-006,Open Source License Compliance,Compliance,NFR,,not-started,,,
 NFR-COMPY-007,Documentation Compliance,Compliance,NFR,,not-started,,,
-NFR-COMPY-008,Process Compliance,Compliance,NFR,,not-started,,,
+NFR-COMPY-008,Process Compliance,Compliance,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-COMPY-009,Compliance Evidence,Compliance,NFR,,not-started,,,
-NFR-COMPY-010,Periodic Compliance Review,Compliance,NFR,,not-started,,,
+NFR-COMPY-010,Periodic Compliance Review,Compliance,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-OPS-001,Production Readiness,OperationalQuality,NFR,,not-started,,,
 NFR-OPS-002,Release Management,OperationalQuality,NFR,,not-started,,,
-NFR-OPS-003,Reproducible Builds,OperationalQuality,NFR,,not-started,,,
+NFR-OPS-003,Reproducible Builds,OperationalQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-OPS-004,Deployment Validation,OperationalQuality,NFR,,not-started,,,
 NFR-OPS-005,Configuration Governance,OperationalQuality,NFR,,not-started,,,
 NFR-OPS-006,Release Rollback Capability,OperationalQuality,NFR,,not-started,,,
-NFR-OPS-007,Incident Response Readiness,OperationalQuality,NFR,,not-started,,,
+NFR-OPS-007,Incident Response Readiness,OperationalQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-OPS-008,Operational Documentation,OperationalQuality,NFR,,not-started,,,
 NFR-OPS-009,Operational Monitoring Readiness,OperationalQuality,NFR,,not-started,,,
-NFR-OPS-010,Maintenance Window Management,OperationalQuality,NFR,,not-started,,,
-NFR-OPS-011,Change Management,OperationalQuality,NFR,,not-started,,,
-NFR-OPS-012,Operational Metrics Review,OperationalQuality,NFR,,not-started,,,
+NFR-OPS-010,Maintenance Window Management,OperationalQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
+NFR-OPS-011,Change Management,OperationalQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
+NFR-OPS-012,Operational Metrics Review,OperationalQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-OPS-013,Supportability,OperationalQuality,NFR,,not-started,,,
-NFR-OPS-014,Lifecycle Management,OperationalQuality,NFR,,not-started,,,
-NFR-OPS-015,Continuous Operational Improvement,OperationalQuality,NFR,,not-started,,,
+NFR-OPS-014,Lifecycle Management,OperationalQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
+NFR-OPS-015,Continuous Operational Improvement,OperationalQuality,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)

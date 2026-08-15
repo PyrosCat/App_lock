@@ -143,24 +143,35 @@ commits** (reviewability + regression isolation).
 over a WP5 build on the emulator keeps a11y bound and data intact.
 
 ### WP7 — Database migration hardening (FR-163/164, FR-228/229, ADR-007/012)
+
+> **Re-scoped 2026-08-14** (decision with the ADR-019 version split): part (b) changed from
+> *hardening* the legacy plaintext→encrypted conversion to **deleting** it. Zero installs have
+> shipped — the Phase-1 plaintext path only ever served dev devices — so R-006 closes **by
+> elimination**, not by an atomic-conversion rewrite. The original (b) text is preserved below,
+> struck, for traceability to the 2026-08-11 review (CR-003).
+
 Two independently-reviewable fixes to `AppLockDatabase`, **one commit each** (regression isolation):
-- **(a) Destructive-fallback removal (R-004).** Remove `fallbackToDestructiveMigration()`; replace
-  with an explicit fail-safe open path (mirroring the existing plaintext-migration failure
-  handling): on `openHelper` failure → move DB files aside as `.recovery-<ts>.bak` (data preserved,
-  FR-228 "recovery"), start fresh, raise a persistent notification, log a security event. Never
-  crash-loop the accessibility service; never silently wipe. Startup `PRAGMA quick_check` after
-  open (FR-229 seed; full integrity framework is M2+).
-- **(b) Atomic legacy conversion (R-006 / review CR-003).** Make the plaintext→encrypted import
-  atomic: **retain the plaintext source** (as `.bak`) until the encrypted import is committed and
-  row-count/schema-verified; idempotent restart at each stage; remove the source only after
-  validation. Closes the interruption window where the in-memory snapshot is the only copy.
+- **(a) Destructive-fallback removal (R-004) — unchanged.** Remove
+  `fallbackToDestructiveMigration()`; replace with an explicit fail-safe open path: on `openHelper`
+  failure → move DB files aside as `.recovery-<ts>.bak` (data preserved, FR-228 "recovery"), start
+  fresh, raise a persistent notification, log a security event. Never crash-loop the detection
+  service; never silently wipe. Startup `PRAGMA quick_check` after open (FR-229 seed; the fuller
+  integrity framework lands with the M7+ engine work). *(This obligation carries into 1.0.0: the
+  v1.0.0 SRS retains "secure local storage, safe migration, and destructive reset".)*
+- **(b) Legacy-path deletion (R-006 / review CR-003) — re-scoped.** Delete the plaintext→encrypted
+  conversion code (`snapshotAndRemovePlaintext`, `importLegacyRows`, and the legacy-detect branch in
+  `AppLockDatabase.build`): a fresh install is encrypted-from-birth (verified since Phase 2), and no
+  shipped install carries a plaintext DB to convert. Any lingering dev-device plaintext file is
+  ignored, not imported. R-006 closes by elimination; cite this deletion (commit) in the register.
+  ~~Original (b): make the import atomic — retain the plaintext source as `.bak` until the
+  encrypted import is committed and row-count/schema-verified; idempotent restart; remove the
+  source only after validation.~~
 - Tests: JVM tests for the fail-safe decision logic; on-device drills — (a) upgrade-install with a
   deliberately future schema version → fail-safe path engages, `.bak` present, app usable;
-  (b) interrupted legacy conversion (kill/throw between snapshot and committed import) → data
-  recovers from the retained source, no loss.
-**Exit check:** both deliberate-failure drills pass; normal upgrade (v2→v2) and a clean legacy
-conversion untouched; RTM FR-228 → `implemented`, FR-229 → `partial`, with R-004 **and** R-006
-closure evidence cited.
+  (b) fresh install is encrypted-from-birth and a stray plaintext `app.db` is not imported.
+**Exit check:** the deliberate-failure drill (a) passes; fresh-install drill (b) passes; RTM
+FR-228 → `implemented`, FR-229 → `partial`, with R-004 closure evidence and the R-006
+closure-by-deletion commit cited.
 
 ### WP8 — Instrumentation seed & managed-device matrix (ADR-014), close-out
 - `app/src/androidTest/`: smoke suite — app launches to PIN setup; DB opens encrypted

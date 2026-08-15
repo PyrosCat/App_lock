@@ -23,16 +23,18 @@ import os
 import subprocess
 import sys
 
-# Active baseline: per-area, non-recursive. docs/archive/** is deliberately excluded
-# (frozen, superseded documents are not mirrored).
+# Client-received spec areas: per-area, non-recursive. docs/archive/** is deliberately excluded
+# (frozen, superseded documents are not mirrored). Paths follow the ADR-019 version split:
+# the full-spec (2.0.0 target) areas live under docs/v2.0.0/. The v1.0.0 package is NOT mirrored
+# by this script — docs/v1.0.0/ has its own self-contained pipeline (docs/v1.0.0/source/).
 AREAS = [
-    "docs/srs",
-    "docs/nfr",
-    "docs/architecture/tas",
-    "docs/design/sds",
-    "docs/design/dds",
-    "docs/testing/tsp",
-    "docs/security/tm",
+    "docs/v2.0.0/srs",
+    "docs/v2.0.0/nfr",
+    "docs/v2.0.0/tas",
+    "docs/v2.0.0/sds",
+    "docs/v2.0.0/dds",
+    "docs/v2.0.0/tsp",
+    "docs/v2.0.0/tm",
     "docs/process",
 ]
 

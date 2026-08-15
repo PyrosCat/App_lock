@@ -88,13 +88,11 @@ M1 foundation and get their formal security-gate review in M2.
 
 | Path | Contents |
 |---|---|
-| `docs/srs/` | Software Requirements Specification, sections 1–18 (FR-001..375) |
-| `docs/nfr/` | Non-Functional Requirements, sections 0–13 |
-| `docs/architecture/tas/` | Technical Architecture Specification, parts 1–9 |
-| `docs/architecture/adr/` | Architecture Decision Records — ADR-001..018 (+ ADR-013A supersession) |
-| `docs/design/sds/` | Software Design Specification, sections 1–17 |
-| `docs/process/` | Implementation Strategy, migration assessment, plans, RTM |
-| `docs/testing/` | Validation campaign records (Phase 3) and the automation test plan |
+| `docs/v1.0.0/` | **Active baseline (ADR-019):** client-approved 1.0.0 specs — SRS, NFR, SDS, DDS, Threat Model, UI/UX + self-contained build pipeline (`source/`) |
+| `docs/v2.0.0/` | 2.0.0 target: the full client-received spec set — SRS 1–18 (FR-001..375), NFR, TAS, SDS, DDS, TSP, TM |
+| `docs/architecture/adr/` | Architecture Decision Records — ADR-001..019 (incl. the ADR-013 lineage) |
+| `docs/process/` | Implementation Strategy, migration assessment, plans, ROADMAP, RTM, risk register |
+| `docs/testing/` | Test plans and validation campaign records |
 | `docs/archive/` | Superseded docs — **note the FR-226..250 renumbering notice** |
 
 `changelog.txt` (repo root) carries human-readable change detail; commit subjects stay one line.

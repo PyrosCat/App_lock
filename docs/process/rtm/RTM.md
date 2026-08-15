@@ -1,7 +1,9 @@
 # Requirements Traceability Matrix — Guide
 
 `rtm.csv` is the authoritative status ledger for all **546** baseline requirements
-(375 FRs from `docs/srs/`, 171 NFRs from `docs/nfr/`). It replaces the archived
+(375 FRs and 171 NFRs, seeded from the full corpus now at `docs/v2.0.0/srs/` + `docs/v2.0.0/nfr/`;
+since the ADR-019 version split the **active meanings are the v1.0.0 baseline's** — `docs/v1.0.0/` —
+with out-of-scope identifiers held at `descoped-v1`). It replaces the archived
 "Functional Requirements Completion Summary".
 
 ## Columns
