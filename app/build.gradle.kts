@@ -19,6 +19,11 @@ android {
         versionCode = 1
         versionName = "0.1.0"
 
+        // WP8 (M1): the on-device smoke suite (app/src/androidTest) runs under the standard
+        // AndroidJUnitRunner — the real @HiltAndroidApp application backs it, so the tests
+        // exercise the production Hilt graph (no test-only component or custom runner needed).
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
         // WP4 (M1, ADR-017 / FR-234): build provenance exposed to the app via BuildConfig.
         // SCHEMA_VERSION mirrors the Room schema version in AppLockDatabase (currently 2) —
         // keep the two in lockstep when the DB is bumped.
@@ -113,6 +118,67 @@ android {
             excludes += "/META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
     }
+
+    // WP8 (M1, ADR-014 / M1_PLAN D4): Gradle-managed devices for the on-device smoke suite
+    // (app/src/androidTest). Two device groups run the same variant's androidTest APK:
+    //   • `ci`   — API 30 + 35, run on the GitHub Actions runners (KVM); see .github/workflows/ci.yml.
+    //   • `full` — API 26/29/30/33/35, run locally on the NucBox G5 (the fleet device host).
+    // Run a group with e.g. `./gradlew ciGroupProdDebugAndroidTest` /
+    // `fullGroupProdDebugAndroidTest`, or a single level with `api33ProdDebugAndroidTest`.
+    // Physical devices (the arm64 Moto G 2025) are NOT GMD-managed — GMD is emulator-only; run the
+    // same suite there with `./gradlew connectedProdDebugAndroidTest` for real-hardware + native
+    // SQLCipher coverage the all-x86_64 matrix cannot give.
+    // Operator runbook (incl. the API-29 Argon2 heap workaround): docs/testing/WP8_GMD_MATRIX.md.
+    //
+    // Image source: ATD (automated-test-device) images are headless + lighter and exist from API 30
+    // up, so 30/33 use `aosp-atd`; API 26/29 predate ATD and API 35's ATD image is not relied upon,
+    // so those use the standard `aosp` image. No smoke test needs Google APIs (Argon2 = BouncyCastle,
+    // SQLCipher = bundled .so, EncryptedSharedPreferences = the AOSP Keystore), so plain AOSP suffices.
+    testOptions {
+        animationsDisabled = true
+        managedDevices {
+            localDevices {
+                create("api26") {
+                    device = "Pixel 2"
+                    apiLevel = 26
+                    systemImageSource = "aosp"
+                }
+                create("api29") {
+                    device = "Pixel 2"
+                    apiLevel = 29
+                    systemImageSource = "aosp"
+                }
+                create("api30") {
+                    device = "Pixel 5"
+                    apiLevel = 30
+                    systemImageSource = "aosp-atd"
+                }
+                create("api33") {
+                    device = "Pixel 5"
+                    apiLevel = 33
+                    systemImageSource = "aosp-atd"
+                }
+                create("api35") {
+                    device = "Pixel 5"
+                    apiLevel = 35
+                    systemImageSource = "aosp"
+                }
+            }
+            groups {
+                create("ci") {
+                    targetDevices.add(localDevices["api30"])
+                    targetDevices.add(localDevices["api35"])
+                }
+                create("full") {
+                    targetDevices.add(localDevices["api26"])
+                    targetDevices.add(localDevices["api29"])
+                    targetDevices.add(localDevices["api30"])
+                    targetDevices.add(localDevices["api33"])
+                    targetDevices.add(localDevices["api35"])
+                }
+            }
+        }
+    }
 }
 
 // WP3 (M1, ADR-016): detekt = style/complexity + ktlint formatting ruleset. Architecture
@@ -178,6 +244,15 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.konsist) // WP3 (ADR-016): architecture rules as unit tests
+
+    // WP8 (M1): on-device instrumentation smoke suite (app/src/androidTest), run on the GMD matrix.
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.core.ktx)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    // Injects the empty test-host activity used by the Compose test rules into the debug manifest.
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     detektPlugins(libs.detekt.formatting) // ktlint ruleset inside detekt
 }

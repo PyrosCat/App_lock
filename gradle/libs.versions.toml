@@ -20,6 +20,10 @@ konsist = "0.17.3"
 licenseReport = "2.9"
 hilt = "2.56.2"
 hiltNavigationCompose = "1.2.0"
+# WP8 (M1, ADR-014): on-device instrumentation seed + Gradle-managed-device matrix.
+androidxTestCore = "1.6.1"
+androidxTestJunit = "1.2.1"
+androidxTestRunner = "1.6.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -50,6 +54,13 @@ konsist = { group = "com.lemonappdev", name = "konsist", version.ref = "konsist"
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-android-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }
 androidx-hilt-navigation-compose = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hiltNavigationCompose" }
+
+# WP8 (M1): androidTest (instrumentation) — on-device smoke suite driven by Gradle-managed devices.
+androidx-test-core-ktx = { group = "androidx.test", name = "core-ktx", version.ref = "androidxTestCore" }
+androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestJunit" }
+androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
+androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

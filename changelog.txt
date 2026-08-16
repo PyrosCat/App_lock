@@ -4,6 +4,38 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+WP8: on-device instrumentation seed + Gradle-managed-device matrix wired (last M1 package)   (2026-08-16)
+--------------------------------------------------------------------------------------------------------
+M1/WP8 authoring step; the device run + the M1 gate close-out follow, per docs/testing/WP8_GMD_MATRIX.md.
+Added app/src/androidTest (greenfield) with four com.applock.smoke tests that run on the real
+@HiltAndroidApp graph (stock AndroidJUnitRunner, no test-only component):
+- PinSetupLaunchTest: fresh install (credentials cleared) launches MainActivity -> PIN setup.
+- EncryptedDatabaseTest: applock.db 16-byte header != the SQLite plaintext magic = SQLCipher at rest
+  (FR-162/FR-164). Magic spelled out as bytes so no NUL lives in a source string literal.
+- Argon2OnDeviceTest: production-cost Argon2id (19 MiB / t=2) round-trips on a real ART heap = the
+  API-29 constrained-heap canary.
+- LockScreenLaunchTest: LockScreenActivity.createIntent(...) stays RESUMED showing the PIN prompt =
+  the EXTRA_TARGET_PACKAGE launch contract.
+Wiring:
+- build.gradle.kts: testInstrumentationRunner = androidx.test.runner.AndroidJUnitRunner;
+  testOptions.managedDevices with local devices api26/29/30/33/35 and groups ci (30+35) and full (all
+  five). ATD images for 30/33, aosp for 26/29/35. libs.versions.toml: androidx.test + Compose ui-test.
+- ci.yml: new `instrumentation` job runs ciGroupProdDebugAndroidTest (API 30+35) on ubuntu-latest with
+  KVM. continue-on-error + no pull_request trigger for now (first GMD wiring; hosted images can flake,
+  M1_PLAN §3) -> flip to blocking once stable, same burn-down as the WP1 lint / WP3 detekt baselines.
+- docs/testing/WP8_GMD_MATRIX.md: NucBox full-matrix runbook incl. the API-29 Argon2 heap decision, a
+  REQUIRED Moto G 2025 real-hardware smoke pass (connectedProdDebugAndroidTest — the only arm64 /
+  native-SQLCipher / real-API-35 coverage, since the whole GMD matrix is x86_64), and the complete
+  M1-exit gate checklist (campaign reports, RTM §5 batch, ADR-015 + ADR-014 closures, IS Phase-0
+  gate-record skeleton).
+Verified: local gate green on the 2012 box -- compileProdDebugAndroidTestKotlin (suite compiles + the
+GMD DSL configures), testProdDebugUnitTest, detekt, lint (incl. lintAnalyzeProdDebugAndroidTest).
+assembleProdRelease is unaffected (only androidTest/debug deps added -- nothing on the release runtime
+classpath). No src/main change -> no verified requirement's implementation touched -> no RTM
+invalidation. The RTM §5 batch, ADR-015/014 closures, and the gate record are evidence-driven gate acts,
+deferred to close-out per M1_PLAN §5 and WP8_GMD_MATRIX.md §7.
+
+
 WP7 migration fail-safe — on-device drills PASS (NucBox G5, API 33); R-004 Closed   (2026-08-16)
 -------------------------------------------------------------------------------------------------
 The WP7(a) fail-safe (83bebcb) verified on-device per docs/testing/WP7_MIGRATION_DRILLS.md (the
