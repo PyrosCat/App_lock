@@ -4,6 +4,33 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+WP7 migration fail-safe — on-device drills PASS (NucBox G5, API 33); R-004 Closed   (2026-08-16)
+-------------------------------------------------------------------------------------------------
+The WP7(a) fail-safe (83bebcb) verified on-device per docs/testing/WP7_MIGRATION_DRILLS.md (the
+2012-box -> NucBox handoff), on emulator matrix_api33 (google_apis;x86_64, headless WHPX), variant
+devDebug (com.applock.dev), against 0063e7d. All four drills PASS:
+- Drill A (R-004 closure): a v2 install with real data (PIN 1234 + protected Clock), then a throwaway
+  version=3 build with no MIGRATION_2_3 installed over it. On launch the missing migration surfaced
+  (IllegalStateException, no destructive fallback) -> the DB was preserved as
+  applock.db.recovery-<ts>.bak (16-byte header byte-identical to the pre-drill baseline = the original
+  data, not wiped), a fresh encrypted DB was created, and the app stayed usable at the PIN gate (no
+  crash-loop). The PIN (EncryptedSharedPreferences) survived independently.
+- Drill A' (corrupt file): 64 random bytes over the SQLCipher header -> same fail-safe; a second
+  timestamped .bak, the first not clobbered.
+- Drill B.1 (encrypted-from-birth): fresh install -> applock.db header is not the SQLite plaintext
+  magic (FR-162/FR-164), encrypted before a PIN is even set.
+- Drill B.2 (R-006 confirmation): a planted plaintext applock.db (carrying a protected_apps row) is
+  NOT adopted/imported -> moved aside to .bak, fresh encrypted DB created; the stray package never
+  surfaces as protected.
+- Report: docs/reports/campaigns/2026-08-16_wp7-migration-drills_nucbox-g5.md.
+- RTM: FR-228 implemented -> implemented-verified (evidence = the report); FR-229 stays partial.
+  RISK_REGISTER: R-004 Open -> Closed (2026-08-16). WP7 device obligation done; only WP8 remains
+  before the M1 exit.
+- No app/repo code change: the version=3 edit was a disposable working-tree artifact, reverted after
+  the drill (tree clean at version=2). Runbook operator note: dd bs=1 count=64 reads 0 bytes from
+  /dev/urandom under run-as on this image; use bs=64 count=1 (single block).
+
+
 WP7(a): fail-safe database open replaces destructive migration fallback (R-004 remediation)   (2026-08-15)
 ---------------------------------------------------------------------------------------------------------
 M1/WP7 fix (a) of two (fix (b) landed in c9ebcae). Removed fallbackToDestructiveMigration() from

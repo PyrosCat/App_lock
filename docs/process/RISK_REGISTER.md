@@ -17,7 +17,7 @@ compensating treatment.
 | [R-001](#r-001) | Detection-permission exposure (was: accessibility; now Usage Access + overlay grants — a11y left 1.0.0 per ADR-013B) | **High** | M7 · M10 | Open |
 | [R-002](#r-002) | Lock-engine rapid-relaunch window-ordering race (protected app outruns the lock screen) | **High** (pending real-hardware) | M7 | Open |
 | [R-003](#r-003) | Schedule/capacity: enterprise-scale baseline vs solo-developer cadence | **High** | all (pacing) | Open |
-| [R-004](#r-004) | `fallbackToDestructiveMigration` — silent data-loss trap on schema mismatch | **High** | M1 (WP7) | Open — code remediation landed (WP7(a)); closure pending device drill |
+| [R-004](#r-004) | `fallbackToDestructiveMigration` — silent data-loss trap on schema mismatch | **High** | M1 (WP7) | Closed (2026-08-16) — WP7 device drills PASS (NucBox, API 33): fail-safe preserves data, no wipe |
 | [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** | M7 | Open |
 | [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **Medium** | M1/WP7 | Closed (2026-08-15) — eliminated by WP7(b) path deletion |
 
@@ -256,7 +256,7 @@ any material scope addition (new spec revisions, new mandated deliverables).
 ## R-004 — `fallbackToDestructiveMigration`: silent data-loss trap on schema mismatch
 
 **Category:** Reliability / Data integrity · **Likelihood:** Medium · **Impact:** High
-· **Severity:** High · **Status:** Open — remediation implemented (WP7(a)), closure pending the deliberate-failure drill · **Opened:**
+· **Severity:** High · **Status:** **Closed (2026-08-16)** — WP7 device drills PASS (NucBox G5, API 33); fail-safe preserves the unreadable DB, no silent wipe · **Opened:**
 2026-08-10 (promoted; risk first recorded 2026-07-19) · **Owner:** project lead
 **Affected gate(s):** M1 — WP7 is the in-phase remediation; the IS Phase-0 (M1) gate record
 (WP8) verifies closure. Exposure compounds if carried into M2/M3 schema work.
@@ -275,6 +275,19 @@ and the encryption boundary is unchanged (FR-164 unaffected). RTM FR-228 → `im
 `partial` in the same change. **Stays Open:** the plan's deliberate-failure drill (upgrade-install to
 a future schema version → fail-safe engages, `.bak` present, app usable) runs on-device at WP8 and is
 the closure evidence; FR-228 moves to `implemented-verified` then.
+
+**Closed 2026-08-16 — WP7 on-device drills PASS (NucBox G5, API 33).** The deliberate future-schema
+upgrade (a used v2 install → a throwaway `version = 3` build with no `MIGRATION_2_3`, installed over it)
+engaged the fail-safe **instead of** the destructive wipe: the unreadable DB was preserved as
+`applock.db.recovery-<ts>.bak` — its 16-byte header byte-identical to the pre-drill baseline, i.e. the
+original seeded data (protected-app rows), **not wiped** — a fresh encrypted DB was created, and the app
+stayed usable at the PIN gate (no crash-loop; PIN survived in its separate EncryptedSharedPreferences
+store). The corrupt-file branch (A′, random bytes over the SQLCipher header) and the stray-plaintext
+branch (B.2, a planted plaintext `applock.db` moved aside, never adopted) also engaged the fail-safe;
+fresh installs are encrypted from birth (B.1). Evidence:
+`docs/reports/campaigns/2026-08-16_wp7-migration-drills_nucbox-g5.md`; remediation commit `83bebcb`.
+RTM **FR-228 → `implemented-verified`**. FR-229 stays `partial` (the `quick_check` seed is by design;
+the fuller integrity framework is M7+).
 
 ### Description
 `AppLockDatabase.build` still chains `.fallbackToDestructiveMigration()`: any schema
