@@ -53,7 +53,7 @@ jobs:
 
       - name: Upload reports (tests + lint)
         if: always() # evidence survives red runs — that's when it matters
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: reports
           path: app/build/reports/
@@ -62,7 +62,7 @@ jobs:
       # WP4 (M1, FR-247 partial): the dependency/license inventory as a durable artifact.
       - name: Upload dependency-license inventory
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: license-inventory
           path: app/build/reports/dependency-license/
@@ -70,7 +70,7 @@ jobs:
 
       - name: Upload APKs
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: apks
           path: app/build/outputs/apk/**/*.apk
@@ -126,7 +126,7 @@ jobs:
 
       - name: Upload instrumentation reports
         if: always() # the androidTest HTML report is the triage evidence, especially on a red run
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: androidTest-reports
           path: |
