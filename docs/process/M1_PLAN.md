@@ -221,6 +221,18 @@ closure-by-deletion commit cited.
 
 ## 5. RTM impact (rows updated at close-out)
 
+> **[2026-08-17] Superseded by the post-ADR-019 reconciliation — do not apply this list mechanically.**
+> The row list below was written 2026-08-06..10, **before the ADR-019 version split** (RTM re-base,
+> 2026-08-14). Against the current `rtm.csv` + **SRS v1.0.0 Appendix A §A.19** (the authoritative
+> descope list, per ADR-019 §5), **FR-226, FR-227, FR-247, FR-355, FR-356, FR-357, FR-358, FR-361,
+> FR-363 are now `descoped-v1`** — their engineering *qualities* are carried by the retained NFRs, not
+> these FR forms (Appendix A §A.18). So the M1 gate credits only the **retained** rows with evidence:
+> **NFR-COMP-001 / NFR-TEST-002 / NFR-MNT-003 / FR-234 → `partial`**, and **leaves the descoped FRs
+> alone** (FR-228 is already `implemented-verified`, FR-229 `partial` — both WP7). The `review`
+> burndown is scoped to the *retained* FR-026..080 rows only. Authoritative reconciled disposition:
+> `docs/testing/WP8_GMD_MATRIX.md §7.2`. Authority: living plan over frozen snapshot + the executed
+> ADR-019 re-base (GOVERNANCE §5.1). Original pre-ADR-019 target below, kept for traceability:
+
 FR-226 `implemented` · FR-227 `partial` (mechanism, no secrets yet) · FR-228 `implemented` ·
 FR-229 `partial` · FR-234 `partial` · FR-247 `partial` · FR-355/356 `partial` (Dependabot) ·
 FR-357 `partial` · FR-358 `implemented` (static analysis in CI) · FR-361 `implemented` ·

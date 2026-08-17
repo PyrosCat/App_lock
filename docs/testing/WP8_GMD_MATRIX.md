@@ -156,17 +156,42 @@ changes **together** (the operator runs `git add`/commit — D4). Suggested one 
   (host-tagged separately so the fleet machines never merge-conflict): device/Android build, the four
   test results, arm64 + native-SQLCipher note.
 
-### 7.2 RTM batch (`docs/process/rtm/rtm.csv`) — the M1_PLAN §5 rows
-Apply at the gate (evidence = the §7.1 report and CI):
-> FR-226 `implemented` · FR-227 `partial` · FR-228 `implemented`(already `implemented-verified` since
-> WP7 — leave it) · FR-229 `partial` · FR-234 `partial` · FR-247 `partial` · FR-355/356 `partial` ·
-> FR-357 `partial` · FR-358 `implemented` · FR-361 `implemented` · FR-363 `implemented` ·
-> NFR-COMP-001 `partial` (matrix per D4) · NFR-TEST-002 `partial` · NFR-MNT-003 `partial`
-> · plus the `review`→ resolved burndown for FR-026..080 at the gate (per the RTM.md rule).
+### 7.2 RTM batch (`docs/process/rtm/rtm.csv`)
 
-Any row whose *implementation was already in place from an earlier WP* keeps its state; the gate
-verifies, it doesn't re-open. `implemented-verified` needs an evidence pointer — use the §7.1 report
-(or the relevant CI run) for the rows the matrix actually exercised.
+> **⚠ Corrected 2026-08-17 (2012-box).** This section originally reproduced M1_PLAN §5 verbatim —
+> which predates the **ADR-019 version split** (RTM re-base, 2026-08-14). Against the *current* RTM +
+> **SRS v1.0.0 Appendix A §A.19** (the authoritative descope list, per ADR-019 §5), most of that old
+> list is now `descoped-v1`; applying it mechanically would **revert the descoping** and overstate
+> v1.0.0 scope. **Do not apply the old list.** M1_PLAN §5 carries the same staleness (dated note added
+> there). The reconciled disposition:
+
+**Principle.** Honor ADR-019: descoped rows stay `descoped-v1`. The M1 engineering work is credited to
+the **retained NFRs**, not their descoped FR twins — Appendix A §A.18 states the FR forms (FR-351–375,
+and the FR-226/227/247 build/config/inventory ones) are reserved and the qualities are carried once by
+the NFRs. Verify each row against Appendix A §A.19 before touching it.
+
+**Change (retained rows, real M1 evidence):**
+- **NFR-COMP-001** `not-started` → `partial` — WP8 device matrix (the §7.1 Moto G report now; CI `ci` +
+  NucBox `full` as they land). Upgrade to `implemented-verified` only once the full matrix is green.
+- **NFR-TEST-002** `not-started` → `partial` — WP8 androidTest seed + GMD + CI test integration + the
+  Moto G connected run.
+- **NFR-MNT-003** `not-started` → `partial` — WP3 detekt/ktlint/Konsist coding-standards enforcement.
+- **FR-234** `not-started` → `partial` — WP4 BuildConfig provenance (`SCHEMA_VERSION`/`BUILD_TIME`).
+  (NFR-MNT-003 and FR-234 trace to WP3/WP4 evidence — a legitimate gate catch-up, not a WP8 claim.)
+
+**Leave `descoped-v1` (honor ADR-019):** FR-226, FR-227, FR-247, FR-355, FR-356, FR-357, FR-358,
+FR-361, FR-363 (reserved per Appendix A §A.13/A.18/A.19). Precedent: ADR-019 §Consequences keeps the
+Phase-1..3 Vault/intruder code in-tree while its rows read `descoped-v1` — the CI/build infra is the
+identical "capability ahead of the descoped requirement" case.
+
+**Already done (no gate action):** FR-228 `implemented-verified` (WP7), FR-229 `partial` (WP7).
+
+**`review` burndown (FR-026..080):** scope to the **retained** rows only — many of FR-026..080 are in
+the Appendix A §A.19 reserved list, so cross-check before classifying, and classify against the
+**v1.0.0** meanings (ADR-013B/019 narrowed several). Whether it is mandatory *this* gate or a tracked
+follow-up is a governance-rule + gate-lead decision.
+
+`implemented-verified` always needs an evidence pointer (§7.1 report / the relevant CI run).
 
 ### 7.3 ADR closures
 - **ADR-015 (Hilt):** its only open exit criterion was "the device gating-regression suite runs on
@@ -175,8 +200,9 @@ verifies, it doesn't re-open. `implemented-verified` needs an evidence pointer �
   the Hilt build). Amend the ADR-015 **status line** to "Accepted — implemented (WP5) and closed at
   the M1 gate (YYYY-MM-DD)", citing those reports + the M1 gate record. (Status/implementation-line
   amendments are permitted; the decision content is unchanged.)
-- **ADR-014 (API range):** append a dated implementation note that **NFR-COMP-001 is closed** against
-  the executed matrix (CI `ci` group + NucBox `full`), citing §7.1.
+- **ADR-014 (API range):** append a dated implementation note that **NFR-COMP-001 is now `partial`**
+  against the executed legs (Moto G now; CI `ci` + NucBox `full` as they land) — its "closes in M1"
+  consequence upgrades to `implemented-verified` only when the full matrix is green. Cite §7.1.
 
 ### 7.4 IS Phase-0 gate record — `docs/reports/gates/YYYY-MM-DD_gate-m1.md`
 The M1 exit artifact. Skeleton (fill each box with an evidence link):
