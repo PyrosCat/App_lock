@@ -215,6 +215,13 @@ Then **M1 is closed → M7 (the accessibility exit)** is next.
 - **Task names:** group tasks are `ciGroupProdDebugAndroidTest` / `fullGroupProdDebugAndroidTest`;
   single-device tasks are `api30ProdDebugAndroidTest` etc. All target the **prodDebug** androidTest
   variant (matches the CI unit-test variant; debug so FLAG_SECURE is off and the UI is inspectable).
+- **Validate GMD config locally without an emulator:** `./gradlew ciGroupProdDebugAndroidTest --dry-run`
+  builds the task graph — where AGP realizes a task per managed device — but boots nothing, so it
+  catches config errors (e.g. an unsupported API level) in seconds. `compile*AndroidTestKotlin` and
+  `connected*` do **not** realize GMD device tasks, so they cannot catch these. GMD rejects **API ≤ 26**;
+  the api26 floor device needs `android.experimental.testOptions.managedDevices.allowOldApiLevelDevices=true`
+  (already in `gradle.properties`). That flag only permits task *creation* — an api26 image that won't
+  boot under GMD is the floor caveat (fall back to a manual emulator like the api29 case in §5.2).
 - **No custom test runner / Hilt-test app** is used: the tests launch the real activities on the
   real `@HiltAndroidApp` graph. If a future test needs to *replace* a module, that's when
   `HiltTestApplication` + a custom runner come in — out of scope for this seed.

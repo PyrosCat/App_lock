@@ -4,6 +4,23 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+WP8: fix CI GMD configuration -- allow API<=26 managed devices   (2026-08-16)
+----------------------------------------------------------------------------
+The instrumentation job (first GMD-on-Actions run, commit c4565c0) failed at CONFIGURATION time -- 14s,
+before any emulator booted: "Could not create task ':app:api26ProdDebugAndroidTest' -- API level 26 and
+lower is currently not supported for Gradle Managed devices." AGP realizes a task for EVERY defined
+managed device at config time, so the api26 device (our minSdk floor, kept for NFR-COMP-001 coverage)
+broke task creation and took down even the ci group (30+35) that does not include it.
+Fix: added android.experimental.testOptions.managedDevices.allowOldApiLevelDevices=true to
+gradle.properties (AGP's own sanctioned opt-in). Verified locally WITHOUT an emulator via
+`gradlew ciGroupProdDebugAndroidTest --dry-run` and `fullGroupProdDebugAndroidTest --dry-run` -- both now
+build the task graph green (api26/29/30/33/35 tasks all create). This fixes task CREATION only; whether
+the API-26 image actually boots under GMD is the separate "not recommended" floor caveat
+(WP8_GMD_MATRIX.md §5). Lesson: `--dry-run` on a GMD group task is the way to validate the managed-device
+DSL locally -- `compile*AndroidTestKotlin` and `connected*` do NOT realize GMD device tasks (which is why
+the Moto G connected run stayed green while CI's config was broken).
+
+
 WP8: on-device instrumentation seed + Gradle-managed-device matrix wired (last M1 package)   (2026-08-16)
 --------------------------------------------------------------------------------------------------------
 M1/WP8 authoring step; the device run + the M1 gate close-out follow, per docs/testing/WP8_GMD_MATRIX.md.
