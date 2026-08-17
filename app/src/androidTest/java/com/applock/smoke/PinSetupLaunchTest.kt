@@ -48,7 +48,7 @@ class PinSetupLaunchTest {
     }
 
     @Test
-    fun `fresh install lands on PIN setup`() {
+    fun freshInstallLandsOnPinSetup() {
         ActivityScenario.launch(MainActivity::class.java).use {
             compose.onNodeWithText(context.getString(R.string.set_pin_title)).assertIsDisplayed()
         }

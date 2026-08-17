@@ -33,7 +33,7 @@ classpath. **What only a device can prove is below.**
 - The **NucBox `full` group (API 26/29/30/33/35)** runs, with the API-29 caveat in §5.2 decided and
   recorded → **NFR-COMP-001** closes against the executed matrix (ADR-014 D4 split).
 - The **Moto G 2025 real-hardware smoke pass** (§6) is green — the only arm64 / native-SQLCipher /
-  real-API-35 coverage of the WP8 suite.
+  real-API-35 coverage of the WP8 suite. **[DONE 2026-08-16 — 4/4, see §6.]**
 - The **M1 IS Phase-0 gate record** is written to `docs/reports/gates/` and every exit box is
   checked with an evidence link (§7) → **M1 exits**.
 - **ADR-015 (Hilt)** is formally closed (§7.3) and the **RTM §5 batch** is applied (§7.2).
@@ -112,6 +112,10 @@ Recommended: **option 1** — keep the coverage, prove the app logic once with t
 note the caveat. Either way the gate record must state which was chosen.
 
 ## 6. Real hardware (Moto G 2025, arm64 / API 35) — REQUIRED
+
+> **Status: DONE (2026-08-16)** — 4/4 PASS on moto g - 2025 (Android 15, arm64). Evidence:
+> `docs/reports/campaigns/2026-08-16_wp8-smoke_moto-g-2025.md`. Recipe kept below for re-runs and any
+> other real device.
 
 The emulator matrix (§4–§5) is entirely **x86_64**. The Moto G 2025 is the fleet's only **arm64**
 target and only real hardware, so it is the sole place the smoke suite exercises the native

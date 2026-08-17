@@ -22,7 +22,7 @@ import org.junit.runner.RunWith
 class EncryptedDatabaseTest {
 
     @Test
-    fun `database file header is not the plaintext SQLite magic`() {
+    fun databaseHeaderIsNotPlaintextSqliteMagic() {
         val context: Context = ApplicationProvider.getApplicationContext()
         val dbFile = context.getDatabasePath("applock.db")
 

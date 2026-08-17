@@ -20,7 +20,7 @@ import org.junit.runner.RunWith
 class Argon2OnDeviceTest {
 
     @Test
-    fun `production-cost hash round-trips and rejects the wrong pin`() {
+    fun productionCostHashRoundTripsAndRejectsWrongPin() {
         val salt = Argon2PinHasher.newSalt()
         // No cost overrides → the production defaults (MEMORY_KIB / ITERATIONS / PARALLELISM).
         val hash = Argon2PinHasher.hash(CORRECT.toCharArray(), salt)

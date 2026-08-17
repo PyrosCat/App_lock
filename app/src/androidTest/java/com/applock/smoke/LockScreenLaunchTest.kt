@@ -40,7 +40,7 @@ class LockScreenLaunchTest {
     }
 
     @Test
-    fun `lock screen launched with the target extra stays resumed and shows the PIN prompt`() {
+    fun lockScreenWithExtraStaysResumedAndShowsPinPrompt() {
         val intent = LockScreenActivity.createIntent(context, "com.android.settings")
         ActivityScenario.launch<LockScreenActivity>(intent).use { scenario ->
             assertEquals(Lifecycle.State.RESUMED, scenario.state)

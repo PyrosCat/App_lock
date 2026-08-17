@@ -28,12 +28,20 @@ Wiring:
   native-SQLCipher / real-API-35 coverage, since the whole GMD matrix is x86_64), and the complete
   M1-exit gate checklist (campaign reports, RTM §5 batch, ADR-015 + ADR-014 closures, IS Phase-0
   gate-record skeleton).
-Verified: local gate green on the 2012 box -- compileProdDebugAndroidTestKotlin (suite compiles + the
-GMD DSL configures), testProdDebugUnitTest, detekt, lint (incl. lintAnalyzeProdDebugAndroidTest).
-assembleProdRelease is unaffected (only androidTest/debug deps added -- nothing on the release runtime
-classpath). No src/main change -> no verified requirement's implementation touched -> no RTM
-invalidation. The RTM §5 batch, ADR-015/014 closures, and the gate record are evidence-driven gate acts,
-deferred to close-out per M1_PLAN §5 and WP8_GMD_MATRIX.md §7.
+Verified: local gate green on the 2012 box -- testProdDebugUnitTest, detekt, lint (incl.
+lintAnalyzeProdDebugAndroidTest). Real hardware: connectedProdDebugAndroidTest on the Moto G 2025
+(Android 15, arm64/API 35) = 4/4 PASS in 6.3s (report
+docs/reports/campaigns/2026-08-16_wp8-smoke_moto-g-2025.md) -- the only arm64 / native-libsqlcipher.so
+leg the all-x86_64 GMD matrix cannot give. assembleProdRelease is unaffected (only androidTest/debug
+deps added -- nothing on the release runtime classpath). No src/main change -> no verified requirement's
+implementation touched -> no RTM invalidation.
+androidTest method names are camelCase, NOT backtick-with-spaces like the JVM unit tests: spaces in a
+SimpleName are illegal in DEX < 040 (minSdk 26), so space-names build on the JVM but fail
+dexBuilderProd*AndroidTest -- compileProd*AndroidTestKotlin does NOT catch it, only assemble*/connected*
+(which dex the test APK) do. This was caught on the Moto G run and would have failed the whole GMD matrix.
+The emulator legs (CI ci-group 30+35, NucBox full 26/29/30/33/35), the RTM §5 batch, the ADR-015/014
+closures, and the gate record are the remaining evidence-driven gate acts, per M1_PLAN §5 and
+WP8_GMD_MATRIX.md §7.
 
 
 WP7 migration fail-safe — on-device drills PASS (NucBox G5, API 33); R-004 Closed   (2026-08-16)
