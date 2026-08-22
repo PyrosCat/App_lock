@@ -38,7 +38,7 @@ jobs:
           java-version: "17"
 
       - name: Set up Gradle (with caching)
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # WP3 (M1, ADR-016): detekt = style/complexity + ktlint (detekt-formatting); the Konsist
       # architecture rules (R1-R4) run inside the unit-test task. Both gate on their baselines —
@@ -109,7 +109,7 @@ jobs:
           java-version: "17"
 
       - name: Set up Gradle (with caching)
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # GMD auto-downloads the system image via sdkmanager; make sure the image licence is accepted
       # non-interactively. Harmless (and skipped by `|| true`) if it is already accepted.
