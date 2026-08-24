@@ -107,9 +107,14 @@ immutable** — architecture evolves by *superseding* decisions, never by rewrit
 |---|---|
 | Change `Status` field (lifecycle: Proposed → Accepted → Superseded / Rejected) | **MAY**, dated |
 | Update a separate **Implementation status** line (e.g. "executed in WP5, commit …") | **MAY**, dated |
-| Add cross-links (`Superseded-by`, `Related`), fix typos/formatting, correct factual errors that do not alter the decision | **MAY** |
-| Rewrite Context, Decision, Alternatives, or Consequences to say something **different** | **MUST NOT** — that is a supersession |
-| Delete an ADR or reuse its number/suffix | **MUST NOT** — identifiers are permanent, even for Rejected ADRs |
+| Add cross-links (`Superseded-by`, `Related`); fix typos, formatting, a broken reference, or a wrong date/commit-hash, provided it changes **no value a reader would act on** | **MAY** |
+| Rewrite Context, Decision, Alternatives, or Consequences to say something **different** | **MUST NOT** (that is a supersession) |
+| Edit the body to reconcile a value in it with how the implementation has since changed (e.g. syncing a listed parameter to the build) | **MUST NOT.** Correct the value in its living SSOT (§2.7), not the ADR; if the ADR should stop carrying that value, re-point it with a dated Implementation note. A genuine change of the decision itself is a supersession (§2.4) |
+| Delete an ADR or reuse its number/suffix | **MUST NOT** (identifiers are permanent, even for Rejected ADRs) |
+
+If it is unclear whether an edit is a permitted correction or a parameter/decision change, it is a
+decision change by default: do not edit the ADR; update the cited living document and/or record the
+discrepancy and surface it. Uncertainty about the boundary is never a license to edit the ADR body.
 
 ### 2.4 Supersession protocol
 
@@ -141,7 +146,35 @@ related ADRs, Implementation status.
 ### 2.6 Index
 
 `adr/README.md` **MUST** list every ADR with current status, updated in the same commit as
-any ADR addition or status change.
+any ADR addition or status change, and, per §2.8, an ADR body or status change names its §2.3
+row in the accompanying changelog entry.
+
+### 2.7 ADRs record durable decisions, not volatile parameters
+
+An ADR states the decision and its rationale. Operational parameters that change on their own
+cadence (exact API-level or test matrices, tool and dependency versions, fleet composition, file
+paths, CI groupings) live in their living single-source-of-truth: the build files, `rtm.csv`, the
+reports fleet index, or a runbook. The ADR **references** that source; it does not restate the
+value. Restating a value that has a living source duplicates a fact that will drift, and drift
+creates pressure to edit an immutable record (§2.3).
+
+When an ADR already carries such a value and it has drifted, do not sync it in place. Correct it in
+its source; if the ADR should no longer carry it, re-point it with a dated Implementation note
+(§2.3). An instance that notices a drift it may not fix in place appends a row to
+`docs/process/DISCREPANCIES.md` (append-only: date, file and section, the mismatch, the
+authoritative source, status) and moves on, rather than editing the ADR.
+
+### 2.8 Reviewing ADR amendments
+
+A new ADR is reviewed before it counts, through its `Status` lifecycle (Proposed, then Accepted,
+§2.5). An amendment to an already-Accepted ADR does not ride in under that original acceptance. It
+is its own reviewed change, reviewed at the commit gate (§3.3, where the user applies all commits):
+
+- Any change to an ADR body or status is staged with its §2.3 classification and a one-line
+  justification recorded in the changelog entry the user reviews before committing (which row of
+  §2.3 it falls under, and why).
+- If the §2.3 classification is uncertain, the tie-breaker applies: it is treated as a decision
+  change, it is not staged, and the discrepancy is recorded instead (§2.7).
 
 ---
 

@@ -40,3 +40,12 @@ attempted on the hosted runners and retained as their images prove stable. The *
 26/29/33/35 matrix runs locally on the NucBox** (fleet index remains the source of truth
 for per-host status), and the Moto G 2025 covers real-hardware verification manually via
 the WP2 scripts. NFR-COMP-001 closes against this split at WP8.
+
+## Implementation note (2026-08-24) — matrix parameters live in their SSOT (GOVERNANCE §2.7)
+Decision content unchanged. This ADR does not own the concrete GMD matrix. Authoritative sources:
+`app/build.gradle.kts` (`testOptions.managedDevices`: the devices and the `ci` / `full` groups),
+operated per `docs/testing/WP8_GMD_MATRIX.md`; per-host verification status is the reports fleet
+index (`docs/reports/README.md`); NFR-COMP-001 status is `rtm.csv`. Where the "Verification fleet"
+list or the 2026-08-06 note differs from those sources (for example, the `full` group is
+`api26/29/30/33/35` in the build, not `26/29/33/35` as written above, since API 30 was added in WP8),
+the sources are authoritative and this ADR's enumerations are historical.

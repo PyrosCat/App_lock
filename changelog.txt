@@ -4,6 +4,28 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Governance: sharpen ADR immutability (SSOT rule, drift row, amendment review)   (2026-08-24)
+-------------------------------------------------------------------------------------------
+Why: an auto-mode instance rationalized editing ADR-014's API-matrix text directly (drift vs
+app/build.gradle.kts) past the old §2.3 "correct factual errors" clause. These changes make that
+boundary unambiguous and default it to "do not edit".
+
+GOVERNANCE §2:
+- §2.3 table: narrowed the "factual error" MAY row to meaning-preserving fixes only; added a
+  MUST NOT row for syncing a drifted body value to the implementation (fix the SSOT, not the ADR).
+- §2.3 tie-breaker: if the classification is unclear, treat it as a decision change -> do not edit;
+  fix the SSOT and/or record the discrepancy.
+- §2.7 (new): ADRs reference volatile parameters in their living SSOT, never restate them.
+- §2.8 (new): an amendment to an Accepted ADR is its own reviewed change, staged with its §2.3
+  classification for review at the commit gate.
+
+ADR-014: appended a dated §2.7 note re-pointing matrix authority to build.gradle / WP8_GMD_MATRIX /
+fleet index / rtm. Append, not superseded (the minSdk/targetSdk decision is unchanged).
+
+docs/process/DISCREPANCIES.md (new): append-only drift log; seeded and reconciled the ADR-014 drift
+(build's `full` group is 26/29/30/33/35, not the 26/29/33/35 the ADR listed).
+
+
 WP8: fix CI GMD configuration -- allow API<=26 managed devices   (2026-08-16)
 ----------------------------------------------------------------------------
 The instrumentation job (first GMD-on-Actions run, commit c4565c0) failed at CONFIGURATION time -- 14s,
