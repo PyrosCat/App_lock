@@ -200,9 +200,13 @@ follow-up is a governance-rule + gate-lead decision.
   the Hilt build). Amend the ADR-015 **status line** to "Accepted — implemented (WP5) and closed at
   the M1 gate (YYYY-MM-DD)", citing those reports + the M1 gate record. (Status/implementation-line
   amendments are permitted; the decision content is unchanged.)
-- **ADR-014 (API range):** append a dated implementation note that **NFR-COMP-001 is now `partial`**
-  against the executed legs (Moto G now; CI `ci` + NucBox `full` as they land) — its "closes in M1"
-  consequence upgrades to `implemented-verified` only when the full matrix is green. Cite §7.1.
+- **ADR-014 (API range): do not edit ADR-014** (GOVERNANCE §2.7). NFR-COMP-001's status lives in
+  `rtm.csv` (§7.2) and the WP8 reports; ADR-014's matrix authority is its 2026-08-24 §2.7 note.
+  NFR-COMP-001 reaches `implemented-verified` via its `rtm.csv` row when the full matrix is green
+  (NucBox `full` + CI `ci` + Moto G), not via an ADR edit.
+  > **⚠ Corrected 2026-08-24.** This bullet originally said to append a dated ADR-014 note
+  > ("NFR-COMP-001 is now `partial`"); that predates GOVERNANCE §2.7 (2026-08-24), which bars
+  > restating an SSOT-owned value in an ADR. The M1 gate (2026-08-17) correctly left ADR-014 unedited.
 
 ### 7.4 IS Phase-0 gate record — `docs/reports/gates/YYYY-MM-DD_gate-m1.md`
 The M1 exit artifact. Skeleton (fill each box with an evidence link):
