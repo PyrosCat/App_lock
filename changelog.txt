@@ -4,6 +4,36 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M1 EXIT: GRANTED -- IS Phase-0 foundation retrofit closed   (2026-08-25)
+------------------------------------------------------------------------
+Signed the M1 (IS Phase-0) exit gate GRANTED (lead: Malcolm D., 2012-box). Every technical exit
+criterion was already green at the 2026-08-17 review (builds, static analysis, license audit,
+service-locator elimination, WP6 device gating-regression, NucBox GMD full 20/20, Moto G 4/4,
+real-hardware smoke); that review left the decision PENDING on two lead-scope items, now resolved:
+
+(a) FR-026..080 `review` burndown (GOVERNANCE 1.3.5). The 33 review rows in the M1 scope band were
+    cross-checked against SRS v1.0.0 Appendix A 19 -- all 33 are retained (none reserved; their
+    descoped twins already read descoped-v1, so no descoping was reverted). Classified in two
+    buckets against the ADR-013B/019-narrowed v1.0.0 meanings:
+    - 26 Lock-Engine rows -> not-started (FR-026, 028-036, 038-042, 044, 046-055). The v1.0.0
+      detection/lock engine is UsageStats + mandatory overlay, no a11y (ADR-013B); that engine is
+      M7 scope and does not exist yet. The legacy PHASE3 a11y detector does not meet the v1.0.0
+      criteria and is being replaced, so no M1 credit is claimed.
+    - 7 already-built UI/data rows -> partial (FR-027 lock screen; FR-056/057/060/072/073/078
+      protected-apps management). These ship today (FR-027 is exercised by the WP8
+      LockScreenLaunchTest); each note states v1.0.0 integration + verification is owned by M7.
+    Result: zero review rows remain in FR-026..080 -- 1.3.5 satisfied for the M1 gate.
+
+(b) NFR-COMP-001 (Android Platform Compatibility): partial -> implemented-verified. Full acceptance
+    matrix green (NucBox full 20/20 API 26/29/30/33/35 + Moto G 4/4 arm64/API35 + CI ci-group
+    30/35); evidence pointer already on the row.
+
+Sign-off filed as a NEW dated gate record (reports are immutable, docs/reports/README.md rule 1):
+docs/reports/gates/2026-08-25_gate-m1-signoff.md, which completes/supersedes the PENDING decision in
+2026-08-17_gate-m1.md; that record is left unedited. No ADRs touched (ADR-014 left per 2.7;
+ADR-015 already closed at the 2026-08-17 gate). Next milestone: M7 (accessibility/detection exit).
+
+
 Governance: sharpen ADR immutability (SSOT rule, drift row, amendment review)   (2026-08-24)
 -------------------------------------------------------------------------------------------
 Why: an auto-mode instance rationalized editing ADR-014's API-matrix text directly (drift vs
