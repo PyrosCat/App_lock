@@ -4,6 +4,53 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7 prep: plan revised per external review; D0 = API 36; ADR-020/021 drafted Proposed   (2026-08-25)
+---------------------------------------------------------------------------------------------------
+Resolved the target-API decision, and drafted the two WP0 ADRs. 
+
+docs/process/M7_PLAN.md (folded in the review):
+- Canonical R-002 evidence rule (emulator A/B = decisive; Moto G = no-regression; FTL = OEM residual;
+  no WP calls real hardware "decisive"). Per-WP RTM instead of a WP6 batch (GOVERNANCE 1.3), with an
+  RTM line on each WP and a per-WP consolidated table in section 6; FR-049 -> implemented-verified;
+  NFR-PERF-015 -> partial.
+- New spec tables: 2.2 foreground-service restart/start-authorization model (boot / process-death /
+  force-stop / killed-while-visible / revoke, per API, with health-if-fail); 2.3 enforcement decision
+  table (readiness x capability x target -> decision x overlay x health) with the shield/escape-hatch
+  rule; 2.4 UsageStats detection contract (query window/dedup/freshness/wall-clock/per-API events +
+  the isUserUnlocked/keyguard fix -- SCREEN_ON is not "unlocked").
+- Request-identity four-concept model in WP2 (observed pkg / logical target / active auth surface /
+  request id) so the app's own biometric host going foreground can't corrupt the in-flight request;
+  exported=false, recreation-safe, cancel/rotation/death tests. Three-timestamp liveness in WP4 (a
+  quiet no-transition phone stays Protected). No new SecurityEventDao writes -- DDS 1.0.0 1.3 excludes
+  security-event + persisted-health history (in-memory + logcat + reports instead).
+- Numeric measurement protocol (section 11: burst N/K/R, ABSENT=0 / BEHIND<=2%, p50/p95/p99, paired
+  confidence rule, battery thresholds). Exact test matrix (section 10: CI 30/35/36, NucBox full
+  26/29/30/33/35/36, Moto G arm64/35, FTL). Split WP0 outputs: disposable spike (cleanup point) vs the
+  committed UIAutomator OV-4 regression test. Baseline refreshed d62b601 -> 60265b6 (tag M1_Exit).
+
+D0 RESOLVED (lead): adopt targetSdk 36 (Android 16), effective at WP0. v1.0.0 is a new app whose first
+Play submission is M10 (past both the 2026-08-31 deadline and the Nov-1 extension), so the release must
+be API 36 regardless -- the extension only defers. Toolchain bump (AGP 8.7.3 -> a 36-capable release,
++ Gradle/Kotlin, exact versions pinned in WP0) + compileSdk/targetSdk 36 done on the WP0 throwaway
+spike first, then production; M1's API-35 device gate is untouched. Fallback if the 36 toolchain is
+blocked at WP0: hold 35 + file the Play extension.
+
+ADRs drafted **Proposed** (Accept at WP0 before WP2, GOVERNANCE 2.2), indexed in adr/README.md:
+- ADR-020 overlay lock presentation -- drawn SYSTEM_ALERT_WINDOW surface, biometric via a transparent
+  exported=false FragmentActivity, LockScreenActivity deleted, and the request-identity model.
+  Implements ADR-013B.
+- ADR-021 UsageStats poll detector -- queryEvents contract, consolidated specialUse foreground service
+  (poll + health), poll interval. Per GOVERNANCE 2.7 the measured values (interval P, latency, battery)
+  live in their SSOT (WP0 report + detector constant + NFR-PERF-012), NOT in the ADR body; Accept-gated
+  on WP0 confirming a viable interval. Implements ADR-013B.
+- Both ADRs + plan 2.2/WP2 refined per a second review: BAL (a visible window permits an Activity
+  launch -- the biometric host) kept distinct from the background-FGS-start rule (visible-overlay as
+  the SAW justification on Android 15+); process-death recovery re-derives a FRESH in-memory request
+  (no held reference survives death); the poll pauses only on screen-off/locked or no protected
+  selections, never merely because the current foreground app is unprotected (that would miss the next
+  protected app).
+
+
 M1 EXIT: GRANTED -- IS Phase-0 foundation retrofit closed   (2026-08-25)
 ------------------------------------------------------------------------
 Signed the M1 (IS Phase-0) exit gate GRANTED (lead: Malcolm D., 2012-box). Every technical exit
