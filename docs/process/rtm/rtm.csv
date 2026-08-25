@@ -232,7 +232,7 @@ FR-230,Background Processing,ProductionReadiness,FR,,not-started,,,
 FR-231,Startup Health Check,ProductionReadiness,FR,,not-started,,,
 FR-232,Dependency Validation,ProductionReadiness,FR,,not-started,,,
 FR-233,Permission Verification,ProductionReadiness,FR,,not-started,,,
-FR-234,Build Version Identification,ProductionReadiness,FR,,not-started,,,
+FR-234,Build Version Identification,ProductionReadiness,FR,,partial,"app/build.gradle.kts (BuildConfig SCHEMA_VERSION/BUILD_TIME/ENVIRONMENT)",,"WP4/ADR-017 build provenance: BuildConfig fields SCHEMA_VERSION (int, mirrors Room v2), BUILD_TIME, ENVIRONMENT emitted per variant. Remaining: surface build/version identity in-app (About) and in release metadata"
 FR-235,Release Validation,ProductionReadiness,FR,,not-started,,,
 FR-236,Feature Flag Support,ProductionReadiness,FR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 SRS Appendix A (2026-08-14)
 FR-237,Safe Default Configuration,ProductionReadiness,FR,,partial,,,"secure defaults as built (lock on, encryption on)"
@@ -456,7 +456,7 @@ NFR-PRIV-009,Third-Party Privacy Assurance,PrivacyQuality,NFR,,not-started,,,
 NFR-PRIV-010,Privacy Compliance Verification,PrivacyQuality,NFR,,not-started,,,
 NFR-MNT-001,Modular Design,Maintainability,NFR,,not-started,,,
 NFR-MNT-002,Separation of Concerns,Maintainability,NFR,,not-started,,,
-NFR-MNT-003,Coding Standards Compliance,Maintainability,NFR,,not-started,,,
+NFR-MNT-003,Coding Standards Compliance,Maintainability,NFR,,partial,".github/workflows/ci.yml (detekt + ktlint + Konsist); app/src/test/java/com/applock/architecture/ArchitectureRulesTest.kt",,"WP3 coding-standards enforcement (ADR-016): detekt + detekt-formatting (ktlint) + Konsist R1-R4 run in CI with frozen baselines. Remaining: opportunistic burn-down of the legacy detekt/lint baselines"
 NFR-MNT-004,Code Readability,Maintainability,NFR,,not-started,,,
 NFR-MNT-005,Documentation Quality,Maintainability,NFR,,not-started,,,
 NFR-MNT-006,Change Traceability,Maintainability,NFR,,not-started,,,
@@ -470,7 +470,7 @@ NFR-MNT-013,Knowledge Transfer,Maintainability,NFR,,descoped-v1,,,deferred to 2.
 NFR-MNT-014,Maintainability Assessment,Maintainability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-MNT-015,Continuous Maintainability Improvement,Maintainability,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-TEST-001,Testable Architecture,Testability,NFR,,partial,,,injectable clocks/policies in domain logic; 67 JVM tests
-NFR-TEST-002,Automated Testing,Testability,NFR,,not-started,,,
+NFR-TEST-002,Automated Testing,Testability,NFR,,partial,"app/src/androidTest/java/com/applock/smoke; app/src/test",docs/reports/campaigns/2026-08-17_wp8-gmd-matrix_nucbox-g5.md,"WP8 automated-testing seed: 76 JVM unit tests + 4 instrumentation smoke tests, wired into the GMD device matrix (full/ci groups) and the CI instrumentation job (ciGroupProdDebugAndroidTest, continue-on-error). Remaining: broader integration/coverage breadth and flipping CI off continue-on-error, in later milestones"
 NFR-TEST-003,Unit Test Coverage,Testability,NFR,,not-started,,,
 NFR-TEST-004,Integration Test Coverage,Testability,NFR,,not-started,,,
 NFR-TEST-005,Regression Testing,Testability,NFR,,not-started,,,
@@ -508,7 +508,7 @@ NFR-UX-012,Localization Readiness,Usability&Accessibility,NFR,,not-started,,,
 NFR-UX-013,User Satisfaction Assessment,Usability&Accessibility,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
 NFR-UX-014,Accessibility Verification,Usability&Accessibility,NFR,,not-started,,,
 NFR-UX-015,Continuous Usability Improvement,Usability&Accessibility,NFR,,descoped-v1,,,deferred to 2.0.0 per ADR-019 + v1.0.0 NFR Appendix A (2026-08-14)
-NFR-COMP-001,Android Platform Compatibility,Compatibility&Portability,NFR,,not-started,,,ADR-014: CI device matrix (API 26/29/33/35) is the M1 evidence path
+NFR-COMP-001,Android Platform Compatibility,Compatibility&Portability,NFR,,partial,"app/build.gradle.kts (GMD managedDevices api26/29/30/33/35)",docs/reports/campaigns/2026-08-17_wp8-gmd-matrix_nucbox-g5.md,"WP8 smoke matrix green: NucBox full GMD 20/20 across API 26/29/30/33/35 (x86_64) + Moto G 2025 4/4 (arm64/API 35; 2026-08-16 report) + CI ci-group API 30/35 (instrumentation job success). Full matrix now green — eligible for implemented-verified at the M1-gate lead's sign-off; held partial pending that call. Remaining: broader real-device/API-breadth coverage in later milestones"
 NFR-COMP-002,Device Compatibility,Compatibility&Portability,NFR,,not-started,,,
 NFR-COMP-003,Display Compatibility,Compatibility&Portability,NFR,,not-started,,,
 NFR-COMP-004,Hardware Compatibility,Compatibility&Portability,NFR,,not-started,,,

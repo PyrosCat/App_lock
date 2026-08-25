@@ -1,6 +1,6 @@
 # ADR-015 — Hilt Adoption Plan (Replacing the Graph Service Locator)
 
-**Status:** Accepted — implemented in M1/WP5 (2026-08-08); formal closure at the M1/WP8 gate, after the device gating-regression suite runs on the Hilt build · **Date:** 2026-07-19 · **Source:** M0 decision; SDS §5.5, TAS §70
+**Status:** Accepted — implemented in M1/WP5 (2026-08-08) and closed at the M1 gate (2026-08-17): the device gating-regression suite ran green on the Hilt build (WP5 device exits — `docs/reports/campaigns/2026-08-08_wp5-harness_moto-g-2025.md` + `docs/reports/campaigns/2026-08-09_wp5-matrix_nucbox-g5.md`); see the M1 gate record `docs/reports/gates/2026-08-17_gate-m1.md` · **Date:** 2026-07-19 · **Source:** M0 decision; SDS §5.5, TAS §70
 
 ## Context
 `core/Graph.kt` is a global service locator, prohibited by SDS §5.5. It was always intended as a placeholder ("can be replaced with Hilt later"). All constructed objects already use constructor injection; only lookup sites couple to `Graph`.
