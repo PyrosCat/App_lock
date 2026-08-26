@@ -123,10 +123,13 @@
             android:taskAffinity=""
             android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
-        <!-- Usage-poll detection host (specialUse FGS). -->
+        <!-- Usage-poll detection host (specialUse FGS). SPIKE-only exported=true so the OV-4 test /
+             adb (shell uid) can `am start-foreground-service` it; the @Before foregrounds the app
+             first so the FGS start is permitted on API 31+. Production auto-starts its own detection
+             service (WP3), so this crutch is not carried forward. -->
         <service
             android:name=".platform.spike.UsagePollService"
-            android:exported="false"
+            android:exported="true"
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"

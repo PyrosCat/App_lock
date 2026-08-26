@@ -9,15 +9,12 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.ServiceInfo
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.UserManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.core.app.ServiceCompat
 
 /**
  * M7 WP0 SPIKE (throwaway). A `specialUse` foreground service polling `UsageStatsManager.queryEvents`
@@ -138,12 +135,10 @@ class UsagePollService : Service() {
             .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
             .setOngoing(true)
             .build()
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-        } else {
-            0
-        }
-        ServiceCompat.startForeground(this, SpikeConfig.NOTIFICATION_ID, notification, type)
+        // Plain 2-arg start: the manifest foregroundServiceType="specialUse" is what the OS uses.
+        // Mirrors ProtectionWatchdogService (works API 26-36); passing the SPECIAL_USE type constant
+        // (API 34) explicitly can throw on older APIs, so we don't.
+        startForeground(SpikeConfig.NOTIFICATION_ID, notification)
     }
 
     private fun createChannel() {

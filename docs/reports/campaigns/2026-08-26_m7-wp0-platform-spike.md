@@ -26,6 +26,22 @@ are run and the result tables are completed.
 warnings (AGP-newer, dependency updates, hardcoded spike strings); **no `NewApi`/deprecation/FGS
 findings**, and the target-36 move cleared the old too-low-target nags.
 
+## 1a. Dev-box pre-flight (Pixel_5 x86 API 30, headless) — partial
+
+A functional smoke was attempted on the constrained 2012 dev box (the only viable local AVD). It was
+**not** a measurement; it validated the driving mechanics. Two outcomes:
+
+- **Defect found + fixed:** `am start-foreground-service` of the spike service failed from the shell
+  uid (`Requires permission not exported from uid`) because the service was `exported=false` — which
+  would break the OV-4 test's `@Before` on **every** lane, not just here. Fixed: the spike
+  `UsagePollService` is now `exported=true` (SPIKE-only; the `@Before` foregrounds the app first so
+  the FGS start is permitted on API 31+; production auto-starts its own detection service in WP3).
+- **Overlay validation blocked here:** the emulator came up with a persistent
+  `com.android.systemui` **ANR** (the known GPU-color-buffer cold-boot failure of this box — adb alive,
+  UI layer dead). The overlay draw can't be validated against a dead window layer, so **the functional
+  overlay/biometric validation is deferred to the fleet** (NucBox/Moto G), which is where the real
+  measurements run anyway.
+
 ## 2. How the fleet drives it
 
 Build + install the spike (debug): `./gradlew :app:installProdDebug`. Then over adb:
