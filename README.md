@@ -26,8 +26,8 @@ accessibility service in 1.0.0**.
 | Milestone | Line | Status |
 |---|---|---|
 | M0 Baseline & governance | foundation | 🟢 Done |
-| M1 Foundation retrofit (IS Phase 0) | foundation | 🟡 Current — WP1–WP6 done, WP7 next |
-| M7 Detection & enforcement replacement | 1.0.0 | 🔵 Up next — the accessibility exit (Usage Access + overlay) |
+| M1 Foundation retrofit (IS Phase 0) | foundation | 🟢 Done (2026-08-25) — exit granted, tag `M1_Exit` |
+| M7 Detection & enforcement replacement | 1.0.0 | 🟡 Current — the accessibility exit (Usage Access + overlay); plan + ADR-020/021 prepped, WP0 next |
 | M8 Product & conformance | 1.0.0 | ⚪ Planned — UI/UX surfaces; vault/intruder removed from the 1.0.0 line |
 | M9 Hardening & verification | 1.0.0 | ⚪ Planned |
 | M10 Release | 1.0.0 | ⚪ Planned — signed v1.0.0 |
@@ -37,8 +37,9 @@ accessibility service in 1.0.0**.
 
 Live status: [ROADMAP.md](docs/process/ROADMAP.md); baseline analysis (frozen snapshot):
 [MIGRATION_ASSESSMENT.md](docs/process/MIGRATION_ASSESSMENT.md). The **1.0.0 line is M0–M1 → M7–M10**
-(ADR-019 re-cut); the earlier M2–M6 scope is frozen as the deferred 2.0.0 lineage. M1 (foundation
-retrofit = IS Phase 0) is broken into work packages WP1–WP8 ([M1_PLAN.md](docs/process/M1_PLAN.md)).
+(ADR-019 re-cut); the earlier M2–M6 scope is frozen as the deferred 2.0.0 lineage. **M1 (foundation
+retrofit) closed 2026-08-25** ([M1_PLAN.md](docs/process/M1_PLAN.md), WP1–WP8 all done); **M7 is now
+the current milestone** ([M7_PLAN.md](docs/process/M7_PLAN.md)).
 
 **Legend:** 🟢 done · 🟡 current · 🔵 next · ⚪ planned.
 
@@ -52,8 +53,8 @@ flowchart LR
     classDef todo fill:#e6e8ea,stroke:#8a9199,color:#3a4149
 
     M0["M0<br/>Baseline and governance"]:::done
-    M1["M1<br/>Foundation retrofit<br/>(IS Phase 0)"]:::current
-    M7["M7<br/>Detection and enforcement<br/>(accessibility exit)"]:::next
+    M1["M1<br/>Foundation retrofit<br/>(IS Phase 0)"]:::done
+    M7["M7<br/>Detection and enforcement<br/>(accessibility exit)"]:::current
     M8["M8<br/>Product and<br/>conformance"]:::todo
     M9["M9<br/>Hardening and<br/>verification"]:::todo
     M10["M10<br/>v1.0.0 release"]:::todo
@@ -63,7 +64,7 @@ flowchart LR
 
 The deferred **M2–M6** scope (vault, intruder capture, automation, observability, …) becomes the **2.0.0** lineage.
 
-**M1 (current)** breaks into eight work packages — WP1–WP6 done, WP7 next:
+**M1 (done, 2026-08-25)** delivered eight work packages — WP1–WP8 all complete:
 
 ```mermaid
 flowchart LR
@@ -77,16 +78,35 @@ flowchart LR
     WP4["WP4<br/>Build variants"]:::done
     WP5["WP5<br/>Hilt migration"]:::done
     WP6["WP6<br/>Package realign"]:::done
-    WP7["WP7<br/>DB fail-safe"]:::next
-    WP8["WP8<br/>Instrumentation and gate"]:::todo
+    WP7["WP7<br/>DB fail-safe"]:::done
+    WP8["WP8<br/>Instrumentation and gate"]:::done
 
     WP1 --> WP2 --> WP3 --> WP4 --> WP5 --> WP6 --> WP7 --> WP8
 ```
 
-**WP6 (package realignment) is complete** — the ADR-018 FQCN pins held on the upgrade-install drill;
-Konsist layer rules active. WP7 (data-safe migrations — re-scoped: remove the destructive fallback,
-and **delete** the legacy plaintext path since nothing has shipped) is next, then WP8
-(instrumentation seed + IS Phase-0 gate record).
+**All eight WPs are complete.** WP7 removed the destructive-migration fallback and deleted the legacy
+plaintext path (nothing had shipped — R-004/R-006 closed); WP8 landed the instrumentation seed + GMD
+smoke matrix + the IS Phase-0 gate record. M1 exited 2026-08-25 (tag `M1_Exit`); **M7 opens next** with
+`M7_PLAN.md` and ADR-020/021 (Proposed) prepared.
+
+**M7 (current)** — the accessibility exit — runs as seven work packages ([M7_PLAN.md](docs/process/M7_PLAN.md);
+WP0 authors/accepts ADR-020/021 before any WP2 code, and adopts targetSdk 36 per D0):
+
+```mermaid
+flowchart LR
+    classDef next fill:#bde3ec,stroke:#1592a8,color:#0c4a56
+    classDef todo fill:#e6e8ea,stroke:#8a9199,color:#3a4149
+
+    WP0["WP0<br/>Platform spike<br/>+ ADRs"]:::next
+    WP1["WP1<br/>Harness rework"]:::todo
+    WP2["WP2<br/>Overlay lock<br/>+ request-identity"]:::todo
+    WP3["WP3<br/>UsageStats<br/>detection"]:::todo
+    WP4["WP4<br/>Protection<br/>health"]:::todo
+    WP5["WP5<br/>Accessibility<br/>cutover"]:::todo
+    WP6["WP6<br/>M7 gate"]:::todo
+
+    WP0 --> WP1 --> WP2 --> WP3 --> WP4 --> WP5 --> WP6
+```
 
 Pre-rebaseline **Phases 1–3 are built and E2E-validated** — PIN/biometric auth, encryption, and
 brute-force defense carry into 1.0.0. The **vault and intruder capture are reserved for 2.0.0**
@@ -98,7 +118,7 @@ brute-force defense carry into 1.0.0. The **vault and intruder capture are reser
 |---|---|
 | `docs/v1.0.0/` | **Active baseline (ADR-019):** client-approved 1.0.0 specs — SRS, NFR, SDS, DDS, Threat Model, UI/UX + self-contained build pipeline (`source/`) |
 | `docs/v2.0.0/` | 2.0.0 target: the full client-received spec set — SRS 1–18 (FR-001..375), NFR, TAS, SDS, DDS, TSP, TM |
-| `docs/architecture/adr/` | Architecture Decision Records — ADR-001..019 (incl. the ADR-013 lineage) |
+| `docs/architecture/adr/` | Architecture Decision Records — ADR-001..021 (incl. the ADR-013 lineage; ADR-020/021 = the M7 overlay/detection drafts, Proposed) |
 | `docs/process/` | Implementation Strategy, migration assessment, plans, ROADMAP, RTM, risk register |
 | `docs/testing/` | Test plans and validation campaign records |
 | `docs/archive/` | Superseded docs — **note the FR-226..250 renumbering notice** |
@@ -164,5 +184,5 @@ random + Keystore-wrapped; Phase-1 plaintext DBs migrate by read-and-reinsert (s
 uninstall protection is opt-in device admin.
 
 Migration status (see ADRs): `core/Graph.kt` service locator → Hilt **done** (ADR-015, M1/WP5);
-destructive-migration fallback removal pending (ADR-007, M1/WP7); root/tamper detection and
+destructive-migration fallback **removed** (ADR-007, M1/WP7); root/tamper detection and
 pattern/knock auth not yet implemented (RTM rows FR-167..170, FR-004/005).

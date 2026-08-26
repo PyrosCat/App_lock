@@ -16,8 +16,8 @@ consistent with ADR/FR practice). This scope cut is also the principal mitigatio
 | Milestone | Line | Status |
 |---|---|---|
 | M0 Baseline & governance | foundation | **Done** (2026-07-19) |
-| M1 Foundation retrofit | foundation | **Current** — WP1–WP6 done; WP7 (re-scoped 2026-08-14) + WP8 remain |
-| **M7 Detection & Enforcement Replacement** | 1.0.0 | Planned — starts on M1 close |
+| M1 Foundation retrofit | foundation | **Done** (2026-08-25) — exit granted; tag `M1_Exit` (`60265b6`) |
+| **M7 Detection & Enforcement Replacement** | 1.0.0 | **Current** — opening; `M7_PLAN.md` + ADR-020/021 (Proposed) prepped; WP0 first |
 | **M8 1.0.0 Product Conformance** | 1.0.0 | Planned |
 | **M9 Hardening & Verification** | 1.0.0 | Planned |
 | **M10 Release** | 1.0.0 | Planned |
@@ -33,18 +33,23 @@ the pivotal milestone: the app's core engine is replaced, not extended.
 
 | Milestone | Scope | Gate / exit evidence |
 |---|---|---|
-| **M7 — Detection & Enforcement Replacement** ("the accessibility exit") | UsageStatsManager polling detector behind the SDS §8 trigger-processor seam; overlay (`SYSTEM_ALERT_WINDOW`) lock surface replacing the Activity path; **remove `AppDetectionService` + the accessibility manifest declaration** (clean — nothing shipped; the ADR-018 FQCN pin stays dormant-binding for the 2.0.0 return); fail-secure policy initialization (closes **R-005**); overlay presentation resists the relaunch race (closes **R-002** on re-validation); FR-179-lineage protection health re-pointed to Usage Access + overlay loss; **WP2 harness rework in-scope** (resumed-activity assertions and a11y rebind steps die with the old engine — window/overlay-based assertions replace them) | Device + emulator matrix green with the new engine (incl. OV-4 burst re-run on hardware for R-002); poll-interval benchmark per v1.0.0 NFR-PERF-012 (end-to-end transition→lock figure recorded); no accessibility declaration in the merged manifest |
+| **M7 — Detection & Enforcement Replacement** ("the accessibility exit") | UsageStatsManager polling detector behind the SDS §8 trigger-processor seam; overlay (`SYSTEM_ALERT_WINDOW`) lock surface replacing the Activity path; **remove `AppDetectionService` + the accessibility manifest declaration** (clean — nothing shipped; the ADR-018 FQCN pin stays dormant-binding for the 2.0.0 return); fail-secure policy initialization (closes **R-005**); overlay presentation resists the relaunch race (closes **R-002** on re-validation); FR-179-lineage protection health re-pointed to Usage Access + overlay loss; **WP2 harness rework in-scope** (resumed-activity assertions and a11y rebind steps die with the old engine — window/overlay-based assertions replace them); **detailed in `M7_PLAN.md`; ADR-020/021 (Proposed) govern presentation/detection; targetSdk 36 adopted at WP0 (D0)** | Device + emulator matrix green on the **API-36 target** with the new engine; **R-002 per the `M7_PLAN.md` canonical standard** (emulator A/B decisive, Moto G no-regression, FTL OEM sweep for the residual); NFR-PERF-012 end-to-end transition→lock figure recorded; no accessibility declaration in the merged manifest |
 | **M8 — 1.0.0 Product Conformance** | Build the v1.0.0 UI/UX-spec surfaces (onboarding SCR-001.., two-grant setup checklist, protection-health states, permission recovery, settings, help, destructive reset); **remove descoped features from the 1.0.0 line** (vault/, privacy/ intruder capture, their screens, CAMERA permission, DB tables — decision 2026-08-14: removal, not dormancy; git history + a pre-removal tag preserve the code for 2.0.0); schema conformance to v1.0.0 DDS; truthful protection-state model end-to-end | All v1.0.0 SRS retained-FR acceptance criteria demonstrable; manifest/permission audit = exactly the v1.0.0 permission matrix (UI/UX Appendix D); RTM rows updated with evidence |
 | **M9 — Hardening & Verification** | v1.0.0 Threat Model controls (SC-*), tapjacking/obscured-input defense (THR-UI-001/003 — hostile *third-party* overlays), lockout + biometric failure accounting (resolves defect CR-005), bounded diagnostics, NFR benchmark set (v1.0.0 NFR-PERF-015), UI-accessibility audit (NFR-UX-007..014), Play-listing pre-check (data-safety, permission declarations) | v1.0.0 TM §8 verification activities (VA-*) executed and recorded; benchmark report filed; no Critical/High finding open |
 | **M10 — Release** | Full acceptance campaign per v1.0.0 SRS §5 + TM §8; release engineering (signed build, store assets); store submission | Acceptance evidence complete; signed 1.0.0; Play review passed |
 
-Gate-blocking risks by milestone (authoritative list: `RISK_REGISTER.md`): M7 — R-002, R-005 (and
-R-004/R-006 must be closed in M1/WP7 before M7's schema work); M10 — the Usage-Access/overlay
-successor of R-001 (Play + sideload grant friction; distribution-model decision still open).
+Gate-blocking risks by milestone (authoritative list: `RISK_REGISTER.md`): M7 — R-002, R-005
+(R-004/R-006 already **Closed** in M1/WP7; M7 adds no schema — plan invariant); M10 — the
+Usage-Access/overlay successor of R-001 (Play + sideload grant friction; distribution-model decision
+still open).
 
 ## Foundation close-out (M1, unchanged identifiers)
 
-M1 finishes under its original plan (`M1_PLAN.md`) with WP7 **re-scoped 2026-08-14**: the legacy
+**M1 closed 2026-08-25** — exit granted (`docs/reports/gates/2026-08-25_gate-m1-signoff.md`), tag
+`M1_Exit` (`60265b6`); the FR-026..080 `review` burndown is done, NFR-COMP-001 verified, and R-004 and
+R-006 **Closed** (WP7). The description below is retained as history.
+
+M1 finished under its original plan (`M1_PLAN.md`) with WP7 **re-scoped 2026-08-14**: the legacy
 plaintext→encrypted migration path is **deleted** rather than hardened (zero shipped installs — the
 path only ever served dev devices; **R-006 closes by elimination**), and the WP7 fail-safe work
 narrows to removing `fallbackToDestructiveMigration` (**R-004**). WP8 (instrumentation seed, GMD

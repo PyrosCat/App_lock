@@ -4,6 +4,18 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs: reflect M1 closed / M7 current (ROADMAP, README, roadmap.html)   (2026-08-25)
+----------------------------------------------------------------------------------
+Milestone-status docs brought current now that M1 is closed (60265b6, tag M1_Exit) and M7 is the
+active line.
+- ROADMAP.md: M1 -> Done; M7 -> Current. M7 gate row aligned to the M7_PLAN canonical R-002 standard
+  and the D0/API-36 target; R-004/R-006 noted Closed and M7 flagged as adding no schema (invariant).
+- README.md: milestone table + mermaid diagrams + prose set to M1 done / M7 current, incl. a new
+  M7 work-package diagram (WP0-WP6); ADR count -> ADR-001..021; destructive-migration fallback removed.
+- docs/roadmap.html (public status page): M1 -> Complete (8/8 WPs), M7 -> In progress (the emphasised
+  current card) with its WP0-WP6 subtrack (WP0 next); dates -> 25 August 2026; stats + callout updated.
+
+
 M7 prep: plan revised per external review; D0 = API 36; ADR-020/021 drafted Proposed   (2026-08-25)
 ---------------------------------------------------------------------------------------------------
 Resolved the target-API decision, and drafted the two WP0 ADRs. 
