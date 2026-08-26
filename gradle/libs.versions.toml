@@ -1,5 +1,10 @@
+# M7 WP0 (spike): API-36 toolchain bump (D0). AGP 8.7.3 -> 8.13.2 (min+default Gradle 8.13,
+# max compileSdk API 36.1, JDK 17) is the smallest step that reaches compileSdk/targetSdk 36
+# while staying in the 8.x / Gradle-8 line (no Gradle-9 migration). Kotlin HELD at 2.1.0 (and
+# KSP with it) so the only variable this spike changes is the API-36 platform surface; the
+# Kotlin 2.4.x bump rides the dependabot flow separately. Wrapper -> gradle-8.13 in lockstep.
 [versions]
-agp = "8.7.3"
+agp = "8.13.2"
 kotlin = "2.1.0"
 ksp = "2.1.0-1.0.29"
 coreKtx = "1.15.0"

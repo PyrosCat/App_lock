@@ -10,12 +10,15 @@ plugins {
 
 android {
     namespace = "com.applock"
-    compileSdk = 35
+    // M7 WP0 (spike, D0): API-36 baseline. AGP 8.13.2 supports up to compileSdk 36.1; the
+    // installed platform is android-36.1. targetSdk 36 is the shipping target (v1.0.0 first
+    // submits at M10, past the 2026-08-31 Play deadline). M1's API-35 device gate is untouched.
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.applock"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
 
