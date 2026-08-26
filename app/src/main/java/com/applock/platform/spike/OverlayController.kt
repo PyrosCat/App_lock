@@ -8,6 +8,7 @@ import android.graphics.PixelFormat
 import android.util.Log
 import android.view.Gravity
 import android.view.View
+import android.view.ViewTreeObserver
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
@@ -29,15 +30,31 @@ class OverlayController(private val context: Context) {
 
     val isShowing: Boolean get() = overlayView != null
 
-    fun show(targetPackage: String) {
+    fun show(targetPackage: String, eventTs: Long = 0L) {
         if (overlayView != null) return
         val view = buildView(targetPackage)
         try {
             windowManager.addView(view, buildParams())
             overlayView = view
+            if (eventTs > 0L) logFirstDraw(view, eventTs)
         } catch (e: Exception) {
             Log.e(SpikeConfig.LOG_TAG, "overlay addView failed (SYSTEM_ALERT_WINDOW granted?)", e)
         }
+    }
+
+    // End-to-end latency (§11 / NFR-PERF-012): transition event -> overlay's FIRST frame drawn.
+    // detection-lag (poll) is logged by the service; this adds the overlay-draw tail.
+    private fun logFirstDraw(view: View, eventTs: Long) {
+        view.viewTreeObserver.addOnDrawListener(object : ViewTreeObserver.OnDrawListener {
+            private var done = false
+            override fun onDraw() {
+                if (done) return
+                done = true
+                Log.i(SpikeConfig.LOG_TAG, "E2E transition->overlay ~${System.currentTimeMillis() - eventTs}ms")
+                val self = this
+                view.post { view.viewTreeObserver.removeOnDrawListener(self) }
+            }
+        })
     }
 
     fun dismiss() {

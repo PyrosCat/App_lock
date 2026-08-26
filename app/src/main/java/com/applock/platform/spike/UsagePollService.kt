@@ -116,7 +116,7 @@ class UsagePollService : Service() {
     private fun onForeground(pkg: String, eventTs: Long, now: Long) {
         when (pkg) {
             SpikeState.protectedPackage -> {
-                overlay.show(pkg)
+                overlay.show(pkg, eventTs)
                 SpikeState.lastLatencyMs = now - eventTs
                 Log.i(SpikeConfig.LOG_TAG, "LOCK $pkg detection-lag ~${now - eventTs}ms")
             }
