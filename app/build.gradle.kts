@@ -124,8 +124,9 @@ android {
 
     // WP8 (M1, ADR-014 / M1_PLAN D4): Gradle-managed devices for the on-device smoke suite
     // (app/src/androidTest). Two device groups run the same variant's androidTest APK:
-    //   • `ci`   — API 30 + 35, run on the GitHub Actions runners (KVM); see .github/workflows/ci.yml.
-    //   • `full` — API 26/29/30/33/35, run locally on the NucBox G5 (the fleet device host).
+    //   • `ci`   — API 30 + 35 + 36, run on the GitHub Actions runners (KVM); see .github/workflows/ci.yml.
+    //   • `full` — API 26/29/30/33/35 + 36, run locally on the NucBox G5 (the fleet device host).
+    // The api36 lane is the M7 WP0 / D0 API-36 shipping target (M7_PLAN §10); a build change, not an ADR.
     // Run a group with e.g. `./gradlew ciGroupProdDebugAndroidTest` /
     // `fullGroupProdDebugAndroidTest`, or a single level with `api33ProdDebugAndroidTest`.
     // Physical devices (the arm64 Moto G 2025) are NOT GMD-managed — GMD is emulator-only; run the
@@ -135,8 +136,10 @@ android {
     //
     // Image source: ATD (automated-test-device) images are headless + lighter and exist from API 30
     // up, so 30/33 use `aosp-atd`; API 26/29 predate ATD and API 35's ATD image is not relied upon,
-    // so those use the standard `aosp` image. No smoke test needs Google APIs (Argon2 = BouncyCastle,
-    // SQLCipher = bundled .so, EncryptedSharedPreferences = the AOSP Keystore), so plain AOSP suffices.
+    // so those use the standard `aosp` image. API 36 (M7 WP0 / D0) likewise uses `aosp`; its
+    // system-image availability is confirmed at the GMD run on the fleet host (this machine only
+    // defines the lane). No smoke test needs Google APIs (Argon2 = BouncyCastle, SQLCipher = bundled
+    // .so, EncryptedSharedPreferences = the AOSP Keystore), so plain AOSP suffices.
     testOptions {
         animationsDisabled = true
         managedDevices {
@@ -166,11 +169,18 @@ android {
                     apiLevel = 35
                     systemImageSource = "aosp"
                 }
+                // M7 WP0 (D0): the API-36 shipping-target lane (M7_PLAN §10).
+                create("api36") {
+                    device = "Pixel 5"
+                    apiLevel = 36
+                    systemImageSource = "aosp"
+                }
             }
             groups {
                 create("ci") {
                     targetDevices.add(localDevices["api30"])
                     targetDevices.add(localDevices["api35"])
+                    targetDevices.add(localDevices["api36"]) // M7 WP0 (§10): API-36 CI lane
                 }
                 create("full") {
                     targetDevices.add(localDevices["api26"])
@@ -178,6 +188,7 @@ android {
                     targetDevices.add(localDevices["api30"])
                     targetDevices.add(localDevices["api33"])
                     targetDevices.add(localDevices["api35"])
+                    targetDevices.add(localDevices["api36"]) // M7 WP0 (§10): API-36 full lane
                 }
             }
         }
