@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Needed to list launchable apps on Android 11+ -->
     <queries>
@@ -8,6 +9,14 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
     </queries>
+
+    <!-- ===== M7 WP0 SPIKE (throwaway) — remove with the com.applock.platform.spike package ===== -->
+    <!-- Usage Access is a special-access op granted via Settings/appops, not a runtime grant. -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- ===== end SPIKE permissions ===== -->
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -93,6 +102,37 @@
                 <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
             </intent-filter>
         </receiver>
+
+        <!-- ===== M7 WP0 SPIKE (throwaway) — delete this block with the platform.spike package ===== -->
+        <!-- Manual driver + adb entry point; a second launcher icon is acceptable on the spike branch. -->
+        <activity
+            android:name=".platform.spike.SpikeLauncherActivity"
+            android:exported="true"
+            android:label="AppLock WP0 Spike">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Transparent biometric host, launched from the overlay via BAL (ADR-020 case (a)). -->
+        <activity
+            android:name=".platform.spike.SpikeBiometricActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Usage-poll detection host (specialUse FGS). -->
+        <service
+            android:name=".platform.spike.UsagePollService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="M7 WP0 spike: usage-poll foreground detection" />
+        </service>
+        <!-- ===== end SPIKE components ===== -->
 
     </application>
 </manifest>
