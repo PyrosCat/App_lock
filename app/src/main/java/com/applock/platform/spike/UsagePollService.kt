@@ -7,14 +7,17 @@ import android.app.NotificationManager
 import android.app.Service
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.UserManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 
 /**
  * M7 WP0 SPIKE (throwaway). A `specialUse` foreground service polling `UsageStatsManager.queryEvents`
@@ -42,6 +45,24 @@ class UsagePollService : Service() {
         }
     }
 
+    // §2.1/§2.4: pause the poll on screen-off (battery), resume on screen-on. (Production resumes on
+    // *unlock*, not merely screen-on — a WP3 refinement; screen-on is enough for the WP0 battery test.)
+    private val screenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_OFF -> {
+                    stopPolling()
+                    overlay.dismiss()
+                    Log.i(SpikeConfig.LOG_TAG, "poll paused (screen off)")
+                }
+                Intent.ACTION_SCREEN_ON -> if (SpikeState.protectedPackage != null) {
+                    startPolling()
+                    Log.i(SpikeConfig.LOG_TAG, "poll resumed (screen on)")
+                }
+            }
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -51,6 +72,15 @@ class UsagePollService : Service() {
         overlay = OverlayController(this)
         createChannel()
         pollCursor = System.currentTimeMillis()
+        ContextCompat.registerReceiver(
+            this,
+            screenReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+            },
+            ContextCompat.RECEIVER_NOT_EXPORTED,
+        )
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -76,6 +106,7 @@ class UsagePollService : Service() {
     override fun onDestroy() {
         stopPolling()
         overlay.dismiss()
+        runCatching { unregisterReceiver(screenReceiver) }
         super.onDestroy()
     }
 
