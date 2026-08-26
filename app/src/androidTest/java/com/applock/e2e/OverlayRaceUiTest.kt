@@ -4,6 +4,7 @@ package com.applock.e2e
 
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import org.junit.After
@@ -33,9 +34,15 @@ class OverlayRaceUiTest {
 
     private enum class Z { TOP, BEHIND, ABSENT }
 
+    private lateinit var targetComponent: String
+
     @Before
     fun grantAndStart() {
         assumeTrue("target app $TARGET_PKG not installed", sh("pm path $TARGET_PKG").contains("package:"))
+        // Resolve the launcher component at runtime (varies by image/OEM).
+        targetComponent = sh("cmd package resolve-activity --brief -c android.intent.category.LAUNCHER $TARGET_PKG")
+            .trim().lineSequence().lastOrNull { it.contains("/") }?.trim().orEmpty()
+        assumeTrue("no launcher activity for $TARGET_PKG", targetComponent.contains("/"))
         sh("appops set $APP_PKG android:get_usage_stats allow")
         sh("appops set $APP_PKG android:system_alert_window allow")
         assumeTrue(
@@ -68,7 +75,7 @@ class OverlayRaceUiTest {
         repeat(repeat) {
             repeat(bursts) {
                 settle()
-                repeat(relaunches) { sh("am start -n $TARGET_COMPONENT") }
+                repeat(relaunches) { sh("am start -n $targetComponent") }
                 when (awaitOverlay()) {
                     Z.TOP -> top++
                     Z.BEHIND -> behind++
@@ -80,6 +87,7 @@ class OverlayRaceUiTest {
         val total = top + behind + absent
         val log = "OV-4 overlay race: TOP=$top BEHIND=$behind ABSENT=$absent of $total " +
             "(bursts=$bursts relaunches=$relaunches repeat=$repeat)"
+        Log.i("M7SpikeTest", log) // always emit the counts (assert message only prints on failure)
         // Hard budget (§11): ABSENT = 0 on any burst; BEHIND tolerated only as sub-poll flicker (<=2%).
         assertEquals("$log — ABSENT must be 0 (R-002/F4 exposure)", 0, absent)
         assertEquals(
@@ -103,7 +111,10 @@ class OverlayRaceUiTest {
     }
 
     private fun zOrder(): Z {
-        val dump = sh("dumpsys window windows")
+        // `dumpsys window` (not `... windows`) carries BOTH the window list and the mCurrentFocus
+        // line; `dumpsys window windows` omits mCurrentFocus, which made every present overlay read
+        // as BEHIND. (dumpsys format varies by API — revalidate the grep across the §10 lanes / FTL.)
+        val dump = sh("dumpsys window")
         val present = dump.contains(OVERLAY_TITLE)
         val focused = dump.lineSequence()
             .firstOrNull { it.contains("mCurrentFocus") }
@@ -143,8 +154,11 @@ class OverlayRaceUiTest {
         const val POLL_SERVICE = "com.applock/com.applock.platform.spike.UsagePollService"
         const val OVERLAY_TITLE = "AppLockSpikeOverlay"
 
-        const val TARGET_PKG = "com.android.settings"
-        const val TARGET_COMPONENT = "com.android.settings/.Settings"
+        // A NORMAL app, deliberately NOT Settings: Android force-hides TYPE_APPLICATION_OVERLAY
+        // windows over Settings / permission screens (HIDE_NON_SYSTEM_OVERLAY), so an overlay can
+        // never read "on top" there (verified on the Moto G, WP0). The launcher component is
+        // resolved at runtime in @Before.
+        const val TARGET_PKG = "com.google.android.deskclock"
 
         const val T_APPEAR_MS = 1500L
         const val SAMPLE_MS = 100L
