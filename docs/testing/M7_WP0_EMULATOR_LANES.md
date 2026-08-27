@@ -15,7 +15,8 @@ rule if you need the fine print.
 The dev box has validated everything real hardware can show, on the Moto G 2025 (arm64, API 35),
 recorded in `docs/reports/campaigns/2026-08-26_m7-wp0-spike_moto-g-2025.md`: OV-4 no-regression
 (TOP=25, ABSENT=0), latency plus the poll-interval sweep (p95 tracks the interval: ~136 ms at 100 ms up
-to ~456 ms at 400 ms), biometric-via-BAL, and the screen-off pause with a CPU/wakelock proxy.
+to ~456 ms at 400 ms), biometric-via-BAL, and the battery profile (frugal loop confirmed: ~0.37 % active
+CPU at 400 ms, ~0.4 %/hour idle overnight, no wakelock across screen-off).
 
 But the Moto G is a budget single-OEM device that was already clean on the old engine, so it can only
 show *no-regression* — it cannot prove the race is fixed. The decisive proof needs the slow software-GPU
