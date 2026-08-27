@@ -40,22 +40,22 @@ class OverlayRaceUiTest {
 
     @Before
     fun grantAndStart() {
-        // Resolve the victim per-device (§10 purpose = api × oem coverage, not one fixed app):
-        // the first VICTIM_CANDIDATE that is installed AND has a launcher activity. This lets the
+        // Resolve the target app per-device (§10 purpose = api × oem coverage, not one fixed app):
+        // the first TARGET_APP_CANDIDATE that is installed AND has a launcher activity. This lets the
         // same artifact run on the AOSP emulator api sweep (via the AOSP clock) and on OEM/GMS
         // devices — Moto G, FTL (via Maps or the OEM clock) — rather than skipping wherever one
         // hardcoded package is absent.
-        val resolved = VICTIM_CANDIDATES.asSequence()
+        val resolved = TARGET_APP_CANDIDATES.asSequence()
             .filter { sh("pm path $it").contains("package:") }
             .map { it to launcherComponent(it) }
             .firstOrNull { (_, comp) -> comp.contains("/") }
         assumeTrue(
-            "no suitable victim app (normal, non-Settings, launchable) on this device: tried $VICTIM_CANDIDATES",
+            "no suitable target app (normal, non-Settings, launchable) on this device: tried $TARGET_APP_CANDIDATES",
             resolved != null,
         )
         targetPkg = resolved!!.first
         targetComponent = resolved.second
-        Log.i("M7SpikeTest", "OV-4 victim: $targetPkg ($targetComponent)")
+        Log.i("M7SpikeTest", "OV-4 target app: $targetPkg ($targetComponent)")
         sh("appops set $APP_PKG android:get_usage_stats allow")
         sh("appops set $APP_PKG android:system_alert_window allow")
         assumeTrue(
@@ -172,7 +172,7 @@ class OverlayRaceUiTest {
         const val POLL_SERVICE = "com.applock/com.applock.platform.spike.UsagePollService"
         const val OVERLAY_TITLE = "AppLockSpikeOverlay"
 
-        // Victim candidates, tried in order — the first INSTALLED one with a launcher activity is
+        // Target-app candidates, tried in order — the first INSTALLED one with a launcher activity is
         // used (resolved in @Before). Each must be a NORMAL app, deliberately NOT Settings:
         // Android force-hides TYPE_APPLICATION_OVERLAY over Settings / permission screens
         // (HIDE_NON_SYSTEM_OVERLAY), so an overlay could never read "on top" there (Moto G, WP0).
@@ -185,7 +185,7 @@ class OverlayRaceUiTest {
         // (A fresh device could raise a first-run *system* permission dialog for Maps — an
         // overlay-hiding surface; `am start` on the resolved launcher lands on the app's own UI,
         // and the clock candidates avoid it entirely, so resolution prefers whatever is present.)
-        val VICTIM_CANDIDATES = listOf(
+        val TARGET_APP_CANDIDATES = listOf(
             "com.google.android.apps.maps",   // GMS — most OEMs incl. Samsung/Xiaomi
             "com.google.android.deskclock",   // Google Clock — GMS devices
             "com.android.deskclock",          // AOSP clock — emulator images

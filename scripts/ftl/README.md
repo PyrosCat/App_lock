@@ -52,19 +52,19 @@ the console; each device's logcat carries the `M7SpikeTest` line
 `docs/reports/campaigns/` report per §11 and the canonical R-002 standard (never full-Close
 R-002 on single-OEM evidence).
 
-## Victim app (resolved per device) + one thing to sanity-check
+## Target app (resolved per device) + one thing to sanity-check
 
-`OverlayRaceUiTest` races the overlay against a "victim" app it **resolves per device** — the
-first installed candidate with a launcher activity from `VICTIM_CANDIDATES` (Google Maps →
+`OverlayRaceUiTest` races the overlay against a target app it **resolves per device** — the
+first installed candidate with a launcher activity from `TARGET_APP_CANDIDATES` (Google Maps →
 Google clock → AOSP clock → calculators). Each is a *normal* app, deliberately not Settings
 (Android force-hides `TYPE_APPLICATION_OVERLAY` over Settings / permission screens via
 `HIDE_NON_SYSTEM_OVERLAY`). The list spans GMS + AOSP so the same artifact runs on OEM devices
 (Maps / OEM clock) **and** plain AOSP images (AOSP clock) without skipping — that is what gives
-the api × oem coverage this sweep exists for. No per-device victim config is needed.
+the api × oem coverage this sweep exists for. No per-device target-app config is needed.
 
 Sanity-check when reading results: the test `assumeTrue`-skips only if *no* candidate resolves,
 and a skip still shows non-red in FTL. Confirm each device actually **ran** — the logcat
-`M7SpikeTest` lines (`OV-4 victim: <pkg> …` then `OV-4 overlay race: TOP=.. BEHIND=.. ABSENT=..`)
+`M7SpikeTest` lines (`OV-4 target app: <pkg> …` then `OV-4 overlay race: TOP=.. BEHIND=.. ABSENT=..`)
 are emitted only on a real run. A skip is **not** evidence.
 
 ## Scheduling note (plan alignment)

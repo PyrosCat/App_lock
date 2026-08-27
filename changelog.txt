@@ -4,23 +4,161 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
-M7/WP0: Firebase Test Lab runner + OV-4 test-tiering split + per-device victim   (2026-08-27)
---------------------------------------------------------------------------------------------
-Wired the FTL multi-OEM lane (M7_PLAN section 10 / canonical R-002 rule #3) and separated the
-heavy OV-4 burst from the fast smoke gate. Build/CI + test-infra only -- no ADR (GOVERNANCE 2.7:
-test matrices / CI groupings are living build-file config, same class as the api36 GMD lane) and
-no RTM change (2.2 test infrastructure; no requirement-state change; FR-028 still lands in WP2).
-- scripts/ftl/: run_ov4_ftl.sh (assembles prodDebug app+androidTest APKs, submits the OV-4 test to
-  FTL with quick/sweep/full profiles scaling the section 11 counts via --environment-variables, an
-  editable physical OEM/API matrix) + README (gcloud/billing/API prereqs, run steps, sanity-check).
-- OverlayRaceUiTest: victim app now RESOLVED PER DEVICE from VICTIM_CANDIDATES (Maps -> Google clock
-  -> AOSP clock -> calculators), first-installed-with-a-launcher wins. Spans GMS+AOSP so the one
-  artifact runs on the AOSP emulator api sweep AND OEM/GMS devices (Moto G, FTL) without skipping --
-  the api x oem coverage the sweep exists for. Supersedes the single hardcoded target.
-- New @OverlayRaceTest marker (androidTest); the per-push CI `ci` GMD group excludes it via
-  -Pandroid.testInstrumentationRunnerArguments.notAnnotation (ci.yml) to stay fast. OV-4 still runs
-  in its own lanes: `full` GMD sweep + Moto G connected (api / no-regression) and FTL (multi-OEM).
-  FTL is unaffected by the Gradle arg (not baked into the APK) -- it selects OV-4 via --test-targets.
+M7/WP0: Firebase Test Lab runner + OV-4 test-tiering split + per-device target app   (2026-08-27)
+-------------------------------------------------------------------------------------------------
+Wired the Firebase Test Lab (FTL) multi-OEM lane and split the heavy OV-4 rapid-relaunch burst out
+of the fast per-push smoke gate. This is build, CI, and test-infrastructure only. No ADR is needed
+(per GOVERNANCE 2.7, test matrices and CI groupings are living build-file config, the same class as
+the api36 GMD lane), and no requirement changes state (FR-028 still lands in WP2), so the RTM is
+untouched.
+- scripts/ftl/: run_ov4_ftl.sh assembles the prodDebug app and androidTest APKs and submits the
+  OV-4 test to FTL. It offers quick/sweep/full profiles that scale the burst counts (through
+  --environment-variables) over an editable physical OEM/API matrix, alongside a README covering the
+  gcloud, billing, and API prerequisites, the run steps, and a sanity check.
+- OverlayRaceUiTest now picks its target app per device instead of using one hardcoded package. It
+  walks a candidate list (Google Maps, then Google Clock, then the AOSP clock, then calculators) and
+  takes the first that is both installed and launchable. The list spans GMS and AOSP, so the single
+  test artifact runs on the AOSP emulator API sweep and on OEM/GMS devices (Moto G, FTL) without
+  skipping, which is the API-by-OEM coverage the sweep exists for.
+- A new @OverlayRaceTest annotation marks the test so the per-push CI `ci` GMD group can exclude it
+  (via -Pandroid.testInstrumentationRunnerArguments.notAnnotation in ci.yml) and stay fast. OV-4
+  still runs in its own lanes: the `full` GMD sweep, the Moto G connected run (API and
+  no-regression), and FTL. FTL is unaffected by that Gradle argument, since it selects OV-4 through
+  --test-targets rather than an annotation baked into the APK.
+
+
+M7/WP0 spike: screen-off poll pause + battery/CPU proxy (Moto G)   (2026-08-26)
+-------------------------------------------------------------------------------
+Added a screen-off pause to the throwaway spike's UsagePollService and ran a short battery/CPU proxy
+on the Moto G 2025 (arm64, API 35). A non-exported BroadcastReceiver now stops the poll (and
+dismisses the overlay) on screen-off and restarts it on screen-on when a protected package is
+selected. Production will resume on unlock rather than merely screen-on; screen-on is enough for this
+measurement (a WP3 refinement).
+- The proxy ran 10 minutes on plus 10 minutes off, poll active at P = 400 ms, device idle on the
+  home screen, framed by `dumpsys battery unplug` with CPU read from /proc/<pid>/stat. Screen-on: the
+  app used about 2210 ms of CPU over 600 s (roughly 0.37%, about 1.5 ms per queryEvents tick).
+  Screen-off: the loop was paused, CPU was near zero, and it held no wakelock across screen-off, which
+  meets ADR-021's frugal-loop requirement.
+- CPU scales about linearly with poll rate, so a 100 ms interval would cost roughly 4x (~1.5% CPU):
+  the battery side of the D1 latency-versus-battery tradeoff. Battery percentage was void here (the
+  device sat at 100%); a real percent-per-hour drain figure needs the longer soak (at least 2 h
+  screen-on and 8 h screen-off at a mid charge level), which is deferred. Evidence appended to
+  docs/reports/campaigns/2026-08-26_m7-wp0-spike_moto-g-2025.md.
+
+
+M7/WP0 spike: end-to-end latency sweep (D1) + biometric-via-BAL (Moto G)   (2026-08-26)
+---------------------------------------------------------------------------------------
+Instrumented the spike to time the full detection-to-lock path, ran the D1 poll-interval sweep, and
+confirmed the ADR-020 biometric path, all on the Moto G 2025 (arm64, API 35, portrait).
+- Latency: OverlayController now logs the overlay's first drawn frame, so the report captures the
+  whole transition-to-overlay tail, not just the poll's detection lag. Over 100 controlled
+  transitions per interval, the p95 was 456 ms at P = 400 ms, 329 ms at 300 ms, 226 ms at 200 ms, and
+  136 ms at 100 ms. The p95 tracks the poll interval almost exactly (about P + 40 ms), so P is the
+  dial for the worst case, and 200 ms is the largest interval that keeps end-to-end p95 under 250 ms.
+  The best case floors around 55 to 66 ms (queryEvents recording plus overlay draw). This is the
+  latency half of D1 only; battery is the counterweight and needs the soak before P is fixed. The
+  chosen P lands in ADR-021's SSOT (the detector interval constant and NFR-PERF-012), not the ADR
+  body (GOVERNANCE 2.7).
+- Biometric-via-BAL passed (ADR-020 case (a)): with the overlay up over a protected app, the
+  transparent SpikeBiometricActivity launched from the overlay (a background-activity launch that the
+  app's visible overlay window permits), the system BiometricPrompt took and held focus, a real
+  fingerprint authenticated, and the host finished cleanly with focus returning to the overlay.
+  Wiring that success through to unlock is WP2, not the spike.
+- Measurement note (not a device fault): under rapid app-switching the default logcat buffer rotated
+  the spike's lines out, which made a naive line count plateau near 10 and look like a detection
+  stall. It was not; capturing the full 100 samples simply needed `adb logcat -G 16M`.
+
+
+M7/WP0 spike: Moto G OV-4 no-regression pass (25/25, ABSENT=0)   (2026-08-26)
+-----------------------------------------------------------------------------
+First real-hardware OV-4 rapid-relaunch result, on the Moto G 2025 (arm64, API 35): 25 bursts of 20
+rapid relaunches (500 launches) gave ABSENT = 0, BEHIND = 0, and the overlay present and focused on
+all 25 bursts. The overlay wins the race on real hardware. This is real-device no-regression only
+(canonical R-002 rule #2); it does not close R-002, which the decisive NucBox emulator A/B owns.
+Two test fixes were needed for a valid result, both platform behaviour rather than code bugs:
+- The OV-4 target moved off Settings to a normal app (the clock). Android deliberately force-hides
+  overlay windows over Settings, permission, and other sensitive screens (the documented
+  anti-tapjacking feature), so an overlay can never read "on top" there. The launcher component is
+  resolved at runtime.
+- Focus is now read from `dumpsys window` rather than `dumpsys window windows`. On Android 15 the
+  mCurrentFocus line is absent from the latter, which had made every present overlay read as BEHIND.
+  The dumpsys format varies by API, so this grep is re-validated per lane.
+The reporting was also re-scoped: the host-agnostic platform-spike draft was removed in favour of a
+Moto-G-scoped campaign report (docs/reports/campaigns/2026-08-26_m7-wp0-spike_moto-g-2025.md). One
+platform finding for the lead: because the overlay cannot cover Settings, an overlay-based lock has a
+real product gap there versus the accessibility approach, flagged as a candidate ADR note or new ADR
+and a risk-register entry.
+
+
+M7/WP0 spike: export the poll service + plain startForeground (OV-4 @Before fix)   (2026-08-26)
+----------------------------------------------------------------------------------------------
+A pre-flight on the constrained 2012 dev box surfaced two fixes to the throwaway spike before the
+fleet measurements.
+- The OV-4 test's @Before could not start the detection service: `am start-foreground-service` from
+  the shell uid failed ("Requires permission not exported from uid") because UsagePollService was
+  exported=false, which would have broken the test on every lane. It is now exported=true. This is a
+  spike-only crutch, since the @Before foregrounds the app first (so the foreground-service start is
+  permitted on API 31+) and production auto-starts its own detection service in WP3.
+- The foreground start was simplified to the plain two-argument startForeground, matching
+  ProtectionWatchdogService (which works across API 26 to 36). The manifest foregroundServiceType of
+  "specialUse" is what the OS actually uses; passing the API-34 type constant explicitly can throw on
+  older APIs, so it was dropped.
+The overlay itself could not be validated on the dev box: the emulator came up with a persistent
+system-UI ANR (this box's known cold-boot GPU failure, with adb alive but the UI layer dead), so the
+functional overlay and biometric validation is deferred to the fleet (Moto G, NucBox), where the real
+measurements run anyway.
+
+
+M7/WP0 spike: usage-poll + overlay + biometric harness + durable OV-4 test   (2026-08-26)
+-----------------------------------------------------------------------------------------
+Built the throwaway platform-validation spike that measures the behaviours ADR-020 and ADR-021 depend
+on (overlay wins the relaunch race, biometric-via-BAL, poll interval, battery), directly on the
+API-36 target and before any WP2 production code. The whole com.applock.platform.spike package and
+its clearly fenced manifest block are deleted at WP0 close; there is no engine wiring, persistence, or
+production quality bar.
+- Disposable spike components: UsagePollService, a specialUse foreground service that polls
+  UsageStatsManager.queryEvents for the foreground app; OverlayController, which draws an overlay
+  window with the stable title "AppLockSpikeOverlay"; SpikeBiometricActivity, a transparent activity
+  launched from the overlay to host the biometric prompt; SpikeLauncherActivity, a manual and adb
+  driver; and SpikeConfig / SpikeState, holding the interval and target in memory only (nothing
+  persisted, per DDS 1.3).
+- Durable test: OverlayRaceUiTest, a black-box UIAutomator check of the OV-4 rapid-relaunch race. It
+  survives the spike's deletion and is repointed at the production engine in WP2, asserting on the
+  overlay's stable window title. Burst counts default light for CI and can be overridden to the full
+  measurement protocol on the reproducing rig and FTL.
+- Manifest: the spike block adds the two special-access permissions (Usage Access and the overlay
+  permission, both granted through Settings rather than runtime prompts) plus the service and
+  activities.
+- Local gate on the dev box, all green on API 36: Kotlin compile, assemble, detekt,
+  testProdDebugUnitTest (the Konsist R4 entry-point rule is satisfied by the platform.spike placement,
+  plus the 67 JVM tests), lint, and the androidTest compile. Lint added only version-nag warnings,
+  with no NewApi, deprecation, or foreground-service findings.
+The campaign report (docs/reports/campaigns/2026-08-26_m7-wp0-platform-spike.md) was started as a
+draft that fixes the method and the measurement protocol, with the result tables left for the fleet to
+fill; it becomes the immutable WP0 record once those lanes run.
+
+
+M7/WP0: add the API-36 Gradle-managed-device lane (ci 30+35+36, full ...+36)   (2026-08-26)
+------------------------------------------------------------------------------------------
+Added an api36 Gradle-managed device (Pixel 5, API 36, aosp image) to both on-device smoke-test
+groups: `ci` becomes API 30 + 35 + 36 (on the GitHub Actions runners) and `full` becomes
+26/29/30/33/35 + 36 (on the NucBox G5). This exercises the smoke suite on the API-36 shipping target
+chosen at WP0. It is a build-file change, not an ADR (GOVERNANCE 2.7). API 36 uses the plain aosp
+image like the other levels, since no smoke test needs Google APIs; its system-image availability is
+confirmed at the GMD run on the fleet host, as this machine only defines the lane.
+
+
+M7/WP0: API-36 toolchain bump (AGP 8.13.2, Gradle 8.13, target 36)   (2026-08-25)
+---------------------------------------------------------------------------------
+Put the D0 target-API decision into effect: compileSdk and targetSdk move from 35 to 36 (Android 16).
+Because v1.0.0's first Play submission is at M10, past the 2026-08-31 deadline, the release must
+target API 36 regardless. This is the first WP0 change, applied on the throwaway spike branch ahead of
+production, and M1's API-35 device gate is left untouched.
+- Toolchain: AGP 8.7.3 to 8.13.2, the smallest step that reaches compileSdk/targetSdk 36 while staying
+  on the 8.x and Gradle-8 line (no Gradle-9 migration). The Gradle wrapper moves 8.10.2 to 8.13 in
+  lockstep.
+- Kotlin is deliberately held at 2.1.0 (and KSP with it) so the only variable this bump changes is the
+  API-36 platform surface; the Kotlin 2.4.x update rides the dependabot flow separately.
 
 
 Docs: reflect M1 closed / M7 current (ROADMAP, README, roadmap.html)   (2026-08-25)
