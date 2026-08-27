@@ -4,6 +4,25 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP0: Firebase Test Lab runner + OV-4 test-tiering split + per-device victim   (2026-08-27)
+--------------------------------------------------------------------------------------------
+Wired the FTL multi-OEM lane (M7_PLAN section 10 / canonical R-002 rule #3) and separated the
+heavy OV-4 burst from the fast smoke gate. Build/CI + test-infra only -- no ADR (GOVERNANCE 2.7:
+test matrices / CI groupings are living build-file config, same class as the api36 GMD lane) and
+no RTM change (2.2 test infrastructure; no requirement-state change; FR-028 still lands in WP2).
+- scripts/ftl/: run_ov4_ftl.sh (assembles prodDebug app+androidTest APKs, submits the OV-4 test to
+  FTL with quick/sweep/full profiles scaling the section 11 counts via --environment-variables, an
+  editable physical OEM/API matrix) + README (gcloud/billing/API prereqs, run steps, sanity-check).
+- OverlayRaceUiTest: victim app now RESOLVED PER DEVICE from VICTIM_CANDIDATES (Maps -> Google clock
+  -> AOSP clock -> calculators), first-installed-with-a-launcher wins. Spans GMS+AOSP so the one
+  artifact runs on the AOSP emulator api sweep AND OEM/GMS devices (Moto G, FTL) without skipping --
+  the api x oem coverage the sweep exists for. Supersedes the single hardcoded target.
+- New @OverlayRaceTest marker (androidTest); the per-push CI `ci` GMD group excludes it via
+  -Pandroid.testInstrumentationRunnerArguments.notAnnotation (ci.yml) to stay fast. OV-4 still runs
+  in its own lanes: `full` GMD sweep + Moto G connected (api / no-regression) and FTL (multi-OEM).
+  FTL is unaffected by the Gradle arg (not baked into the APK) -- it selects OV-4 via --test-targets.
+
+
 Docs: reflect M1 closed / M7 current (ROADMAP, README, roadmap.html)   (2026-08-25)
 ----------------------------------------------------------------------------------
 Milestone-status docs brought current now that M1 is closed (60265b6, tag M1_Exit) and M7 is the

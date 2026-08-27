@@ -30,19 +30,32 @@ import org.junit.runner.RunWith
  * `-e ov4_bursts 50 -e ov4_relaunches 20 -e ov4_repeat 5`.
  */
 @RunWith(AndroidJUnit4::class)
+@OverlayRaceTest
 class OverlayRaceUiTest {
 
     private enum class Z { TOP, BEHIND, ABSENT }
 
+    private lateinit var targetPkg: String
     private lateinit var targetComponent: String
 
     @Before
     fun grantAndStart() {
-        assumeTrue("target app $TARGET_PKG not installed", sh("pm path $TARGET_PKG").contains("package:"))
-        // Resolve the launcher component at runtime (varies by image/OEM).
-        targetComponent = sh("cmd package resolve-activity --brief -c android.intent.category.LAUNCHER $TARGET_PKG")
-            .trim().lineSequence().lastOrNull { it.contains("/") }?.trim().orEmpty()
-        assumeTrue("no launcher activity for $TARGET_PKG", targetComponent.contains("/"))
+        // Resolve the victim per-device (§10 purpose = api × oem coverage, not one fixed app):
+        // the first VICTIM_CANDIDATE that is installed AND has a launcher activity. This lets the
+        // same artifact run on the AOSP emulator api sweep (via the AOSP clock) and on OEM/GMS
+        // devices — Moto G, FTL (via Maps or the OEM clock) — rather than skipping wherever one
+        // hardcoded package is absent.
+        val resolved = VICTIM_CANDIDATES.asSequence()
+            .filter { sh("pm path $it").contains("package:") }
+            .map { it to launcherComponent(it) }
+            .firstOrNull { (_, comp) -> comp.contains("/") }
+        assumeTrue(
+            "no suitable victim app (normal, non-Settings, launchable) on this device: tried $VICTIM_CANDIDATES",
+            resolved != null,
+        )
+        targetPkg = resolved!!.first
+        targetComponent = resolved.second
+        Log.i("M7SpikeTest", "OV-4 victim: $targetPkg ($targetComponent)")
         sh("appops set $APP_PKG android:get_usage_stats allow")
         sh("appops set $APP_PKG android:system_alert_window allow")
         assumeTrue(
@@ -52,10 +65,15 @@ class OverlayRaceUiTest {
         // Foreground the app so the spike FGS may start, then hand it the target + interval.
         sh("am start -n $APP_PKG/$LAUNCHER")
         SystemClock.sleep(500)
-        sh("am start-foreground-service -n $POLL_SERVICE --es target $TARGET_PKG --el interval 400")
+        sh("am start-foreground-service -n $POLL_SERVICE --es target $targetPkg --el interval 400")
         SystemClock.sleep(500)
         home()
     }
+
+    /** The launcher Activity component for [pkg], or "" if none (varies by image/OEM). */
+    private fun launcherComponent(pkg: String): String =
+        sh("cmd package resolve-activity --brief -c android.intent.category.LAUNCHER $pkg")
+            .trim().lineSequence().lastOrNull { it.contains("/") }?.trim().orEmpty()
 
     @After
     fun stop() {
@@ -154,11 +172,26 @@ class OverlayRaceUiTest {
         const val POLL_SERVICE = "com.applock/com.applock.platform.spike.UsagePollService"
         const val OVERLAY_TITLE = "AppLockSpikeOverlay"
 
-        // A NORMAL app, deliberately NOT Settings: Android force-hides TYPE_APPLICATION_OVERLAY
-        // windows over Settings / permission screens (HIDE_NON_SYSTEM_OVERLAY), so an overlay can
-        // never read "on top" there (verified on the Moto G, WP0). The launcher component is
-        // resolved at runtime in @Before.
-        const val TARGET_PKG = "com.google.android.deskclock"
+        // Victim candidates, tried in order — the first INSTALLED one with a launcher activity is
+        // used (resolved in @Before). Each must be a NORMAL app, deliberately NOT Settings:
+        // Android force-hides TYPE_APPLICATION_OVERLAY over Settings / permission screens
+        // (HIDE_NON_SYSTEM_OVERLAY), so an overlay could never read "on top" there (Moto G, WP0).
+        //
+        // The list spans OEM/GMS and AOSP so the sweep covers both axes without skipping:
+        //   • Google Maps / Google clock — present on Google-certified OEMs incl. Samsung/Xiaomi
+        //     (where the AOSP clock package is absent), covering the FTL multi-OEM lane;
+        //   • AOSP clock / calculators — present on plain AOSP emulator images, covering the
+        //     api-level sweep (ci/full GMD lanes) where no GMS app exists.
+        // (A fresh device could raise a first-run *system* permission dialog for Maps — an
+        // overlay-hiding surface; `am start` on the resolved launcher lands on the app's own UI,
+        // and the clock candidates avoid it entirely, so resolution prefers whatever is present.)
+        val VICTIM_CANDIDATES = listOf(
+            "com.google.android.apps.maps",   // GMS — most OEMs incl. Samsung/Xiaomi
+            "com.google.android.deskclock",   // Google Clock — GMS devices
+            "com.android.deskclock",          // AOSP clock — emulator images
+            "com.google.android.calculator",  // GMS calculator
+            "com.android.calculator2",        // AOSP calculator — older/emulator images
+        )
 
         const val T_APPEAR_MS = 1500L
         const val SAMPLE_MS = 100L

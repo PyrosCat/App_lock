@@ -116,11 +116,17 @@ jobs:
       - name: Accept Android SDK licences
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
-      # ciGroupProdDebugAndroidTest = the `ci` device group (api30 + api35) × prodDebug androidTest.
-      # maxConcurrentDevices=1 keeps the two emulators sequential so the runner does not run out of RAM.
-      - name: GMD smoke matrix (API 30 + 35), prodDebug
+      # ciGroupProdDebugAndroidTest = the `ci` device group (api30 + 35 + 36) × prodDebug androidTest.
+      # maxConcurrentDevices=1 keeps the emulators sequential so the runner does not run out of RAM.
+      #
+      # notAnnotation excludes the heavy OV-4 overlay-race burst (@OverlayRaceTest) from the fast
+      # per-push gate — it is a test-tiering choice (build/CI config, not an ADR: GOVERNANCE §2.7).
+      # OV-4 runs in its own lanes: the `full` GMD sweep (NucBox) + Moto G connected (api/no-regression)
+      # and Firebase Test Lab (multi-OEM, scripts/ftl/). See M7_PLAN §10.
+      - name: GMD smoke matrix (API 30 + 35 + 36), prodDebug
         run: >
           ./gradlew ciGroupProdDebugAndroidTest
+          -Pandroid.testInstrumentationRunnerArguments.notAnnotation=com.applock.e2e.OverlayRaceTest
           -Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices=1
           -PbuildTime="$(date -u +%Y-%m-%dT%H:%M:%SZ)" --stacktrace
 

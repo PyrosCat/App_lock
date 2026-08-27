@@ -37,7 +37,7 @@ class SpikeLauncherActivity : FragmentActivity() {
         }
         targetInput = EditText(this).apply {
             hint = "protected package"
-            setText("com.google.android.deskclock")
+            setText("com.google.android.apps.maps")
         }
         status = TextView(this)
 
