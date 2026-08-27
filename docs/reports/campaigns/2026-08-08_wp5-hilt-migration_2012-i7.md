@@ -1,7 +1,7 @@
 # WP5 Local Verification — Hilt DI Migration (retire the Graph service locator)
 
 - **Date:** 2026-08-08
-- **Author / host:** Claude (2012 i7-3520M, primary-dev box)
+- **Author / host:** 2012 i7 dev box, driving the Moto G 2025 over USB adb.
 - **Produced against:** baseline `7bcb05e` (M1/WP4) + the WP5 change set (this work, pre-push)
 - **Verifies:** M1_PLAN §2 (WP5) exit check — **local portion**; ADR-015. RTM rows are **not** updated
   here (WP8 close-out batch, M1_PLAN §5).

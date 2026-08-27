@@ -1,7 +1,7 @@
 # WP4 Exit Check — Build Environments & Dependency Governance
 
 - **Date:** 2026-08-07
-- **Author / host:** Claude (2012 i7-3520M, primary-dev box)
+- **Author / host:** 2012 i7 dev box, driving the Moto G 2025 over USB adb.
 - **Produced against:** baseline `c838224` (M1/WP3) + the WP4 change set (this commit, pre-push)
 - **Verifies:** M1_PLAN §2 (WP4) exit check; ADR-017; FR-226 / FR-227 / FR-234 (mechanism) /
   FR-247 (inventory). RTM rows are **not** updated here — they land at the WP8 close-out batch
