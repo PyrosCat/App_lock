@@ -23,6 +23,16 @@ measured, reviewed, or executed. Reports differ from the rest of `docs/` in natu
    verifies or observes (FR/NFR IDs where applicable, so the RTM can point at it).
 4. Raw CI output (test/lint artifacts) lives on GitHub Actions with short retention — reports
    here are the **curated, durable** conclusions, not dumps.
+5. **Write it to be read standalone.** A report is read later by people or machines'
+   assistants, who may not have the plan and ADRs open. Structure it, in order: a
+   one-line-per-item **Headline** (verdict + the key number) up top; a short **"Context & terms"**
+   section that expands the IDs and jargon the report leans on (risk/test IDs such as R-002 / OV-4,
+   the metric vocabulary, work-package numbers, acronyms like GMD / FGS) so a technical reader
+   follows the *meaning* without opening another doc — a `§N` cross-reference still names its
+   document (GOVERNANCE.md §6); then **per-item sections**, each pairing raw evidence (exact counts,
+   log lines, task/command names) with a plain-language verdict; and a closing **Disposition**
+   (impact on requirements / risks / ADRs) + **Follow-ups**. Keep sentences readable — precision,
+   not density. Precedent: `campaigns/2026-08-28_m7-wp0-emulator_nucbox-g5.md`.
 
 ## Categories (subfolders created on first use — git doesn't track empty dirs)
 
@@ -40,7 +50,7 @@ measured, reviewed, or executed. Reports differ from the rest of `docs/` in natu
 | Host | Latest report | State |
 |---|---|---|
 | 2012 i7 (primary dev) | — | Pixel_5 API 30 x86 emulator; WP1 CI baseline produced here |
-| NucBox G5 (Win 11, N-series) | [2026-07-21](fleet/2026-07-21_fleet-nucbox-g5.md) | Fleet-ready — WHPX accel; x86_64 matrix (26/29/33/35) boots; `assembleDebug` green |
+| NucBox G5 (Win 11, N-series) | [2026-08-28](campaigns/2026-08-28_m7-wp0-emulator_nucbox-g5.md) | M7 WP0 emulator lanes done: R-002 A/B **PASS** (old 34% → overlay 0.4% ABSENT); api36 matrix + restart cells PASS; api30/33 OV-4 skip fixed (→ aosp/default). Per-lane swGPU OV-4 is a latency coin-flip, not RAM. Prior: [fleet-ready 2026-07-21](fleet/2026-07-21_fleet-nucbox-g5.md) |
 | Moto G 2025 (physical) | [2026-07-23](campaigns/2026-07-23_wp2-regression_moto-g-2025.md) | Connected (USB adb via 2012 host); WP2 gating all green on Android 15; a11y needs manual UI grant (Restricted Settings ≥ API 13) |
 
 Keep this table to one line per host — details belong in the dated reports it links to.

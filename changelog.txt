@@ -4,6 +4,70 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP0: GMD api30/33 lanes -> aosp/default image so OV-4 runs   (2026-08-29)
+---------------------------------------------------------------------------------------------------
+Switched the api30 and api33 GMD lanes from `aosp-atd` to `aosp` (the SDK `default` image family) in
+app/build.gradle.kts so the OV-4 rapid-relaunch test stops silently skipping. Build change only (living
+matrix config); no requirement changes state, RTM untouched.
+- Cause (verified on the fleet host): the `aosp-atd` "slim" (sdk_slim) images ship no launchable target
+  app -- only the SIM Toolkit -- so OverlayRaceUiTest's per-device target resolution found nothing and
+  the test assume-skipped (AssumptionViolatedException, reported green while asserting nothing). The
+  aosp_atd api33 image lists 123 packages with only com.android.stk launchable; the instrumentation
+  emitted "no suitable target app ... tried [maps, deskclock x2, calculator x2]".
+- Fix: the `aosp`/default images carry the AOSP clock the test targets and stay light (no GMS, so no
+  2 GB heap ANR). Downloaded system-images;android-30;default;x86_64 and
+  system-images;android-33;default;x86_64.
+- Verified: re-ran the actual GMD api30 + api33 lanes on the default images -- each tests=5 failures=0
+  skipped=0, with overlayNeverAbsentUnderRelaunchBurst now executing (26.3s / 16.8s) instead of
+  <skipped/>; the silent skip is gone. (Both also passed ABSENT=0 this run, but that per-lane swGPU pass
+  is a latency coin-flip, not a reliable gate.)
+- CI note: api30 is also in the `ci` group (GitHub Actions), which excludes OV-4 via the
+  @OverlayRaceTest annotation, so CI there just pulls the slightly heavier default image instead of ATD;
+  api33 is full-group (NucBox) only.
+
+
+M7/WP0: NucBox emulator lanes — decisive R-002 A/B, api36 matrix, restart cells   (2026-08-28)
+---------------------------------------------------------------------------------------------
+Ran the three NucBox-owned M7 WP0 emulator lanes and filed the evidence report
+docs/reports/campaigns/2026-08-28_m7-wp0-emulator_nucbox-g5.md. Evidence only — WP0 lands no
+production code, so the RTM, ADRs, and risk register are untouched (M7_PLAN §6; ADR-020/021 stay
+Proposed pending the Firebase Test Lab sweep).
+- Decisive R-002 A/B (software-GPU api35, §11 heavy counts): the old a11y LockScreenActivity engine
+  reproduces the rapid-relaunch race at 34% ABSENT (17/50); the new overlay engine holds 0.4% (1/250)
+  on the identical rig. The overlay eliminates the race. The single emulator ABSENT is one overlay
+  appearing past the 1500 ms budget on a rig slower than any real device (Moto G was 0/25); surfaced
+  for the lead rather than hidden.
+- Root-caused the 1/250 and demonstrated an ABSENT=0 fix (throwaway spike, reverted after — the
+  finding, not the code, is kept): the miss is a late overlay *appearance* (BEHIND stayed ~0 over 750+
+  diagnostic bursts), from main-thread starvation on the software-GPU VM — inducing 4x CPU load lifted
+  it to 2/150 with E2E draws up to 2322 ms while detection-lag stayed <=775 ms. Keeping the overlay
+  window warm (updateViewLayout instead of per-lock addView/removeView) plus polling off the main
+  thread took the same 4x-load run from 2/150 to 0/150 (TOP=150/150). WP3/ADR-021 guidance recorded in
+  the report.
+- api36 smoke matrix: the shipping target is fully green and its system image — installed this session
+  (system-images;android-36;default;x86_64, which was absent) — boots. api26/29/33/35/36 all run OV-4
+  ABSENT=0. Two lane caveats, both root-caused as environment, not overlay defects: the GMD api35 lane
+  failed on flaky overlay appear-latency amplified by GMD's tiny 5-burst default sample, NOT RAM (direct
+  testing: the aosp image at 2 GB has ~1.6 GB free and no ANR, and api36 fails identically at 2 GB -- so
+  the matrix's api35-fail/api36-pass was sample luck; the earlier 2 GB-starvation attribution was wrong
+  and is corrected in the report), and the GMD api30/33 aosp-atd lanes silently skipped OV-4 for lack of
+  a target app (closed for api33 on a manual google_apis run, TOP=20 ABSENT=0).
+- api36 restart cells: the specialUse FGS start from BOOT_COMPLETED is permitted (not boot-prohibited
+  on API 36), START_STICKY recreation works, and process death re-bootstraps clean (cursor from now, no
+  retroactive or stale lock); never a false Protected.
+- Fleet follow-up: the swGPU OV-4 lanes can't reliably hit ABSENT=0 with the current spike (slow render
+  vs the fixed 1500 ms budget) -- and NEITHER more RAM nor more bursts is a route to green (RAM isn't the
+  constraint; a larger N *raises* P(fail), stabilizing toward FAIL). Green comes from the overlay latency
+  remedy (warm surface + off-main detector, landed in production at WP2/WP3), a hardware-accelerated /
+  real-hardware render (Moto G = 0/25), or a scaled T_appear. (The api30/33 aosp-atd OV-4 skip is a
+  separate, deterministic issue -- fixed 2026-08-29, see the top entry.) Also noted: the NucBox lost
+  power and rebooted mid-campaign (2026-08-28 01:27:25);
+  all artifacts and pre-loss results survived. Updated the reports/README.md fleet-index NucBox row,
+  and added rule 5 to reports/README.md (a report structure / self-containment convention -- Headline,
+  Context-&-terms glossary, per-item evidence + verdict, Disposition, Follow-ups; this report is the
+  precedent).
+
+
 M7/WP0: Firebase Test Lab runner + OV-4 test-tiering split + per-device target app   (2026-08-27)
 -------------------------------------------------------------------------------------------------
 Wired the Firebase Test Lab (FTL) multi-OEM lane and split the heavy OV-4 rapid-relaunch burst out

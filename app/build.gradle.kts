@@ -134,12 +134,15 @@ android {
     // SQLCipher coverage the all-x86_64 matrix cannot give.
     // Operator runbook (incl. the API-29 Argon2 heap workaround): docs/testing/WP8_GMD_MATRIX.md.
     //
-    // Image source: ATD (automated-test-device) images are headless + lighter and exist from API 30
-    // up, so 30/33 use `aosp-atd`; API 26/29 predate ATD and API 35's ATD image is not relied upon,
-    // so those use the standard `aosp` image. API 36 (M7 WP0 / D0) likewise uses `aosp`; its
-    // system-image availability is confirmed at the GMD run on the fleet host (this machine only
-    // defines the lane). No smoke test needs Google APIs (Argon2 = BouncyCastle, SQLCipher = bundled
-    // .so, EncryptedSharedPreferences = the AOSP Keystore), so plain AOSP suffices.
+    // Image source: every lane uses `aosp` (the SDK `default` image family). API 30/33 previously used
+    // the lighter `aosp-atd` (Automated-Test-Device) images, but those "slim" builds (sdk_slim) ship NO
+    // launchable target app (only the SIM Toolkit), so the OV-4 UIAutomator race test assume-skipped on
+    // them — a silent green asserting nothing (verified on the fleet host; see the 2026-08-28 M7 WP0
+    // emulator campaign report). Switched 30/33 to `aosp`/default, which carries the AOSP clock that OV-4
+    // targets and stays light (no GMS → no 2 GB heap ANR). API 36 (M7 WP0 / D0) also uses `aosp`; its
+    // system-image availability is confirmed at the GMD run on the fleet host (this machine only defines
+    // the lane). No smoke test needs Google APIs (Argon2 = BouncyCastle, SQLCipher = bundled .so,
+    // EncryptedSharedPreferences = the AOSP Keystore), so plain AOSP suffices.
     testOptions {
         animationsDisabled = true
         managedDevices {
@@ -157,12 +160,12 @@ android {
                 create("api30") {
                     device = "Pixel 5"
                     apiLevel = 30
-                    systemImageSource = "aosp-atd"
+                    systemImageSource = "aosp" // was aosp-atd; ATD "slim" images ship no target app (below)
                 }
                 create("api33") {
                     device = "Pixel 5"
                     apiLevel = 33
-                    systemImageSource = "aosp-atd"
+                    systemImageSource = "aosp" // was aosp-atd; ATD "slim" images ship no target app (below)
                 }
                 create("api35") {
                     device = "Pixel 5"
