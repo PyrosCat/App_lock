@@ -4,6 +4,26 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP0: Firebase Test Lab multi-OEM sweep report + evidence-standard role-name reword   (2026-08-29)
+---------------------------------------------------------------------------------------------------
+Filed the FTL OEM/OS residual-sweep evidence and reworded the R-002 evidence standard's shorthand.
+Evidence + docs only -- WP0 lands no production code, so no RTM / ADR / risk-register rows change.
+- docs/reports/campaigns/2026-08-29_m7-wp0-ftl-sweep_firebase-test-lab.md: the OV-4 overlay-race test
+  run on FTL's physical multi-OEM catalog (Motorola, Samsung One UI, OnePlus OxygenOS, stock Pixel;
+  APIs 30/33/34/35/36 incl. targetSdk-36 on real hardware). ABSENT=0 on every device -- the OEM/OS
+  residual sweep passes at the WP0/spike level; with the emulator A/B and the Moto G no-regression
+  check, the WP0 R-002 evidence set is complete on the spike (not full-Closed: spike overlay + lighter
+  60-sample counts; authoritative re-run is WP6 vs production). Open item: b0q (Samsung One UI) BEHIND
+  is borderline/variable (5% on 08-28, 1.7% on 08-29) -- real focus delay vs mCurrentFocus dumpsys
+  parse, for WP2. Transient FTL infra flakes (CPH2449/OnePlus 11 errored twice -> swapped to
+  OP5552L1/OnePlus 10T; aruba went Inconclusive on teardown but logged a clean run).
+- M7_PLAN.md: replaced the "canonical rule #1-4" shorthand for the canonical R-002 evidence standard
+  with role names (decisive A/B / no-regression check / OEM/OS residual sweep / fallback). The
+  standard's name and content are unchanged -- purely a readability reword. The committed NucBox
+  report keeps its (1)-(4) wording (immutable evidence).
+- docs/reports/README.md: added the Firebase Test Lab host row to the fleet-state index.
+
+
 M7/WP0: GMD api30/33 lanes -> aosp/default image so OV-4 runs   (2026-08-29)
 ---------------------------------------------------------------------------------------------------
 Switched the api30 and api33 GMD lanes from `aosp-atd` to `aosp` (the SDK `default` image family) in
@@ -77,8 +97,13 @@ the api36 GMD lane), and no requirement changes state (FR-028 still lands in WP2
 untouched.
 - scripts/ftl/: run_ov4_ftl.sh assembles the prodDebug app and androidTest APKs and submits the
   OV-4 test to FTL. It offers quick/sweep/full profiles that scale the burst counts (through
-  --environment-variables) over an editable physical OEM/API matrix, alongside a README covering the
-  gcloud, billing, and API prerequisites, the run steps, and a sanity check.
+  --environment-variables) over a physical OEM/API matrix reconciled to the live catalog: four OEM
+  families (Motorola, Samsung One UI, OnePlus OxygenOS, stock Pixel) spanning APIs 30/33/34/35/36,
+  including the targetSdk-36 shipping target on real hardware. gcloud-env.sh sources the Cloud SDK
+  bin onto PATH so an already-open shell finds gcloud without a restart (the runner auto-sources it).
+  The README covers the gcloud and API prerequisites, notes that physical devices are in the Spark
+  free tier (Blaze only past the daily caps), and gives the run steps, the PATH note, and a sanity
+  check.
 - OverlayRaceUiTest now picks its target app per device instead of using one hardcoded package. It
   walks a candidate list (Google Maps, then Google Clock, then the AOSP clock, then calculators) and
   takes the first that is both installed and launchable. The list spans GMS and AOSP, so the single

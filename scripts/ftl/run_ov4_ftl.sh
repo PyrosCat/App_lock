@@ -19,6 +19,7 @@
 #   FTL_PROFILE=quick scripts/ftl/run_ov4_ftl.sh   # 1 device, light counts (pipeline smoke)
 #   FTL_PROFILE=sweep scripts/ftl/run_ov4_ftl.sh   # full OEM matrix, §11-scaled counts
 #   SKIP_BUILD=1 scripts/ftl/run_ov4_ftl.sh    # reuse existing APKs (no Gradle assemble)
+#   FTL_DEVICES="aruba:30,b0q:33" scripts/ftl/run_ov4_ftl.sh   # custom device subset (model:version)
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
@@ -46,19 +47,43 @@ esac
 # Edit this list to what the catalog currently offers; keep OEMs diverse (Samsung/Xiaomi/Oppo/
 # Motorola/Pixel...) and spread API levels (aim for 30/33/34/35 physical; 36 via the emulator
 # api36 lane per §10). `quick` uses only the first entry.
+# 5 devices = Spark's physical-test/day cap (each --device = 1 test). Reconciled against the live
+# FTL catalog (gcloud firebase test android models list --filter="form=PHYSICAL", 2026-08-27):
+# 4 distinct WMS families (Motorola / Samsung One UI / OnePlus OxygenOS / stock Pixel) and the full
+# API spread 30/33/34/35/36 — including the targetSdk-36 shipping target on REAL hardware (a35x).
+# Add a 6th (needs Blaze) for more OEM spread. Re-verify codenames/versions when the catalog drifts.
 DEVICES_SWEEP=(
-  "model=a51,version=30,locale=en,orientation=portrait"          # Samsung Galaxy A51 (One UI)
-  "model=redfin,version=30,locale=en,orientation=portrait"        # Pixel 5 (stock)
-  "model=oriole,version=33,locale=en,orientation=portrait"        # Pixel 6
-  "model=b0q,version=33,locale=en,orientation=portrait"           # Samsung Galaxy S22 Ultra
-  "model=shiba,version=34,locale=en,orientation=portrait"         # Pixel 8
-  "model=akita,version=35,locale=en,orientation=portrait"         # Pixel 8a
+  "model=aruba,version=30,locale=en,orientation=portrait"         # Motorola moto e20
+  "model=b0q,version=33,locale=en,orientation=portrait"           # Samsung Galaxy S22 Ultra (One UI)
+  "model=OP5552L1,version=34,locale=en,orientation=portrait"      # OnePlus 10T 5G (OxygenOS) -- CPH2449 (OnePlus 11) errored twice in FTL, 2026-08-28
+  "model=akita,version=35,locale=en,orientation=portrait"         # Google Pixel 8a (stock)
+  "model=a35x,version=36,locale=en,orientation=portrait"          # Samsung Galaxy A35 5G (One UI, API 36)
 )
-DEVICES_QUICK=( "model=redfin,version=30,locale=en,orientation=portrait" )
+DEVICES_QUICK=( "model=akita,version=35,locale=en,orientation=portrait" )  # Google Pixel 8a (stock)
 
 if [[ "$PROFILE" == "quick" ]]; then DEVICES=("${DEVICES_QUICK[@]}"); else DEVICES=("${DEVICES_SWEEP[@]}"); fi
 
+# FTL_DEVICES override: a comma-separated model:version shorthand replaces the profile's device
+# list (the profile still sets the burst counts). Handy for fitting Spark's 5-physical-tests/day
+# cap — e.g. drop a device already covered by an earlier run:
+#   FTL_DEVICES="aruba:30,b0q:33,CPH2449:34,a35x:36" FTL_PROFILE=sweep scripts/ftl/run_ov4_ftl.sh
+if [[ -n "${FTL_DEVICES:-}" ]]; then
+  DEVICES=()
+  IFS=',' read -ra _pairs <<< "$FTL_DEVICES"
+  for _p in "${_pairs[@]}"; do
+    _p="${_p//[[:space:]]/}"; [[ -z "$_p" ]] && continue
+    [[ "$_p" == *:* ]] || { echo "bad FTL_DEVICES entry '$_p' — want model:version (e.g. akita:35)" >&2; exit 2; }
+    _m="${_p%%:*}"; _v="${_p##*:}"
+    [[ -n "$_m" && -n "$_v" ]] || { echo "bad FTL_DEVICES entry '$_p' — want model:version (e.g. akita:35)" >&2; exit 2; }
+    DEVICES+=("model=$_m,version=$_v,locale=en,orientation=portrait")
+  done
+  [[ ${#DEVICES[@]} -gt 0 ]] || { echo "FTL_DEVICES set but parsed to no devices" >&2; exit 2; }
+  echo "   (device list overridden by FTL_DEVICES)"
+fi
+
 # --- Preflight -------------------------------------------------------------------------------
+# Self-heal PATH: a fresh gcloud install doesn't reach already-open shells until restart.
+command -v gcloud >/dev/null 2>&1 || . "$(dirname "${BASH_SOURCE[0]}")/gcloud-env.sh" || true
 command -v gcloud >/dev/null || { echo "gcloud not on PATH — see scripts/ftl/README.md (Prereqs)"; exit 1; }
 PROJECT="$(gcloud config get-value project 2>/dev/null || true)"
 [[ -n "$PROJECT" && "$PROJECT" != "(unset)" ]] || { echo "no active gcloud project — 'gcloud config set project <id>'"; exit 1; }

@@ -28,21 +28,24 @@ against the **numeric protocol (§11)**; **no accessibility declaration in the m
 R-002 and R-005 dispositioned on evidence per that standard; **RTM synchronized per work package**
 (§6; GOVERNANCE §1.3 — not batched at close-out), ADRs + changelog synchronized.
 
-> **Canonical R-002 evidence standard — the single rule; WP0 / WP2 / WP6 all defer to this.**
-> 1. **Emulator positive-control A/B is the *decisive* proof the fix works.** On the NucBox
->    software-GPU rig that reproduces the 12–37 % race: the old engine reproduces `ABSENT`/`BEHIND`,
+> **Canonical R-002 evidence standard — the single standard; WP0 / WP2 / WP6 all defer to this.**
+> Four parts, each a different kind of evidence:
+> 1. **The decisive A/B — emulator positive-control A/B is the *decisive* proof the fix works.** On the
+>    NucBox software-GPU rig that reproduces the 12–37 % race: the old engine reproduces `ABSENT`/`BEHIND`,
 >    the new overlay is **never `ABSENT`** (self-healing `BEHIND` only).
-> 2. **The Moto G 2025 proves real-device *no-regression* only** — a budget, single-OEM device
->    already clean on the old engine, so it cannot prove the fix, just that nothing regressed
->    (never `ABSENT` under burst, plus latency + biometric).
-> 3. **A Firebase Test Lab multi-OEM / multi-API sweep closes the OEM/OS residual.**
-> 4. **Without FTL, R-002 stays Open at a reduced rating** under an explicitly approved TM §14.10
->    compensating treatment with a review trigger (run before M10) — **never** full-Closed on
+> 2. **The no-regression check — the Moto G 2025 proves real-device *no-regression* only** — a budget,
+>    single-OEM device already clean on the old engine, so it cannot prove the fix, just that nothing
+>    regressed (never `ABSENT` under burst, plus latency + biometric).
+> 3. **The OEM/OS residual sweep — a Firebase Test Lab multi-OEM / multi-API sweep closes the OEM/OS
+>    residual.**
+> 4. **The fallback — without FTL, R-002 stays Open at a reduced rating** under an explicitly approved
+>    TM §14.10 compensating treatment with a review trigger (run before M10) — **never** full-Closed on
 >    single-OEM evidence.
 >
-> No work package calls real hardware "decisive" or "primary": (1) is the decisive test, (2) is
-> no-regression, (3)/(4) dispose of the residual. All burst counts, timeouts, and `ABSENT`/`BEHIND`
-> budgets are the numeric protocol in §11.
+> No work package calls real hardware "decisive" or "primary": the **decisive A/B** is the only proof the
+> fix works, the **no-regression check** shows only that nothing regressed, and the **OEM/OS residual
+> sweep** (with the **fallback** when FTL is unavailable) disposes of the residual. All burst counts,
+> timeouts, and `ABSENT`/`BEHIND` budgets are the numeric protocol in §11.
 
 ---
 
@@ -567,7 +570,7 @@ gate documentation. **RTM is not batched here** — each WP already landed its o
 - **Close the R-002 OEM/OS residual:** run the OV-4-as-instrumentation-test on a **Firebase Test Lab**
   physical multi-OEM / multi-API sweep; record the results. If FTL isn't yet provisioned, log the
   residual as a TM §14.10 compensating treatment with a review trigger (before M10) rather than
-  overstating R-002 to full Closed (canonical rule #4).
+  overstating R-002 to full Closed (the fallback).
 - Record the NFR-PERF-012 end-to-end figure (p50/p95/p99, §11) and the documented poll interval.
 - **Final verification promotions only** (rows already landed by their WP, now with matrix evidence):
   **FR-026 / FR-027 / FR-028 / FR-044 → `implemented-verified`**; **FR-049 → `implemented-verified`**;
@@ -575,8 +578,8 @@ gate documentation. **RTM is not batched here** — each WP already landed its o
   detection-latency benchmark; remaining perf-benchmark scope documented as M9); **FR-179**
   re-verification confirmed (or already applied in WP4). ADR-020/021 → Accepted+implemented status
   lines; ADR-013B implementation-status → 1.0.0 baseline built. Risk register: **R-002** per the
-  canonical standard (Closed-with-residual, or High→Medium, residual per rule #3/#4 — never full-Closed
-  on single-OEM evidence); **R-005 → Closed** (fail-secure readiness tests); **R-001** re-rated (a11y
+  canonical standard (Closed-with-residual, or High→Medium, residual per the OEM/OS residual sweep /
+  fallback — never full-Closed on single-OEM evidence); **R-005 → Closed** (fail-secure readiness tests); **R-001** re-rated (a11y
   gone; residual = the two grants + distribution model, Open for M10).
 - Changelog; **M7 gate record** in `docs/reports/gates/` (scope/exit checklist; a new dated record per
   the reports-immutability rule).
@@ -712,9 +715,9 @@ discrete set below is authoritative — "API 30–35" elsewhere in this plan is 
 | Lane | APIs / devices | What runs | Purpose |
 |---|---|---|---|
 | **CI** (GitHub Actions, KVM, x86_64) | GMD `ci` group = **API 30 + 35 + 36** | reworked overlay/biometric-host androidTest smoke + the OV-4 UIAutomator race test | per-push gate; M7 burns `continue-on-error` off as M1 did |
-| **Local emulator** (NucBox `full`, x86_64) | GMD `full` = **API 26 / 29 / 30 / 33 / 35 + 36** | authoritative smoke matrix **+ the emulator A/B positive control** on the software-GPU rig | canonical rule #1 — the **decisive** R-002 proof; api29 Argon2-heap caveat from WP8 still applies |
-| **Physical** (Moto G 2025, arm64 / API 35) | one real device (budget, single-OEM; Android 15 today) | connected androidTest smoke + OV-4 burst | canonical rule #2 — real-device **no-regression** + arm64 native SQLCipher + real biometric. targetSdk-36 app runs here on API-35 OS; **Android-16 *OS* behavior is covered by the emulator api36 lane** (add real API-36 hardware coverage if the device updates) |
-| **FTL** (Firebase Test Lab, physical) | multi-OEM / multi-API catalog | the OV-4 instrumentation test (same artifact) | canonical rule #3 — closes the OEM/OS residual; rule #4 if unprovisioned |
+| **Local emulator** (NucBox `full`, x86_64) | GMD `full` = **API 26 / 29 / 30 / 33 / 35 + 36** | authoritative smoke matrix **+ the emulator A/B positive control** on the software-GPU rig | the **decisive A/B** — the decisive R-002 proof; api29 Argon2-heap caveat from WP8 still applies |
+| **Physical** (Moto G 2025, arm64 / API 35) | one real device (budget, single-OEM; Android 15 today) | connected androidTest smoke + OV-4 burst | the **no-regression check** — real-device no-regression + arm64 native SQLCipher + real biometric. targetSdk-36 app runs here on API-35 OS; **Android-16 *OS* behavior is covered by the emulator api36 lane** (add real API-36 hardware coverage if the device updates) |
+| **FTL** (Firebase Test Lab, physical) | multi-OEM / multi-API catalog | the OV-4 instrumentation test (same artifact) | the **OEM/OS residual sweep** — closes the OEM/OS residual; the **fallback** if unprovisioned |
 | **API 36** (D0 resolved) | API 36 (Android 16) — the shipping target | full smoke + OV-4 + §2.2 cell confirmation | first-class CI + `full` lane; **WP0 adds the `api36` GMD device and confirms the system image is available** |
 
 Adding the `api36` device/group is a `build.gradle.kts` edit (a build change, recorded in the

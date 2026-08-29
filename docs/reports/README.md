@@ -52,6 +52,7 @@ measured, reviewed, or executed. Reports differ from the rest of `docs/` in natu
 | 2012 i7 (primary dev) | — | Pixel_5 API 30 x86 emulator; WP1 CI baseline produced here |
 | NucBox G5 (Win 11, N-series) | [2026-08-28](campaigns/2026-08-28_m7-wp0-emulator_nucbox-g5.md) | M7 WP0 emulator lanes done: R-002 A/B **PASS** (old 34% → overlay 0.4% ABSENT); api36 matrix + restart cells PASS; api30/33 OV-4 skip fixed (→ aosp/default). Per-lane swGPU OV-4 is a latency coin-flip, not RAM. Prior: [fleet-ready 2026-07-21](fleet/2026-07-21_fleet-nucbox-g5.md) |
 | Moto G 2025 (physical) | [2026-07-23](campaigns/2026-07-23_wp2-regression_moto-g-2025.md) | Connected (USB adb via 2012 host); WP2 gating all green on Android 15; a11y needs manual UI grant (Restricted Settings ≥ API 13) |
+| Firebase Test Lab (cloud, physical) | [2026-08-29](campaigns/2026-08-29_m7-wp0-ftl-sweep_firebase-test-lab.md) | M7 WP0 OEM/OS residual sweep **PASS**: ABSENT=0 across Motorola / Samsung One UI / OnePlus / Pixel, API 30–36 (incl. real API-36). b0q One UI BEHIND borderline (5%→1.7%), open for WP2. Spike overlay; authoritative re-run at WP6 |
 
 Keep this table to one line per host — details belong in the dated reports it links to.
 
