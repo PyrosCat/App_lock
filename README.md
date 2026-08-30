@@ -27,7 +27,7 @@ accessibility service in 1.0.0**.
 |---|---|---|
 | M0 Baseline & governance | foundation | 🟢 Done |
 | M1 Foundation retrofit (IS Phase 0) | foundation | 🟢 Done (2026-08-25) — exit granted, tag `M1_Exit` |
-| M7 Detection & enforcement replacement | 1.0.0 | 🟡 Current — the accessibility exit (Usage Access + overlay); plan + ADR-020/021 prepped, WP0 next |
+| M7 Detection & enforcement replacement | 1.0.0 | 🟡 Current — the accessibility exit (Usage Access + overlay); **WP0 complete (2026-08-30)** — ADR-020/021 Accepted, targetSdk 36 (D0); **WP1 (harness rework) next** |
 | M8 Product & conformance | 1.0.0 | ⚪ Planned — UI/UX surfaces; vault/intruder removed from the 1.0.0 line |
 | M9 Hardening & verification | 1.0.0 | ⚪ Planned |
 | M10 Release | 1.0.0 | ⚪ Planned — signed v1.0.0 |
@@ -86,19 +86,23 @@ flowchart LR
 
 **All eight WPs are complete.** WP7 removed the destructive-migration fallback and deleted the legacy
 plaintext path (nothing had shipped — R-004/R-006 closed); WP8 landed the instrumentation seed + GMD
-smoke matrix + the IS Phase-0 gate record. M1 exited 2026-08-25 (tag `M1_Exit`); **M7 opens next** with
-`M7_PLAN.md` and ADR-020/021 (Proposed) prepared.
+smoke matrix + the IS Phase-0 gate record. M1 exited 2026-08-25 (tag `M1_Exit`); **M7 is now in
+progress** — its WP0 platform spike closed 2026-08-30 with ADR-020/021 Accepted.
 
-**M7 (current)** — the accessibility exit — runs as seven work packages ([M7_PLAN.md](docs/process/M7_PLAN.md);
-WP0 authors/accepts ADR-020/021 before any WP2 code, and adopts targetSdk 36 per D0):
+**M7 (current)** — the accessibility exit — runs as seven work packages
+([M7_PLAN.md](docs/process/M7_PLAN.md)). **WP0 (platform spike + design ADRs) closed 2026-08-30** —
+ADR-020/021 Accepted, targetSdk 36 adopted (D0), and the R-002 evidence set is complete (decisive
+emulator A/B + Firebase Test Lab OEM sweep + Moto G no-regression + biometric-via-BAL matrix); the
+throwaway spike is held to WP2. **WP1 (harness rework) is next:**
 
 ```mermaid
 flowchart LR
+    classDef done fill:#c9efd4,stroke:#248a3d,color:#14532d
     classDef next fill:#bde3ec,stroke:#1592a8,color:#0c4a56
     classDef todo fill:#e6e8ea,stroke:#8a9199,color:#3a4149
 
-    WP0["WP0<br/>Platform spike<br/>+ ADRs"]:::next
-    WP1["WP1<br/>Harness rework"]:::todo
+    WP0["WP0<br/>Platform spike<br/>+ ADRs"]:::done
+    WP1["WP1<br/>Harness rework"]:::next
     WP2["WP2<br/>Overlay lock<br/>+ request-identity"]:::todo
     WP3["WP3<br/>UsageStats<br/>detection"]:::todo
     WP4["WP4<br/>Protection<br/>health"]:::todo
@@ -107,6 +111,23 @@ flowchart LR
 
     WP0 --> WP1 --> WP2 --> WP3 --> WP4 --> WP5 --> WP6
 ```
+
+**WP1 — Harness rework (next):** rework the M1 on-device security harness (`scripts/e2e/`) so it
+asserts on the new engine — the resumed-`LockScreenActivity` and accessibility-rebind checks die with
+the old detector. Authoritative spec: [M7_PLAN.md](docs/process/M7_PLAN.md) §WP1. To do:
+
+- Replace lock detection (`is_lockscreen()` / `top_component`) with an **overlay-window probe**
+  (`dumpsys window windows` matched on the overlay's stable window title); reframe OV-4's "protected
+  content not foreground" as "our overlay is present, on top, and focus-holding".
+- Replace the a11y rebind (`rebind_a11y()` / `a11y_working()`) with **`appops` grants** —
+  `get_usage_stats` + `system_alert_window` — plus a behavioral `detection_working()` probe; drop the
+  `A11Y_*` constants.
+- Raise the OV-4 burst count and add an outer repeat so a green run is meaningful for the probabilistic
+  race; keep OV-3 (relock), F3 (self-gate), and smoke_core.
+- Update `setup_device.sh`, `scripts/e2e/README.md`, and the `run_all.sh` summary.
+- **Validate the reworked harness against the WP0 spike build** (it has a real overlay) and file a dated
+  baseline run; a deliberately-missing overlay grant must fail the probe (negative control). Validate the
+  `dumpsys window` grep across the API 30/33/35/36 lanes.
 
 Pre-rebaseline **Phases 1–3 are built and E2E-validated** — PIN/biometric auth, encryption, and
 brute-force defense carry into 1.0.0. The **vault and intruder capture are reserved for 2.0.0**
@@ -118,7 +139,7 @@ brute-force defense carry into 1.0.0. The **vault and intruder capture are reser
 |---|---|
 | `docs/v1.0.0/` | **Active baseline (ADR-019):** client-approved 1.0.0 specs — SRS, NFR, SDS, DDS, Threat Model, UI/UX + self-contained build pipeline (`source/`) |
 | `docs/v2.0.0/` | 2.0.0 target: the full client-received spec set — SRS 1–18 (FR-001..375), NFR, TAS, SDS, DDS, TSP, TM |
-| `docs/architecture/adr/` | Architecture Decision Records — ADR-001..021 (incl. the ADR-013 lineage; ADR-020/021 = the M7 overlay/detection drafts, Proposed) |
+| `docs/architecture/adr/` | Architecture Decision Records — ADR-001..021 (incl. the ADR-013 lineage; ADR-020/021 = the M7 overlay/detection decisions, **Accepted 2026-08-30**) |
 | `docs/process/` | Implementation Strategy, migration assessment, plans, ROADMAP, RTM, risk register |
 | `docs/testing/` | Test plans and validation campaign records |
 | `docs/archive/` | Superseded docs — **note the FR-226..250 renumbering notice** |
@@ -128,8 +149,9 @@ brute-force defense carry into 1.0.0. The **vault and intruder capture are reser
 ## Getting started
 
 1. Install [Android Studio](https://developer.android.com/studio) (bundles JDK + Android SDK).
-2. Open this folder in Android Studio and let Gradle sync (Gradle 8.10+ / AGP 8.7).
-3. Run the `app` configuration on a device or emulator — minSdk 26 / targetSdk 35 (ADR-014).
+2. Open this folder in Android Studio and let Gradle sync (Gradle 8.13 / AGP 8.13.2).
+3. Run the `app` configuration on a device or emulator — minSdk 26 / targetSdk 36 (ADR-014 baseline was
+   35; raised to 36 at M7/WP0 per D0).
 
 First-run flow: create a PIN (Argon2id hash in EncryptedSharedPreferences) → enable the
 **App Lock protection** accessibility service → toggle apps to protect → opening a protected

@@ -4,6 +4,20 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP0: reflect WP0 closure in roadmap.html + README; list WP1 to-do   (2026-08-30)
+-----------------------------------------------------------------------------------
+Propagated the now-committed WP0 closure into the two status surfaces the doc set links out to.
+- docs/roadmap.html: the M7 work-package subtrack now shows WP0 done and WP1 (security harness rework)
+  as Next; the M7 blurb notes the platform is validated on real hardware and the design ratified; the
+  "status as of" date moved to 30 August 2026.
+- README.md: the M7 milestone row and narrative now read WP0 complete / ADR-020/021 Accepted /
+  targetSdk 36 (D0); the M7 work-package diagram flips WP0 -> done and WP1 -> next; an explicit WP1
+  to-do list was added (pointing at M7_PLAN WP1 as the authoritative spec); the ADR doc-map row now
+  says ADR-020/021 Accepted; getting-started reconciled to this branch's toolchain (Gradle 8.13 /
+  AGP 8.13.2 / targetSdk 36).
+- Presentation/status docs only -- no code, RTM, or ADR content changed.
+
+
 M7/WP0: ADR-020/021 Accepted; D1 poll interval = 200 ms; spike held to WP2; WP0 complete   (2026-08-30)
 ------------------------------------------------------------------------------------------------------
 With the WP0 platform evidence complete (decisive emulator A/B + FTL OEM sweep + Moto G no-regression +
