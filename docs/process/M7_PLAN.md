@@ -276,8 +276,10 @@ start and the biometric-activity launch.
 **Dependencies.** M1 closed. None else.
 **Outputs (two distinct kinds — keep them separate, R10).**
 - **(1) Disposable spike** — the throwaway polling + overlay + biometric module/branch. **Not merged
-  as production; explicit cleanup point: deleted (or its branch abandoned) at WP0 close**, its
-  findings surviving only in the evidence report + the ADRs.
+  as production. Cleanup deferred to WP2 (decided 2026-08-30):** the committed OV-4 UIAutomator test
+  targets the spike's `POLL_SERVICE` / `OVERLAY_TITLE`, so the spike is **held through WP1's harness
+  rework and deleted at WP2** when the test is repointed to the production overlay — not at WP0 close.
+  Its findings otherwise survive only in the evidence reports + the ADRs.
 - **(2) Committed, surviving artifacts** — the dated evidence report (`docs/reports/campaigns/`); the
   **OV-4 race check reframed as a UIAutomator black-box instrumentation test** (`am start` bursts +
   `dumpsys window` z-order/focus sampling; `appops` grants in `@Before`), authored to run against the
@@ -620,8 +622,12 @@ gate unremediated (TM §14.9/§14.10).
   closed tree is not re-bumped). A `targetSdk` bump is a build change (recorded in the changelog), not
   an ADR; §10 carries API 36 as a first-class lane. **Fallback (re-decide only if WP0 finds the
   36-capable toolchain blocked):** hold 35 and file the Play extension for the M10 submission.
-- **D1 — Poll interval** (latency vs battery). Recommend a fixed bounded default from WP0 data (candidate
-  range ~300–800 ms) with backoff on repeated query failure; documented per NFR-PERF-012. → **ADR-021.**
+- **D1 — Poll interval — RESOLVED 2026-08-30: P = 200 ms.** The Moto G n=100/interval sweep
+  (`docs/reports/campaigns/2026-08-26_m7-wp0-spike_moto-g-2025.md`) shows `p95 ≈ P + ~40 ms`; **200 ms is
+  the largest interval that keeps end-to-end p95 < 250 ms** (226 ms measured), so 225 ms (≈265 ms p95)
+  was rejected as too high. Bounded, with backoff on repeated query failure; battery stays frugal (the
+  loop pauses on screen-off). The value's durable SSOT is the WP3 detector constant + NFR-PERF-012
+  (§2.7); recorded here as the WP0 resolution. → **ADR-021 (Accepted 2026-08-30).**
 - **D2 — Detector service topology:** one foreground service that both polls and reports health, vs a
   separate poll service + the existing watchdog. Recommend **consolidate** (single FGS — same
   "protection required" lifecycle gate, fewer FGS, smaller Play/battery surface). → **ADR-021.**

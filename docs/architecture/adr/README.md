@@ -34,5 +34,5 @@ beneath its root (GOVERNANCE §2.4).
 | [ADR-017](ADR-017-build-environment-flavors.md) | Build Environment Flavors: dev/qa/staging/prod with Suffixed Application IDs | Accepted — execution in M1 (WP4) |
 | [ADR-018](ADR-018-fqcn-pinning.md) | Permanent FQCN Pinning of AppDetectionService and UninstallProtectionReceiver | Accepted — binding constraint, enforced from WP6 |
 | [ADR-019](ADR-019-version-split-baseline.md) | Version-Split Documentation Baseline: 1.0.0 Active, Existing Full Spec Becomes the 2.0.0 Target | Accepted — execution staged (migration plan) |
-| [ADR-020](ADR-020-overlay-lock-presentation.md) | Overlay Lock Presentation: Drawn SYSTEM_ALERT_WINDOW Surface, Biometric via Transparent Activity, and the Request-Identity Model | Proposed — M7 WP0 (Accept before WP2) |
-| [ADR-021](ADR-021-usagestats-poll-detector.md) | UsageStats Polling Foreground Detector: Consolidated Special-Use Foreground Service, queryEvents Contract, and Poll Interval | Proposed — M7 WP0 (Accept before WP2) |
+| [ADR-020](ADR-020-overlay-lock-presentation.md) | Overlay Lock Presentation: Drawn SYSTEM_ALERT_WINDOW Surface, Biometric via Transparent Activity, and the Request-Identity Model | Accepted (2026-08-30) — M7 WP0 |
+| [ADR-021](ADR-021-usagestats-poll-detector.md) | UsageStats Polling Foreground Detector: Consolidated Special-Use Foreground Service, queryEvents Contract, and Poll Interval | Accepted (2026-08-30) — M7 WP0 |

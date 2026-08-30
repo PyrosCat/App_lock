@@ -1,12 +1,11 @@
 # ADR-021 — UsageStats Polling Foreground Detector: Consolidated Special-Use Foreground Service, queryEvents Contract, and Poll Interval
 
-**Status:** Proposed · **Date:** 2026-08-25 · **Source/authority:** M7 plan
-(`docs/process/M7_PLAN.md`, WP3 + §2.4), drafted 2026-08-25; **to be Accepted at M7 WP0 by the
-project lead before any WP2/WP3 production code** (GOVERNANCE §2.2). · **Implements:** ADR-013B (does
-not supersede it). · **Accept gate:** stays *Proposed* until WP0 confirms a viable bounded poll
-interval and tolerable battery on the API-36 target, with those measured values recorded in their SSOT
-(WP0 report + the detector constant + NFR-PERF-012) per GOVERNANCE §2.7 — this ADR fixes the method,
-not the numbers.
+**Status:** Accepted (2026-08-30) · **Date:** 2026-08-25 · **Source/authority:** M7 plan
+(`docs/process/M7_PLAN.md`, WP3 + §2.4), drafted 2026-08-25; **Accepted at M7 WP0 (2026-08-30)**
+(GOVERNANCE §2.2; see Implementation status). · **Implements:** ADR-013B (does not supersede it). ·
+**Accept gate (met at WP0, 2026-08-30):** a viable bounded poll interval and a tolerable battery
+profile were confirmed on the fleet, with the measured values recorded in their SSOT (WP0 reports + the
+WP3 detector constant + NFR-PERF-012) per GOVERNANCE §2.7 — this ADR fixes the method, not the numbers.
 
 ## Context
 ADR-013B fixed `UsageStatsManager` (Usage Access) as the **sole** 1.0.0 foreground-detection source,
@@ -44,21 +43,21 @@ compliance surface, so they belong in a recorded, reviewed decision.
    single new service), rather than a separate poller plus the existing watchdog. Rationale: the same
    "protection required" lifecycle gate, fewer foreground services, a smaller Play/battery surface, and
    detector-liveness read in-process (no cross-service boundary). The screen-state receiver
-   (`SCREEN_OFF` / unlock) re-homes into this service (M7 §2.1/§2.2).
+   (`SCREEN_OFF` / unlock) re-homes into this service.
 5. **FGS type + justification.** `foregroundServiceType="specialUse"` with a Play-review justification
-   string describing continuous app-lock foreground detection. Lifecycle per SDS §15.2: start only when
+   string describing continuous app-lock foreground detection. Lifecycle: start only when
    a PIN is set **and** ≥1 protected app **and** capabilities are present; stop when none are selected;
    pause the loop **only** on screen-off / locked, or when **no protected apps are selected at all** —
    **never** merely because the current foreground app is unprotected, which would miss the switch
-   *into* the next protected app (battery, SDS §15.8); bounded retry and backoff, never a tight loop.
+   *into* the next protected app (battery); bounded retry and backoff, never a tight loop.
 6. **Battery profile.** A frugal loop (stop on screen-off / locked / **no protected selections**, per
    #5) that holds **no wakelock across screen-off**. Per §2.7 the measured drain / wakelock / CPU-wake
    figures are recorded in their SSOT (the WP0 evidence report), not restated here; this ADR fixes the
    *requirement* (frugal loop, no cross-screen-off wakelock).
 
 **Binding constraints (1.0.0):** Usage Access is the sole detection source (ADR-013B); the interval is
-bounded and documented; no usage timeline is stored, only current + previous package identity (SDS
-§8.2/§15.3); nothing is persisted (DDS §1.3).
+bounded and documented; no usage timeline is stored, only current + previous package identity; nothing
+is persisted (DDS §1.3).
 
 ## Alternatives considered
 - **`queryUsageStats` (aggregated) instead of `queryEvents`.** Rejected: it aggregates over an
@@ -69,7 +68,7 @@ bounded and documented; no usage timeline is stored, only current + previous pac
 - **Separate poll service + the existing watchdog (non-consolidated).** Rejected (D2): two foreground
   services, a cross-service liveness read, and a larger Play/battery surface, for no benefit.
 - **Resume polling on `SCREEN_ON`.** Rejected: `queryEvents` yields nothing while locked (Android R+);
-  resume must gate on unlock (§2.4).
+  resume must gate on unlock.
 - **Accessibility low-latency tier in 1.0.0.** Out of scope: deferred to 2.0.0 (ADR-013B); the port
   leaves the seam for it.
 
@@ -86,8 +85,8 @@ bounded and documented; no usage timeline is stored, only current + previous pac
   not a sub-second guarantee.
 - `specialUse` FGS plus the 2026 battery/wakelock policy demand a frugal loop and a defensible Play
   justification (Play review itself is M10).
-- The `queryEvents` wall-clock and locked-state quirks require the §2.4 guards; getting them wrong makes
-  detection silently stall.
+- The `queryEvents` wall-clock and locked-state quirks require the detection-contract guards; getting
+  them wrong makes detection silently stall.
 - The interval and battery numbers are **empirical** and gate this ADR's Accept (WP0).
 
 ## Related requirements
@@ -96,11 +95,14 @@ persistence) · FR-179 (health = Usage Access + overlay) · FR-231 / FR-242 (sta
 iff the WP4 liveness lands) · NFR-PERF-012 (latency) · NFR-PERF-015 (benchmark). Risks: **R-005**
 (fail-secure readiness builds on this detector), **R-001** (this is the replacement that removes the
 accessibility exposure), **R-002** (the detector feeds the overlay remediation). Related ADRs:
-**implements ADR-013B**; pairs with **ADR-020** (presentation); the `specialUse` FGS + UsageStats are
-validated on the **API-36** target (D0; ADR-014).
+**implements ADR-013B**; pairs with **ADR-020** (presentation).
 
 ## Implementation status
-**Proposed — not implemented.** WP0 measures `P` + the battery profile on the API-36 target and records
-them in their SSOT (the report + the detector constant + NFR-PERF-012), confirming a viable interval
-exists; this ADR is then **Accepted** (its method unchanged) before WP2/WP3. WP3 implements the
-detector + the consolidated foreground service; WP6 verifies the latency figure on the §10 matrix.
+**Accepted 2026-08-30 (WP0); not yet implemented.** WP0 confirmed a viable bounded poll interval and a
+frugal battery profile (Moto G latency sweep + battery soak, `2026-08-26_m7-wp0-spike_moto-g-2025.md`;
+API-36 platform/FGS cells, `2026-08-28_m7-wp0-emulator_nucbox-g5.md`). **D1 (poll interval) is resolved
+in M7_PLAN §5 / the WP0 reports** — kept out of this body per §2.7; the WP3 detector constant +
+NFR-PERF-012 carry it forward. **D2 (consolidate) ratified.** WP3 implements the detector + the
+consolidated foreground service; WP6 verifies the latency figure on the §10 matrix. (WP3 follow-up from
+the biometric report: verify reliable post-install first-detection — the R-005 `loading` readiness
+model likely covers it.)

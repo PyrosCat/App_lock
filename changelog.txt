@@ -4,6 +4,29 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP0: ADR-020/021 Accepted; D1 poll interval = 200 ms; spike held to WP2; WP0 complete   (2026-08-30)
+------------------------------------------------------------------------------------------------------
+With the WP0 platform evidence complete (decisive emulator A/B + FTL OEM sweep + Moto G no-regression +
+the biometric-via-BAL matrix), the lead ratified the WP0 decisions and accepted the two design ADRs.
+- ADR-020 (overlay/biometric) and ADR-021 (poll/detection) moved Proposed -> Accepted (2026-08-30),
+  their implementation-status lines updated to point at the WP0 evidence. Both bodies also got a
+  readability pass thinning redundant cross-references -- no decision content changed. The ADR index
+  was updated to match.
+- D1 (poll interval) RESOLVED = 200 ms and recorded in M7_PLAN 5. The Moto G n=100/interval sweep shows
+  p95 ~= P + 40 ms; 200 ms is the largest interval keeping end-to-end p95 < 250 ms (226 ms measured), so
+  225 ms (~265 ms p95) was rejected as too high. The number lands in the WP3 detector constant +
+  NFR-PERF-012, not the ADR body.
+- D2 (consolidate the detection+health FGS), D3 (transparent biometric host), D4 (delete
+  LockScreenActivity) ratified as the ADRs propose. NFR-PERF-012 accepted as a documented figure
+  ("poll + <=250 ms enforcement", p95 226 ms end-to-end), not a hard sub-second cap.
+- M7_PLAN WP0 output (1): spike cleanup deferred from WP0 close to WP2 -- the committed OV-4 test targets
+  the spike, so it is held through WP1's harness rework and deleted when WP2 repoints the test to the
+  production overlay.
+- ROADMAP: M7 WP0 marked complete (2026-08-30); WP1 (harness rework) is next.
+- Carried to WP3 (from the biometric report): verify reliable post-install first-detection (an api30
+  UsageStats-after-install gap); the R-005 loading-until-first-snapshot readiness model likely covers it.
+
+
 M7/WP0: NucBox biometric-via-BAL emulator matrix (api30/33/36) + real-match (google_apis)   (2026-08-30)
 ------------------------------------------------------------------------------------------------------
 Ran the M7_WP0_BIOMETRIC_MATRIX task on the NucBox and filed
