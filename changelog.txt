@@ -4,6 +4,38 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP0: NucBox biometric-via-BAL emulator matrix (api30/33/36) + real-match (google_apis)   (2026-08-30)
+------------------------------------------------------------------------------------------------------
+Ran the M7_WP0_BIOMETRIC_MATRIX task on the NucBox and filed
+docs/reports/campaigns/2026-08-30_m7-wp0-biometric-matrix_nucbox-g5.md. Evidence only (WP0 lands no
+production code; RTM/ADRs untouched). Closes ADR-020's last platform residual: biometric-via-BAL proven
+on API 30/33/36 emulator (+ 35 Moto G real).
+- Item A (mandatory): the transparent SpikeBiometricActivity launches from the background on all three
+  levels (a fresh-timestamped START line at each fire, no BAL denial). The app holds SYSTEM_ALERT_WINDOW,
+  which is a standing BAL exception on every Android version, so the launch is permitted on all three via
+  that alone; a visible overlay is a second valid basis when present. The OS log just names which reason
+  fired -- SAW on api30, BAL_ALLOW_NON_APP_VISIBLE_WINDOW (visible window) on api36, none on api33 -- not
+  a version-dependent requirement. (The Android-15 visible-overlay narrowing applies to background FGS
+  starts, ADR-021, not this activity BAL, ADR-020.) BiometricPrompt ran on each (ERROR 11
+  no-enrolled-print, expected on a bare emulator).
+- Item B (optional): on google_apis api33, enrolled a print (adb emu finger) and a matching touch gave
+  "M7Spike: biometric SUCCESS" -- real-match confirmation on an emulator, complementing the Moto G.
+- api30 detection: warm steady-state is reliable (21/21 clean trials, 0.5-2.5s, 0 misses), but reinstall
+  -> immediate trial missed 9 of 10 (n=10) -- every miss with no LOCK logged, i.e. queryEvents never
+  detected the foreground app (not a draw failure; the lone success detected in 0.6s). Ruled out dexopt
+  (0 dex2oat lines; an earlier dexopt attribution was wrong) and appops (stayed granted); the mechanism
+  (UsageStats not reporting events for a just-(re)installed package) is not isolated, nor was single
+  fresh-install separated from repeated-reinstall. Does not gate the biometric BAL (held SAW carries it),
+  but it is a detection gap right after install/grant -- WP3 should verify the production
+  UsageAccessDetector detects reliably in the first seconds after setup.
+- Fixed a methodology bug in the task doc docs/testing/M7_WP0_BIOMETRIC_MATRIX.md: the Item A sequence
+  dumped the M7Spike buffer without clearing it first, so a biometric callback from an earlier run could
+  false-pass. Added an "adb logcat -c" before the BIOMETRIC fire and pointed the pass check at the
+  fresh-timestamped ActivityTaskManager START line (which cannot be stale). (My own runs were already
+  timestamp-anchored via the START line, so the evidence above is valid.)
+- Updated the reports/README.md NucBox fleet-index row.
+
+
 M7/WP0: Firebase Test Lab multi-OEM sweep report + evidence-standard role-name reword   (2026-08-29)
 ---------------------------------------------------------------------------------------------------
 Filed the FTL OEM/OS residual-sweep evidence and reworded the R-002 evidence standard's shorthand.

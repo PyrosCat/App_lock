@@ -59,9 +59,10 @@ adb shell am start-foreground-service -n "$SVC" --es target "$TARGET" --el inter
 adb shell monkey -p "$TARGET" -c android.intent.category.LAUNCHER 1              # 3. bring the "protected" app to the foreground
 sleep 2                                                                          #    the poll detects it, draws the overlay; App Lock is now background
 adb shell dumpsys window | grep -i AppLockSpikeOverlay                           #    confirm the overlay window is up over the target
-adb shell am start-foreground-service -n "$SVC" -a com.applock.spike.BIOMETRIC   # 4. BAL: App Lock (background) launches the host — permitted only by the visible overlay
+adb logcat -c                                                                    # 4. CLEAR logcat FIRST — otherwise a biometric callback left in the buffer from an earlier run can false-pass step 6
+adb shell am start-foreground-service -n "$SVC" -a com.applock.spike.BIOMETRIC   # 5. BAL: App Lock (background) launches the host — permitted by a BAL exception (visible overlay and/or the held SAW permission; see the anchor note)
 sleep 1
-adb logcat -d -s M7Spike | tail -8                                              # 5. the biometric line proves the launch (tag M7Spike)
+adb logcat -d -s M7Spike | tail -8                                              # 6. the biometric line proves the launch (tag M7Spike) — only THIS run's, since the buffer was just cleared
 adb shell dumpsys activity activities | grep -i SpikeBiometricActivity           #    supplementary (the transparent host may already have finished)
 adb shell am start-foreground-service -n "$SVC" -a com.applock.spike.STOP
 ```
@@ -73,6 +74,14 @@ error just reflects the emulator having no enrolled print). **Fail = no biometri
 background-activity-start / BAL denial in the main logcat**
 (`adb logcat -d | grep -iE "background activity|abort.*launch|BAL"`) — that is the ADR-020 escalation;
 capture it.
+
+**Anchor the evidence to *this* run.** Step 4 clears the buffer, so the step-6 line is necessarily from
+this launch (never a stale callback). The definitive launch proof is the `ActivityTaskManager: START …
+SpikeBiometricActivity` line — printed with a fresh timestamp at the fire, it cannot be stale — and it
+also names the qualifying BAL reason (e.g. `BAL_ALLOW_NON_APP_VISIBLE_WINDOW`, or "SYSTEM_ALERT_WINDOW
+permission is granted"): `adb logcat -d | grep "START .*SpikeBiometricActivity"`. Note the app holds
+SAW, which is itself a standing BAL exception on every version, so the launch does not strictly require
+a drawn overlay — the visible overlay is one qualifying reason, the held SAW permission another.
 
 ## 3. Item B — real fingerprint match (OPTIONAL; needs a google_apis image)
 
