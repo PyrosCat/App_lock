@@ -29,10 +29,14 @@ fi
 home
 
 step "neg control: RESTORE overlay grant → overlay recovers"
+# A revoked SYSTEM_ALERT_WINDOW appop wedges the RUNNING app's overlay drawing; Android does not
+# restore it on a re-grant alone (verified on the Moto G 2025), so restart the detector after
+# re-granting. This mirrors production, where a capability re-grant triggers a detector/health restart.
 grant_overlay
+stop_detection; arrange_protected
 home; sleep 1; launch_pkg "$PROTECTED_PKG"
-if wait_lockscreen; then pass "overlay recovers after re-granting"; clear_lock
-else fail "overlay did NOT recover after re-granting the overlay op"; fi
+if wait_lockscreen; then pass "overlay recovers after re-granting + detector restart"; clear_lock
+else fail "overlay did NOT recover after re-granting + restarting the detector"; fi
 home
 
 summary "neg_overlay_grant"

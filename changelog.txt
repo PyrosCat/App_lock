@@ -4,6 +4,17 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP1: neg-control recovery restarts the detector after a SAW re-grant (Moto G finding)   (2026-08-31)
+------------------------------------------------------------------------------------------------------
+The first Moto G §11 gate run surfaced a bug in neg_overlay_grant.sh (from the CR-006 hardening): the
+RESTORE half re-launched the target against the still-running FGS and the overlay never came back, so
+the control failed -- even though its security-critical half (overlay ABSENT while the grant is revoked)
+passed. Root cause verified on the Moto G 2025: revoking the SYSTEM_ALERT_WINDOW appop wedges the running
+app's overlay drawing, and Android does not restore it on a re-grant alone. Fix: the recovery step now
+restarts the detector (stop_detection; arrange_protected) after re-granting, then asserts recovery --
+re-verified 2/2 pass. (OV-4 itself passed the §11 gate clean: TOP=250/250 ABSENT=0 BEHIND=0, both runs.)
+
+
 M7/WP1: harness hardening pass from the 2026-08-31 formal code review   (2026-08-31)
 ------------------------------------------------------------------------------------
 Applied six control fixes from the independent WP1 review
