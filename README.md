@@ -23,6 +23,8 @@ Lifecycle position after the **v1.0.0 / v2.0.0 split** (ADR-019, 2026-08-14): th
 target. Detection scope is fixed by ADR-013B — Usage Access + a mandatory system overlay, **no
 accessibility service in 1.0.0**.
 
+**Legend:** 🟢 done · 🟡 current · ⚪ planned.
+
 | Milestone | Line | Status |
 |---|---|---|
 | M0 Baseline & governance | foundation | 🟢 Done |
@@ -40,8 +42,6 @@ Live status: [ROADMAP.md](docs/process/ROADMAP.md); baseline analysis (frozen sn
 (ADR-019 re-cut); the earlier M2–M6 scope is frozen as the deferred 2.0.0 lineage. **M1 (foundation
 retrofit) closed 2026-08-25** ([M1_PLAN.md](docs/process/M1_PLAN.md), WP1–WP8 all done); **M7 is now
 the current milestone** ([M7_PLAN.md](docs/process/M7_PLAN.md)).
-
-**Legend:** 🟢 done · 🟡 current · 🔵 next · ⚪ planned.
 
 The 1.0.0 milestone spine:
 
