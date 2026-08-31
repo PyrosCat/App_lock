@@ -27,7 +27,9 @@ import org.junit.runner.RunWith
  * The race: fire a storm of `am start` at a protected app; the app-lock overlay must be present and
  * **on top (focused)** afterwards — **never `ABSENT`** (the R-002 / F4 failure). Counts default light
  * for CI; the fleet/FTL rig overrides them to the §11 protocol via instrumentation args, e.g.
- * `-e ov4_bursts 50 -e ov4_relaunches 20 -e ov4_repeat 5`.
+ * `-e ov4_bursts 50 -e ov4_relaunches 20 -e ov4_repeat 5`. `ov4_t_appear_ms` (default 1500) scales the
+ * overlay-appear budget — raise it on the slow software-GPU NucBox lanes (WP0 finding); real hardware
+ * keeps the default.
  */
 @RunWith(AndroidJUnit4::class)
 @OverlayRaceTest
@@ -86,6 +88,11 @@ class OverlayRaceUiTest {
         val bursts = arg("ov4_bursts", 5)
         val relaunches = arg("ov4_relaunches", 10)
         val repeat = arg("ov4_repeat", 1)
+        val tAppearMs = arg("ov4_t_appear_ms", T_APPEAR_DEFAULT_MS)
+        // CR-003: reject vacuous/invalid args (also when run directly, not via the shell wrapper).
+        require(bursts >= 1 && relaunches >= 1 && repeat >= 1 && tAppearMs >= 1) {
+            "OV-4 args must be >= 1 (bursts=$bursts relaunches=$relaunches repeat=$repeat t_appear=$tAppearMs)"
+        }
 
         var absent = 0
         var behind = 0
@@ -94,7 +101,7 @@ class OverlayRaceUiTest {
             repeat(bursts) {
                 settle()
                 repeat(relaunches) { sh("am start -n $targetComponent") }
-                when (awaitOverlay()) {
+                when (awaitOverlay(tAppearMs)) {
                     Z.TOP -> top++
                     Z.BEHIND -> behind++
                     Z.ABSENT -> absent++
@@ -104,7 +111,7 @@ class OverlayRaceUiTest {
 
         val total = top + behind + absent
         val log = "OV-4 overlay race: TOP=$top BEHIND=$behind ABSENT=$absent of $total " +
-            "(bursts=$bursts relaunches=$relaunches repeat=$repeat)"
+            "(bursts=$bursts relaunches=$relaunches repeat=$repeat t_appear=${tAppearMs}ms)"
         Log.i("M7SpikeTest", log) // always emit the counts (assert message only prints on failure)
         // Hard budget (§11): ABSENT = 0 on any burst; BEHIND tolerated only as sub-poll flicker (<=2%).
         assertEquals("$log — ABSENT must be 0 (R-002/F4 exposure)", 0, absent)
@@ -115,9 +122,9 @@ class OverlayRaceUiTest {
         )
     }
 
-    /** Poll `dumpsys window` up to T_APPEAR for the overlay; TOP once it holds focus. */
-    private fun awaitOverlay(): Z {
-        val deadline = SystemClock.uptimeMillis() + T_APPEAR_MS
+    /** Poll `dumpsys window` up to [tAppearMs] for the overlay; TOP once it holds focus. */
+    private fun awaitOverlay(tAppearMs: Int): Z {
+        val deadline = SystemClock.uptimeMillis() + tAppearMs
         var seen = Z.ABSENT
         while (SystemClock.uptimeMillis() < deadline) {
             val z = zOrder()
@@ -193,7 +200,9 @@ class OverlayRaceUiTest {
             "com.android.calculator2",        // AOSP calculator — older/emulator images
         )
 
-        const val T_APPEAR_MS = 1500L
+        // Default overlay-appear budget (ms); override per-run with `-e ov4_t_appear_ms N`. WP0: raise
+        // it on the slow software-GPU NucBox lanes where the un-fixed spike straddles 1500 ms.
+        const val T_APPEAR_DEFAULT_MS = 1500
         const val SAMPLE_MS = 100L
     }
 }

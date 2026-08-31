@@ -343,10 +343,35 @@ engine oracle cannot observe `HIDE_NON_SYSTEM_OVERLAY`.
 **RTM (this WP's commit):** none — harness / test infrastructure (no requirement-state changes).
 **Acceptance.** The reworked scripts pass against the WP0 spike build **per the §11 protocol**
 (defined burst/repeat counts + `ABSENT`/`BEHIND` budget, not an ad-hoc "2/2"); a deliberately-missing
-overlay grant makes `detection_working()`/smoke fail (negative control).
+overlay grant makes `detection_working()`/smoke fail (negative control). **Slow-rig caveat (WP0
+emulator finding).** The committed spike keeps the un-fixed overlay (the warm-overlay / off-main remedy
+is reverted to WP2/WP3), so it coin-flips vs the 1500 ms `T_appear` on the NucBox software-GPU lanes
+(more bursts *raise* P(fail), never lower it). So the **NucBox lanes validate probe/grep portability
+across API 30/33/35/36 + the old-vs-new A/B delta** (both robust to the coin-flip); the **clean §11
+ABSENT=0 pass comes from the Moto G real hardware**, not the swGPU spike. Make
+`OverlayRaceUiTest.T_APPEAR_MS` an instrumentation arg so the swGPU lane can scale it, and keep the
+lanes on `aosp/default` images (`aosp-atd` ships no target app → OV-4 assume-skips; already fixed in
+`build.gradle`).
 **Risks / implications.** Overlay-window detection via `dumpsys window` varies by API level —
 validate the grep across the §10 lanes (30/33/35/36) (mirrors the M1 `top_component`
 API-portability work).
+**Formal-review dispositions (2026-08-31 independent review; `docs/reports/reviews/2026-08-31_m7-wp1-harness-formal-code-review.md`).**
+A WP1 hardening pass applied six control fixes in code: reject `LOCK_ENGINE=prod` for OV-4 (the test is
+spike-hardcoded until WP2) (CR-001); fail-closed input validation so a vacuous run cannot PASS (CR-003);
+fail-closed APK / androidTest install with a `USE_PREINSTALLED` escape (CR-005); a `neg_overlay_grant.sh`
+missing-grant negative control (CR-006); OV-4 requires + arithmetic-validates its retained count line
+(CR-007); prod-only checks skip with exit 3 and `run_all` labels the §11 gate vs a non-gate/diagnostic
+profile (CR-009 / CR-003). Three findings are deferred with owners:
+- **CR-004 → WP2:** WP1 removed a11y provisioning (its own task), but WP2 keeps a11y as the *detector*.
+  WP2 re-adds a **scoped a11y-detector enable** for the prod-presentation run (the `prod` harness path is
+  a not-wired stub until then); dropped at WP5. Kept simple in WP1 rather than building a
+  presentation×detector seam ahead of need.
+- **CR-002 → WP6 / R-002 closure:** the OV-4 BEHIND score is present/absent per burst, not a streak
+  duration; before R-002 closure evidence, measure the max BEHIND streak, reject BEHIND-at-deadline, and
+  tighten the small-N `maxOf(1, …)` tolerance to the exact 2 %.
+- **CR-008 → WP2–WP6:** `settle()` waits a fixed 300 ms (< the poll interval) and can coalesce
+  HOME/target events into a manufactured ABSENT on slow lanes; add a debug-only detector-state ack
+  (neutral foreground processed / cursor reset) before each burst. (False-FAIL flakiness, not a false pass.)
 
 ### WP2 — Lock presentation swap: overlay + request-identity *(keep the a11y detector as input)*
 **Purpose.** Swap the *presentation* mechanism only, feeding it from the **known-good** accessibility

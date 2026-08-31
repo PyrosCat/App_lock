@@ -4,9 +4,11 @@
 # reappear (the vault/log must not be reachable without re-auth, FR-108).
 # The self-gate and App List are both MainActivity, so this asserts on UI content
 # (the "Open vault" content-desc appears ONLY in the unlocked App List) rather than
-# on the resumed activity.
+# on the resumed activity. Needs the app's PIN/self-gate UI, so this is a PROD-engine
+# check (the spike has none); validated at WP2.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; source "$HERE/lib.sh"
+[ "$LOCK_ENGINE" = spike ] && { step "F3 self-gate"; info "SKIPPED (exit 3, unsupported) — prod-path (PIN self-gate / app list); the spike has none. Runs under LOCK_ENGINE=prod at WP2."; exit 3; }
 
 require_device || exit 2
 

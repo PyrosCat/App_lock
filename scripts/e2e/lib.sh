@@ -1,13 +1,18 @@
 #!/usr/bin/env bash
-# WP2 regression harness — shared library.
+# M7 security-regression harness — shared library.
 # Sourced by every check script. Encodes the app's identifiers and the hard-won
-# emulator/adb recipes from the Phase 3 campaign (PIN-pad geometry, a11y rebind,
-# tap timing, focus detection) so the OV-3 / OV-4 / F3 gating checks can run
-# headless and be asserted mechanically — no screenshot parsing.
+# emulator/adb recipes (PIN-pad geometry, tap timing, focus + overlay detection) so the
+# OV-3 / OV-4 / F3 gating checks run headless and are asserted mechanically, no screenshots.
 #
-# The gating semantics these checks defend (F3 self-gate resume, F4 fast-relaunch)
-# are exactly where the two Phase-3 security bypasses lived; run this before AND
-# after any change to the lock engine, session manager, or self-gate (M1 WP5/WP6).
+# M7/WP1 reworked this off the old engine: the lock surface is a drawn SYSTEM_ALERT_WINDOW
+# overlay (found by window title via `dumpsys window`), and capabilities are granted with
+# `appops` (Usage Access + overlay), replacing the resumed-LockScreenActivity assertions and
+# the accessibility rebind. The gating semantics it defends (F3 self-gate resume, F4/OV-4
+# fast-relaunch) are where the two Phase-3 bypasses lived; run it before AND after any change
+# to the lock engine, detector, session manager, or self-gate.
+#
+# LOCK_ENGINE=spike (default, WP1) drives the throwaway WP0 spike overlay; WP2 flips it to
+# prod and repoints OVERLAY_WINDOW_TITLE / POLL_SERVICE to the production surface.
 
 set -uo pipefail
 export MSYS_NO_PATHCONV=1   # Git Bash must not mangle device paths like /sdcard/...
@@ -15,12 +20,18 @@ export MSYS_NO_PATHCONV=1   # Git Bash must not mangle device paths like /sdcard
 # ---- configuration (override via env) -------------------------------------
 : "${APP_ID:=com.applock}"                 # applicationId (WP4 adds .dev/.qa/... suffixes)
 : "${PIN:=1234}"                           # test PIN (campaign baseline)
-: "${A11Y_CLASS:=com.applock.applocker.service.AppDetectionService}"  # FQCN pinned (ADR-013)
-LOCK_ACTIVITY_MATCH="LockScreenActivity"   # substring identifying the lock screen activity
+# --- M7 lock engine (WP1) --------------------------------------------------
+# The lock surface is now a drawn SYSTEM_ALERT_WINDOW overlay, found by its stable window
+# title via `dumpsys window` (the resumed-LockScreenActivity + a11y model died with the old
+# engine, M7_PLAN WP1). Two constants are repointed spike->prod at WP2; nothing else changes.
+: "${LOCK_ENGINE:=spike}"                  # spike | prod — engine the harness drives (WP1 = spike)
+: "${OVERLAY_WINDOW_TITLE:=AppLockSpikeOverlay}"   # SpikeConfig.OVERLAY_WINDOW_TITLE; WP2 -> prod title
+: "${POLL_SERVICE:=com.applock/com.applock.platform.spike.UsagePollService}"  # detection FGS; WP2 -> prod
+: "${SPIKE_LAUNCHER:=com.applock/com.applock.platform.spike.SpikeLauncherActivity}"  # spike-only foregrounder
+: "${POLL_INTERVAL_MS:=400}"               # poll interval P handed to the spike FGS (prod D1 = 200; sweepable)
 # MainActivity moved to presentation/applist in WP6; kept here for reference only —
 # launch_main() resolves the launcher activity dynamically so package moves don't stale it out.
 MAIN_ACTIVITY="${APP_ID}/com.applock.presentation.applist.MainActivity"
-A11Y_COMPONENT="${APP_ID}/${A11Y_CLASS}"
 # UI text signals (from res/values/strings.xml):
 UI_APPLIST_SIGNAL="Open vault"             # content-desc present ONLY in the unlocked App List
 UI_PIN_SIGNAL="Enter your PIN"             # subtitle on the self-gate / lock screen
@@ -118,7 +129,26 @@ top_component() { # -> pkg/activity of the resumed activity (portable across API
   [ -n "$c" ] || c="$(sh_ dumpsys window | grep -iE 'mCurrentFocus|mFocusedApp' | grep -Eo '[A-Za-z0-9_.]+/[A-Za-z0-9_.]+' | head -1)"
   printf '%s' "$c"
 }
-is_lockscreen()   { top_component | grep -q "$LOCK_ACTIVITY_MATCH"; }
+# --- overlay lock-surface probe (M7 engine) --------------------------------
+# z-order of our overlay window ($OVERLAY_WINDOW_TITLE) via `dumpsys window` — NOT
+# `dumpsys window windows`, which omits the mCurrentFocus line and makes every present
+# overlay read BEHIND (mirrors OverlayRaceUiTest.zOrder()). Prints TOP | BEHIND | ABSENT.
+# NB: the dumpsys format varies by API level AND OEM skin. WP0's FTL sweep saw Samsung One UI
+# possibly mis-parse mCurrentFocus (a focused overlay scoring a false BEHIND); the WP2 open item
+# sets the production overlay focus flags and revalidates this grep. ABSENT (the security-critical
+# state) read robustly on every OEM; TOP/BEHIND is the soft boundary. Revalidate across the §10
+# lanes — One UI coverage comes via FTL, not the AOSP NucBox lanes.
+overlay_z() {
+  local dump; dump="$(sh_ dumpsys window)"
+  if printf '%s\n' "$dump" | grep -E 'mCurrentFocus' | grep -qF "$OVERLAY_WINDOW_TITLE"; then printf 'TOP'
+  elif printf '%s\n' "$dump" | grep -qF "$OVERLAY_WINDOW_TITLE"; then printf 'BEHIND'
+  else printf 'ABSENT'; fi
+}
+overlay_present() { [ "$(overlay_z)" != ABSENT ]; }
+overlay_on_top()  { [ "$(overlay_z)" = TOP ]; }
+# "lock screen up" now means the overlay lock surface is drawn AND focus-holding (TOP). The
+# name is kept so the OV-3/OV-4/smoke callers stay stable through the engine swap (M7_PLAN WP1).
+is_lockscreen()   { overlay_on_top; }
 foreground_is()   { top_component | grep -q "^$1/"; }
 
 wait_lockscreen() { # timeout-seconds ; returns 0 when lock screen is up
@@ -177,24 +207,75 @@ resolve_clock() {
   info "protected app (Clock): $PROTECTED_PKG"
 }
 
-rebind_a11y() { # delete-then-put; binding completes on next app launch (see gotchas memo)
-  # NOTE: this adb path works on EMULATORS, but on real devices >= Android 13 the
-  # "Restricted Settings" hardening enables the service in a "malfunctioning" state
-  # that never delivers events (verified on Moto G 2025 / Android 15, where the
-  # "Allow restricted settings" escape hatch is also removed). On such devices the
-  # operator MUST grant accessibility via the real Settings UI (toggle off/on). See
-  # a11y_working() and the setup guidance.
-  sh_ settings delete secure enabled_accessibility_services
-  sh_ settings put secure enabled_accessibility_services "$A11Y_COMPONENT"
-  sh_ settings put secure accessibility_enabled 1
+# --- capability grants (replace the a11y rebind) ---------------------------
+# Usage Access + "display over other apps", both grantable over adb via appops on emulators
+# AND real devices (unlike the old a11y rebind, which real devices >=API13 trapped in the
+# "Restricted Settings" malfunctioning state). Mirrors OverlayRaceUiTest's @Before grants.
+grant_usage_access() { sh_ appops set "$APP_ID" android:get_usage_stats allow >/dev/null; }
+grant_overlay()      { sh_ appops set "$APP_ID" android:system_alert_window allow >/dev/null; }
+grants_ok() { # both ops report allow?
+  sh_ appops get "$APP_ID" android:system_alert_window | grep -qi allow \
+    && sh_ appops get "$APP_ID" android:get_usage_stats | grep -qi allow
+}
+revoke_overlay() { sh_ appops set "$APP_ID" android:system_alert_window ignore >/dev/null; }  # negative control (CR-006)
+is_pos_int() { case "${1:-}" in ''|*[!0-9]*|0) return 1;; *) return 0;; esac; }                # positive integer only (CR-003)
+
+# Arrange the lock surface for $PROTECTED_PKG under the active engine, so a later launch of
+# that package raises the overlay. Spike: hand the throwaway poll FGS the target directly
+# (no PIN / protect-toggle exists in the spike). Prod (WP2): the app's own FGS already runs
+# from provisioning, so this is a placeholder repointed when prod detection lands.
+arrange_protected() {
+  case "$LOCK_ENGINE" in
+    spike)
+      sh_ am start -n "$SPIKE_LAUNCHER" >/dev/null; sleep 0.5
+      sh_ am start-foreground-service -n "$POLL_SERVICE" --es target "$PROTECTED_PKG" --el interval "$POLL_INTERVAL_MS" >/dev/null
+      sleep 0.5; home ;;
+    prod) : ;;   # production keeps its own detector alive once PIN set + app protected (WP2 wires this)
+    *)    fail "unknown LOCK_ENGINE=$LOCK_ENGINE (want spike|prod)"; return 1 ;;
+  esac
 }
 
-# Behavioural test that accessibility events actually reach the engine: a protected
-# app must show the lock screen. Assumes $PROTECTED_PKG is protected. Returns 0 if
-# the lock screen appears (a11y is delivering), 1 otherwise (grant needed via UI).
-a11y_working() {
+# Clear the lock surface after a positive detection, engine-appropriately.
+clear_lock() {
+  case "$LOCK_ENGINE" in
+    spike) sh_ am start-foreground-service -n "$POLL_SERVICE" -a com.applock.spike.DISMISS >/dev/null ;;
+    prod)  enter_pin "$PIN"; wait_foreground "$PROTECTED_PKG" >/dev/null 2>&1 || true ;;
+  esac
+  home
+}
+
+# Tear down detection (spike only; prod's FGS is app-managed). Best-effort, always returns 0.
+stop_detection() {
+  [ "$LOCK_ENGINE" = spike ] && sh_ am start-foreground-service -n "$POLL_SERVICE" -a com.applock.spike.STOP >/dev/null
+  return 0
+}
+
+# Behavioural probe that the detection->overlay path is live: launching the protected app
+# raises the overlay lock surface. Replaces a11y_working(). Returns 0 if the overlay comes
+# up (detection delivering), 1 otherwise (a missing grant / dead detector — the negative
+# control WP1 acceptance requires). Assumes arrange_protected has run (spike).
+detection_working() {
   home; sleep 1; launch_pkg "$PROTECTED_PKG"
-  if wait_lockscreen; then enter_pin "$PIN"; home; return 0; else home; return 1; fi
+  if wait_lockscreen; then clear_lock; return 0; else home; return 1; fi
+}
+
+# --- WP0-report operational lessons (fold the campaign findings into setup) -
+# Keep the screen awake: the poll pauses on screen-off (§2.4 / Moto G battery report), so a
+# sleeping device stalls detection mid-run (svc power stayon true — Moto G method note).
+screen_stayon() { sh_ svc power stayon true >/dev/null 2>&1 || true; }
+# Grow the logcat ring: under a rapid-relaunch burst the default buffer rotates M7Spike lines
+# out and a logcat-based count plateaus (Moto G measurement-fix note). Only matters for
+# count-from-logcat steps; harmless otherwise.
+boost_logcat() { adbx logcat -G 16M >/dev/null 2>&1 || true; }
+# Prime the detector after (re)install: WP0's api30 biometric run found queryEvents misses the
+# FIRST foreground detection for a window right after install (~90%, n=10; steady-state is 21/21
+# reliable). setup_device.sh reinstalls each run, so warm the detector once and discard the
+# result before any check asserts on detection. (Spike: arrange the target first.)
+warm_detection() {
+  [ "$LOCK_ENGINE" = spike ] && arrange_protected
+  home; sleep 1; launch_pkg "$PROTECTED_PKG"; wait_lockscreen >/dev/null 2>&1 || true
+  [ "$LOCK_ENGINE" = spike ] && sh_ am start-foreground-service -n "$POLL_SERVICE" -a com.applock.spike.DISMISS >/dev/null 2>&1
+  home
 }
 
 # Bring App Lock to a known LOCKED-out state for a protected app, then unlock it.

@@ -1,42 +1,66 @@
 #!/usr/bin/env bash
-# setup_device — provision a booted device/emulator to the harness baseline:
-# install the debug APK, set the PIN, bind the accessibility service, and protect
-# the Clock app. Idempotent-ish: safe to re-run. Run once before the check scripts
-# (run_all.sh calls it unless --skip-setup).
+# setup_device — provision a booted device/emulator to the M7 harness baseline:
+# install the APK, grant Usage Access + "display over other apps" via appops (this
+# replaced the old accessibility-service bind), keep the screen awake, and provision
+# the active lock engine. Idempotent-ish: safe to re-run; run_all.sh calls it unless
+# --skip-setup.
 #
-# Protecting Clock is driven through the UI (there is no programmatic protect API,
-# and the DB is SQLCipher-encrypted): it finds the "Clock" row in the app list and
-# taps its switch. That is the most device-fragile step; failures print guidance.
+# LOCK_ENGINE=spike (WP1 default): the throwaway spike has no PIN/app-list, so setup
+# hands its poll FGS the Clock target and confirms the overlay comes up, then stops.
+# LOCK_ENGINE=prod (WP2+): set the PIN and protect Clock through the app-list UI
+# (there is no programmatic protect API, and the DB is SQLCipher-encrypted): it finds
+# the "Clock" row and taps its switch — the most device-fragile step; failures guide.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"; source "$HERE/lib.sh"
-APK="${APK:-$HERE/../../app/build/outputs/apk/debug/app-debug.apk}"
+APK="${APK:-$HERE/../../app/build/outputs/apk/prod/debug/app-prod-debug.apk}"   # WP4 flavors: prod/debug
 
 require_device || exit 2
 resolve_clock || exit 2
 
 step "setup: install APK"
-if [ -f "$APK" ]; then
+# Fail-closed (CR-005): a missing APK or a non-Success install aborts, so a stale
+# on-device build can't silently be cited as evidence. USE_PREINSTALLED=1 is the
+# explicit diagnostic escape (provenance then NOT established).
+if [ "${USE_PREINSTALLED:-}" = 1 ]; then
+  info "USE_PREINSTALLED=1 — skipping install (diagnostic; provenance NOT established)"
+elif [ ! -f "$APK" ]; then
+  fail "APK not found at $APK (build :app:assembleProdDebug, set APK=, or USE_PREINSTALLED=1)"; summary "setup"; exit 1
+else
   out="$(adbx install -r -g "$(host_path "$APK")" 2>&1)"
   if printf '%s' "$out" | grep -q 'Success'; then info "installed $(basename "$APK")"
-  else info "install did not report Success: $(printf '%s' "$out" | tr '\n' ' ' | tail -c 200)"; fi
-else info "APK not found at $APK — assuming already installed"; fi
-
-step "setup: bind accessibility service"
-# Non-destructive: if the service is already enabled (e.g. a working manual UI grant
-# on a real device), DON'T delete+re-put it — that would reset a real device back to
-# the broken "Restricted Settings" state. Only rebind when it isn't already enabled.
-if sh_ settings get secure enabled_accessibility_services | grep -q "$A11Y_CLASS"; then
-  sh_ settings put secure accessibility_enabled 1
-  info "a11y already enabled — preserved (not resetting; a real-device grant survives)"
-else
-  rebind_a11y
-  info "a11y enabled via adb ($A11Y_COMPONENT) — works on emulators; a real device >=API13"
-  info "  will still show it 'malfunctioning' until granted via the Settings UI (see below)"
+  else fail "install did not report Success: $(printf '%s' "$out" | tr '\n' ' ' | tail -c 200)"; summary "setup"; exit 1; fi
 fi
+
+step "setup: grant Usage Access + overlay (appops)"
+# Replaces the old accessibility rebind: both ops grant cleanly over adb on emulators
+# AND real devices (the a11y path trapped real devices >=API13 in "Restricted Settings").
+grant_usage_access; grant_overlay
+if grants_ok; then info "granted android:get_usage_stats + android:system_alert_window"
+else fail "appops grants did not stick (overlay=$(sh_ appops get "$APP_ID" android:system_alert_window))"; fi
+
+step "setup: harness environment (WP0-report lessons)"
+screen_stayon   # poll pauses on screen-off, so keep the screen awake mid-run (Moto G battery report)
+boost_logcat    # grow the logcat ring so M7Spike counts don't rotate out under bursts (Moto G note)
+info "screen kept awake; logcat buffer -> 16M"
 
 step "setup: grant CAMERA (intruder selfie, optional)"
 sh_ pm grant "$APP_ID" android.permission.CAMERA >/dev/null 2>&1 || true
 
+# --- spike engine (WP1): no PIN / no protect-toggle UI. Drive the poll FGS directly. -
+if [ "$LOCK_ENGINE" = spike ]; then
+  step "setup: provision spike engine (target=$PROTECTED_LABEL / $PROTECTED_PKG)"
+  warm_detection   # arrange the target + prime the detector past the post-install first-detection gap
+  if detection_working; then pass "spike overlay comes up for $PROTECTED_LABEL"
+  else
+    fail "spike overlay did NOT come up for $PROTECTED_LABEL. Check:"
+    info "  1. appops overlay=$(sh_ appops get "$APP_ID" android:system_alert_window) usage=$(sh_ appops get "$APP_ID" android:get_usage_stats)"
+    info "  2. the poll FGS started (target lives in SpikeState, reset by process death)"
+    info "  3. the target is a NORMAL app, not Settings (overlays are force-hidden over Settings)"
+  fi
+  summary "setup"; exit $?
+fi
+
+# --- prod engine (WP2+): the app's own PIN + protect-toggle UI (detection lands WP2/WP3) ---
 step "setup: PIN"
 home; sleep 1; launch_main; sleep 2; dismiss_anr
 if ui_has "$UI_PIN_SETUP_SIGNAL"; then
@@ -76,18 +100,15 @@ for step in $(seq 1 20); do
 done
 [ -n "$found" ] || { fail "could not locate the '$PROTECTED_LABEL' row after scrolling (locale? label mismatch?); toggle it manually"; summary "setup"; exit 1; }
 
-# Confirm protection took AND accessibility is delivering events.
+# Confirm protection took AND detection is delivering (the overlay comes up).
 home; sleep 1; launch_pkg "$PROTECTED_PKG"
-if wait_lockscreen; then pass "Clock now protected (lock screen appeared)"; enter_pin "$PIN"; home
+if wait_lockscreen; then pass "Clock now protected (overlay lock surface appeared)"; enter_pin "$PIN"; home
 else
   fail "Clock did not lock. Two possible causes:"
   info "  1. The wrong switch row was toggled (re-run; the locate step is geometric)."
-  info "  2. Accessibility is enabled but NOT delivering events — the Android 13+"
-  info "     'Restricted Settings' state (App Info shows 'malfunctioning'). adb cannot"
-  info "     fix this on real devices. Grant it via the phone: Settings > Accessibility"
-  info "     Settings > Accessibility > App Lock protection > toggle OFF then ON"
-  info "     (on Android 15 the 'Allow restricted settings' menu may be gone — the"
-  info "     off/on toggle is the way). Then re-run with --skip-setup."
+  info "  2. A capability grant did not stick — check appops:"
+  info "     usage=$(sh_ appops get "$APP_ID" android:get_usage_stats) overlay=$(sh_ appops get "$APP_ID" android:system_alert_window)"
+  info "     (both must read 'allow'; re-grant, then re-run with --skip-setup)."
 fi
 
 summary "setup"

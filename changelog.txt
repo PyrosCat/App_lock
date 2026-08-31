@@ -4,6 +4,52 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP1: harness hardening pass from the 2026-08-31 formal code review   (2026-08-31)
+------------------------------------------------------------------------------------
+Applied six control fixes from the independent WP1 review
+(docs/reports/reviews/2026-08-31_m7-wp1-harness-formal-code-review.md); three findings deferred with
+owners in M7_PLAN WP1. No RTM/ADR change (test infrastructure).
+- CR-001: ov4 rejects LOCK_ENGINE!=spike (the OverlayRaceUiTest driver is spike-hardcoded; the
+  production OV-4 scenario is WP2) -> no false engine=prod PASS.
+- CR-003: fail-closed input validation -- run_all rejects non-positive -n RUNS and invalid LOCK_ENGINE
+  (a bare -n 0 used to print PASS 0/0); ov4 rejects non-positive/non-integer OV4_* counts; the Kotlin
+  test require()s bursts/relaunches/repeat/t_appear >= 1; run_all labels the §11 gate vs a non-gate
+  (lighter counts / scaled T_appear) profile in the verdict.
+- CR-005: fail-closed APK + androidTest install (missing file or non-Success aborts) with a
+  USE_PREINSTALLED=1 diagnostic escape.
+- CR-006: new neg_overlay_grant.sh -- revokes the overlay op, asserts the overlay does NOT appear
+  (probe sensitivity), restores + confirms recovery; added to the spike run_all check list.
+- CR-007: ov4 requires a retained "OV-4 overlay race:" count line and validates its arithmetic
+  (TOP+BEHIND+ABSENT == of == bursts*repeat) before trusting the verdict.
+- CR-009: the prod-path checks (ov3/smoke_core/f3) skip with exit 3 (unsupported), not 0.
+- Deferred (M7_PLAN WP1 review-dispositions): CR-004 a11y-detector provisioning -> WP2; CR-002 BEHIND
+  streak-duration + exact 2% tolerance -> WP6/R-002 closure; CR-008 settle() detector-state ack -> WP2-6.
+
+
+M7/WP1: rework scripts/e2e security-regression harness to the overlay/appops engine   (2026-08-31)
+--------------------------------------------------------------------------------------------------
+Reworked the M1 device harness (scripts/e2e/) off the dying accessibility engine per M7_PLAN WP1
+(Plan A, in-place shell port). No RTM/ADR change (test infrastructure). Authored + syntax-clean, OV-4
+instrumentation compiles; the baseline run against the WP0 spike is owed on the fleet (Moto G + NucBox).
+- lib.sh: overlay-window probe (overlay_z TOP/BEHIND/ABSENT via `dumpsys window`, mirroring
+  OverlayRaceUiTest.zOrder()); is_lockscreen/wait_lockscreen now mean "overlay is TOP"; appops grants
+  (grant_usage_access/grant_overlay/grants_ok) replace the a11y rebind; a LOCK_ENGINE=spike|prod seam
+  (arrange_protected/clear_lock/detection_working); the a11y constants + rebind_a11y + a11y_working gone.
+- WP0-report lessons folded in: screen_stayon (poll pauses on screen-off), boost_logcat (M7Spike lines
+  rotate out under bursts), warm_detection (api30 post-install first-detection gap), the One UI
+  mCurrentFocus false-BEHIND caveat.
+- setup_device.sh: appops grants instead of the a11y bind; a spike-engine branch (no PIN/app-list) that
+  provisions the poll FGS + verifies the overlay; prod PIN/protect flow preserved + gated for WP2; APK
+  default fixed to prod/debug/app-prod-debug.apk (stale since WP4 flavors).
+- ov4_rapid_relaunch.sh: now a thin `am instrument` wrapper over the durable OverlayRaceUiTest (one race
+  truth), §11 counts via OV4_BURSTS/RELAUNCHES/REPEAT, OV4_T_APPEAR_MS scaling for swGPU, skip-as-failure
+  for the aosp-atd no-target case. OverlayRaceUiTest.kt: T_APPEAR_MS -> arg-overridable ov4_t_appear_ms.
+- ov3/smoke_core/f3: overlay wording + a defensive LOCK_ENGINE=spike skip (prod-path checks need
+  PIN/relock/self-gate the spike lacks; validated at WP2). run_all.sh: engine-aware check list (spike =
+  OV-4 only; prod = all four) + engine/counts in the report block. README.md: overlay/appops/LOCK_ENGINE
+  + the WP0 device/OEM notes.
+
+
 M7/WP1: WP1 approach decided (Plan A now; C = WP2 test layer; B = incremental parity)   (2026-08-30)
 ----------------------------------------------------------------------------------------------------
 Following a three-viewpoint plan exploration this session, the lead adopted:
@@ -20,8 +66,8 @@ Following a three-viewpoint plan exploration this session, the lead adopted:
   off the main thread -- demonstrated 2/150 -> 0/150 ABSENT under 4x CPU load. The throwaway spike keeps
   the un-fixed version, so WP1 validates probe/grep portability + the old-vs-new A/B delta on the NucBox
   and takes the clean ABSENT=0 pass from the Moto G real hardware.
-- Recorded in M7_PLAN WP1 (approach note), WP2 (oracle task + warm-overlay finding), WP3 (off-main
-  finding). Plan-doc change only; no code or RTM.
+- Recorded in M7_PLAN WP1 (approach note + slow-rig validation caveat), WP2 (oracle task + warm-overlay
+  finding), WP3 (off-main finding). Plan-doc change only; no code or RTM.
 
 
 M7/WP0: reflect WP0 closure in roadmap.html + README; list WP1 to-do   (2026-08-30)

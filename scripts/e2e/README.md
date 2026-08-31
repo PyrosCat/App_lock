@@ -1,118 +1,111 @@
-# WP2 — Device Regression Harness
+# M7 — Device Security-Regression Harness
 
-The security freeze for M1. These scripts assert, mechanically and headlessly, the
-gating behaviour that the two Phase-3 security bypasses defeated. **Run them before
-AND after any change to the lock engine, session manager, or self-gate** (M1 WP5
-Hilt migration, WP6 package moves) — a green run before and a green run after proves
-the refactor preserved the security-critical semantics.
+The security freeze for M7 (the accessibility exit). These scripts assert, mechanically and
+headlessly, the gating behaviour the two Phase-3 bypasses defeated — reworked for the M7 engine: the
+lock surface is a drawn **`SYSTEM_ALERT_WINDOW` overlay** (found by window title via `dumpsys window`)
+and capabilities are granted with **`appops`** (Usage Access + overlay), replacing the
+resumed-`LockScreenActivity` assertions and the accessibility bind. **Run before AND after any change
+to the lock engine, detector, session manager, or self-gate** — green before + green after proves the
+change preserved the security-critical semantics.
+
+## Two engines (`LOCK_ENGINE`)
+
+- **`spike`** (default, WP1): drives the throwaway WP0 spike overlay. Only **OV-4** (the overlay race)
+  is behaviourally validatable here; `setup_device.sh` smoke-tests detection→overlay. The prod-path
+  checks below need a PIN/relock/self-gate the spike has none of, so they self-skip.
+- **`prod`** (WP2+): the real overlay lock surface. The full suite runs; WP2 repoints the two test
+  constants (`POLL_SERVICE` / `OVERLAY_WINDOW_TITLE`) to production and the harness is otherwise unchanged.
 
 ## What each check defends
 
-| Script | Defends | Assertion |
+| Script | Defends | Engine |
 |---|---|---|
-| `smoke_core.sh` | Core lock → PIN → unlock path | Lock screen appears on protected-app launch; correct PIN unlocks; wrong PIN doesn't. |
-| `ov3_fast_switch.sh` | IMMEDIATE relock on window-switching | Leaving and returning to a protected app re-shows the lock screen every time (×10, alternating speeds) — no session leak. |
-| `ov4_rapid_relaunch.sh` | **F4** fast-relaunch bypass | After 5 rapid `am start`s, the lock screen is up and the protected content is NOT foreground. |
-| `f3_self_gate.sh` | **F3** self-gate resume bypass (FR-108) | After unlocking App Lock's own gate, backgrounding, and resuming, the self-gate reappears — the vault/log is not reachable without re-auth. |
+| `ov4_rapid_relaunch.sh` | **R-002 / F4** rapid-relaunch race | spike + prod — a thin `am instrument` wrapper over the durable `OverlayRaceUiTest`: N bursts × K relaunches × R repeats, each scored TOP/BEHIND/ABSENT (ABSENT=0 hard, BEHIND≤2%, §11). |
+| `smoke_core.sh` | Core lock → PIN → unlock | prod — overlay appears on launch; correct PIN unlocks, wrong PIN doesn't. |
+| `ov3_fast_switch.sh` | IMMEDIATE relock on window-switching | prod — leaving/returning re-presents the overlay every time (×10, alternating speeds). |
+| `f3_self_gate.sh` | **F3** self-gate resume (FR-108) | prod — after unlock + background + resume, the self-gate reappears. |
 
-## How assertions work (headless, no screenshot parsing)
+## How assertions work (headless, no screenshots)
 
-- **Lock screen present** → parse `dumpsys activity activities` for the resumed activity
-  and match `LockScreenActivity` (it's a distinct activity, so `dumpsys` sees it).
-- **Self-gate vs App List (F3)** → the two are the *same* `MainActivity` with different
-  Compose nav state, so `dumpsys` can't tell them apart. Instead we `uiautomator dump`
-  and test for the `"Open vault"` content-description, which appears **only** in the
-  unlocked App List. Present = unlocked (bad on resume); absent + `"Enter your PIN"` = re-gated.
-- **PIN entry** → taps by *fraction* of screen size (derived from the 1080×2340 campaign
-  geometry), so it's portable across the pixel_5-profile matrix AVDs. See "Device notes".
+- **Overlay present / on top** → `dumpsys window` (NOT `dumpsys window windows`, which omits
+  `mCurrentFocus` so a present overlay reads BEHIND). TOP = the `mCurrentFocus` line carries the overlay
+  title; BEHIND = present but not focused; ABSENT = not present. `lib.sh: overlay_z`, mirroring
+  `OverlayRaceUiTest.zOrder()`. `is_lockscreen`/`wait_lockscreen` now mean "overlay is TOP".
+- **OV-4** delegates to the instrumentation test (`am instrument`) so there is one race truth across
+  emulator, real device, and FTL; counts pass as `-e ov4_*` args.
+- **Self-gate vs App List (F3)** → both are the same `MainActivity`; `uiautomator dump` tests for the
+  `"Open vault"` content-desc (App List only) vs `"Enter your PIN"` (re-gated).
+- **PIN entry** → taps each digit by its Compose text, else by fraction (1080×2340 geometry).
 
 ## Prerequisites
 
-- A booted device/emulator visible to `adb` (auto-detected, or pass `-s <serial>`).
-- The debug APK built at `app/build/outputs/apk/debug/app-debug.apk` (or set `APK=`).
-- `setup_device.sh` provisions the rest: install, PIN `1234`, bind the a11y service,
-  protect Clock.
-- **Real devices ≥ Android 13 — accessibility must be granted by hand.** The adb
-  `settings put` enable that works on emulators leaves the service in the "Restricted
-  Settings" *malfunctioning* state that delivers no events (verified on Moto G 2025 /
-  Android 15, where the "Allow restricted settings" escape hatch is also removed).
-  Grant it via the phone once: **Settings → Accessibility → App Lock protection → toggle
-  OFF then ON**, then run with `--skip-setup`. `setup_device.sh` detects the failure and
-  prints this guidance. Emulators are unaffected (adb enable works there).
-- On a physical device the screen must be **unlocked** (past your own keyguard) and awake
-  (`adb shell svc power stayon true`) for the harness to drive it.
+- A booted device/emulator visible to `adb` (auto-detected, or `-s <serial>`).
+- App APK at `app/build/outputs/apk/prod/debug/app-prod-debug.apk` (or set `APK=`); for OV-4 the
+  androidTest APK at `app/build/outputs/apk/androidTest/prod/debug/app-prod-debug-androidTest.apk` (or
+  `ANDROIDTEST_APK=`). Build both:
+  `./gradlew :app:assembleProdDebug :app:assembleProdDebugAndroidTest`.
+- `setup_device.sh` does the rest: install, `appops` grant Usage Access + overlay (works over adb on
+  emulators AND real devices — no Restricted-Settings trap), keep the screen awake, provision the engine.
+- Physical device: unlocked past your own keyguard and awake (`svc power stayon true`, done by setup).
 
 ## Running
 
 ```bash
-# full gate: provision, then run all four checks twice (the 2/2 exit criterion)
-scripts/e2e/run_all.sh                    # auto-detect device
-scripts/e2e/run_all.sh -s emulator-5554 -n 2
-scripts/e2e/run_all.sh --skip-setup       # device already provisioned
+# WP1 (spike): provision + OV-4 against the spike overlay
+scripts/e2e/run_all.sh                          # LOCK_ENGINE defaults to spike
+OV4_BURSTS=50 OV4_RELAUNCHES=20 OV4_REPEAT=5 scripts/e2e/run_all.sh   # §11 heavy counts
+OV4_T_APPEAR_MS=4000 scripts/e2e/run_all.sh     # slow software-GPU (NucBox): scale the budget
 
-# individual checks (device must already be provisioned)
+# WP2+ (prod): the full suite once the real engine exists
+LOCK_ENGINE=prod scripts/e2e/run_all.sh -n 2
+
+# individual checks (device already provisioned)
 scripts/e2e/setup_device.sh
-scripts/e2e/smoke_core.sh
-scripts/e2e/f3_self_gate.sh
+scripts/e2e/ov4_rapid_relaunch.sh
 ```
 
-`run_all.sh` prints a markdown result block to paste into a dated report under
-`docs/reports/campaigns/` (per `docs/reports/README.md`). Exit 0 = all green.
+`run_all.sh` prints a markdown result block (with the engine + OV-4 counts) to paste into a dated
+report under `docs/reports/campaigns/`. Exit 0 = all green.
 
-Overridable env: `SERIAL`, `APP_ID` (WP4 flavor suffixes), `PIN`, `PROTECTED_PKG`,
-`NEUTRAL_PKG`, `CYCLES`, `BURST`, `TAP_GAP`, `APK`.
+Overridable env: `SERIAL`, `LOCK_ENGINE`, `APP_ID` (WP4 flavor suffixes), `PIN`, `PROTECTED_PKG`,
+`NEUTRAL_PKG`, `CYCLES`, `OV4_BURSTS` / `OV4_RELAUNCHES` / `OV4_REPEAT` / `OV4_T_APPEAR_MS`,
+`OVERLAY_WINDOW_TITLE`, `POLL_SERVICE`, `TAP_GAP`, `APK`, `ANDROIDTEST_APK`.
+
+## Device & OEM notes (WP0 findings)
+
+- **Slow software-GPU emulators (NucBox) coin-flip on OV-4.** The un-fixed spike's overlay
+  appear-latency straddles the 1500 ms `T_appear`; *more bursts raise* P(fail). Raise `OV4_T_APPEAR_MS`
+  and read these lanes for **grep/probe portability + the old-vs-new A/B delta**, not a strict ABSENT=0.
+  The clean ABSENT=0 pass is real hardware (Moto G). The warm-overlay / off-main remedy lands in
+  WP2/WP3 (`docs/process/M7_PLAN.md`).
+- **Emulator images:** use `aosp/default`, not `aosp-atd` — the stripped ATD images ship no launchable
+  target app, so OV-4 assume-skips (the wrapper reports the skip as a failure, not a silent pass).
+- **Samsung One UI** may mis-parse `mCurrentFocus`, scoring a focused overlay as a false BEHIND (WP2
+  sets the production focus flags + revalidates the grep). ABSENT reads correctly on every OEM.
+- **Post-(re)install detection gap:** `queryEvents` can miss the first foreground detection right after
+  install (~90% on api30; steady-state fine). `setup_device.sh` runs `warm_detection` to prime past it.
+- **Overlays are force-hidden over Settings** (`HIDE_NON_SYSTEM_OVERLAY`), so the target app is always a
+  *normal* app (Clock / Maps), never Settings.
+- **logcat under bursts:** the default buffer rotates `M7Spike` lines out; setup grows it to 16M.
+- **Slow-emulator timing:** taps spaced `TAP_GAP=0.9s`; raise on slower hosts. `dismiss_anr` taps away
+  "System UI isn't responding"; a persistently ANR-wedged SystemUI needs a healthier host.
 
 ## Validation status
 
-- **Need to do — WP5 Hilt build (2026-08-08), NucBox G5 emulator matrix.** The M1/WP5 Hilt migration
-  (replacing `core/Graph`) passed local static + unit gates on the 2012 box; the **device gate is
-  unrun**. NucBox to run the emulator half on the Hilt `devDebug` build:
+- **M7/WP1 — pending (fleet).** The reworked harness is authored + syntax-clean and the OV-4
+  instrumentation compiles; the baseline run against the WP0 spike build is owed on the Moto G (real,
+  clean ABSENT=0) and the NucBox emulator lanes (grep portability across API 30/33/35/36). File a dated
+  `docs/reports/campaigns/…_m7-wp1-harness_*.md`.
+- **M1 (history).** The pre-rework harness gated M1: baseline 2026-07-22 (NucBox, API 33, all four
+  checks PASS 2/2; `docs/reports/campaigns/2026-07-22_wp2-regression-baseline_nucbox-g5.md`) plus the
+  WP5/WP8 device matrix at M1 exit. Superseded by this M7 rework.
 
-  ```bash
-  ./gradlew assembleDevDebug
-  APP_ID=com.applock.dev \
-    APK=app/build/outputs/apk/dev/debug/app-dev-debug.apk \
-    scripts/e2e/run_all.sh -n 2
-  ```
+## Device notes (PIN entry, vault)
 
-  Across the API 26/29/33/35 matrix (a11y-via-adb works on emulators — no manual grant needed). The
-  `APP_ID`/`APK` env vars carry the WP4 flavor identity (a11y component is `<APP_ID>/…AppDetectionService`).
-  **Read OV-4 against R-002** (pre-existing rapid-relaunch flake, 12–37% on some APIs) — identical
-  behavior to the pre-Hilt build = no Hilt regression. File a dated
-  `docs/reports/campaigns/…_wp5-harness_nucbox-g5.md`. This is **ADR-015's closure gate**; nothing
-  after WP2 proceeds while red. (The real-hardware half — Moto G 2025 — is owed on the 2012 box.)
-
-- **Baseline achieved (2026-07-22, NucBox G5, API 33 x86_64):** `run_all.sh -n 2` → all four
-  checks PASS 2/2; the security assertions (IMMEDIATE relock 10/10, F4 rapid-relaunch,
-  F3/FR-108 self-gate) held in every run. WP2 exit criterion met for API 33. Report:
-  `docs/reports/campaigns/2026-07-22_wp2-regression-baseline_nucbox-g5.md`.
-- **Harness fixes (2026-07-22)** from three issues that baseline run surfaced on Windows/
-  Git Bash paths the 2012 host never exercised (the checks passed *with* manual workarounds;
-  these make setup turnkey): (1) `host_path()` converts the APK to a native Windows path for
-  `adb install` (MSYS_NO_PATHCONV mangled it); (2) `open_app_list()` clears the self-gate
-  before the Clock-protection locate loop; (3) wait timeouts are tunable (`FG_WAIT`,
-  `LOCKSCREEN_WAIT`) and OV-3's between-cycle unlock soft-warns (the relock security
-  assertion still hard-fails). **These fixes touch `setup_device.sh` and cold-start pacing,
-  not the security assertions — re-run `run_all.sh -n 2` (with setup, no `--skip-setup`) on
-  the NucBox to confirm turnkey operation and file a follow-up campaign note.**
-- **Deterministic helpers** were separately validated live on the 2012-host Pixel_5 API 30
-  emulator (screen parse → 1080×2340, `dumpsys` focus parse, Clock resolution, a11y read)
-  before that host's SystemUI ANR-wedged (`bad color buffer handle`/swiftshader).
-- **Coverage caveat:** the baseline exercised API 33 only. API 26/29/35 in the matrix are not
-  yet run — a single-API pass does not guarantee the others (tracked on the RTM FR-108 row).
-
-## Device notes
-
-- **PIN entry** locates each digit by its Compose button text (`uiautomator`) and taps the
-  node centre — resolution-independent, so it works on any screen (the AVD matrix and physical
-  devices like the Moto G 2025) without geometry tuning. It falls back to fraction-based taps
-  (the 1080×2340 pixel_5 geometry) only if a device doesn't expose the digit text. If PIN entry
-  ever misses, that fallback is the suspect — adjust `PIN_COL_FRAC`/`PIN_ROW_FRAC` in `lib.sh`.
-- **Slow-emulator timing**: taps are spaced `TAP_GAP=0.9s`; raise it on a slower host.
-- **`dismiss_anr`** taps away the "System UI isn't responding" dialog this class of emulator
-  throws; a *persistently* ANR-wedged SystemUI (as seen on the 2012 box) can't be worked
-  around — use a healthier host.
-- **Vault round-trip is intentionally NOT automated here.** SAF/DocumentsUI automation is
-  fragile (d-pad selection, picker state) and would cause false failures in a fast regression
-  loop; the vault encrypt/export/delete path is covered by the Phase-3 campaign record and is
-  re-checked manually when vault code changes.
+- **PIN entry** locates each digit by its Compose button text and taps the node centre —
+  resolution-independent (the AVD matrix + physical devices like the Moto G 2025), with a
+  fraction-based fallback (`PIN_COL_FRAC` / `PIN_ROW_FRAC` in `lib.sh`) if a device doesn't expose the
+  digit text. If PIN entry ever misses, that fallback is the suspect.
+- **Vault round-trip is intentionally NOT automated** — SAF/DocumentsUI automation is fragile; the
+  vault encrypt/export/delete path is covered by the Phase-3 campaign record and re-checked manually
+  when vault code changes.
