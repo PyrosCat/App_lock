@@ -313,6 +313,18 @@ via `dumpsys activity activities`) and rebinds **accessibility** in setup — bo
 engine (`ROADMAP.md` M7). Rework it to assert on the **overlay window** and grant via **appops**, so
 every later engine swap is mechanically verifiable, and validate the reworked harness against the
 WP0 spike build (which has a real overlay) before trusting it to gate production code.
+**Approach (decided 2026-08-30, from a three-viewpoint exploration this session).** WP1 is the
+**in-place shell port** (Plan A): keep the `scripts/e2e/` operator suite and swap its assertions to the
+overlay-window (`dumpsys window`) + `appops` model. Two adjacent viewpoints are scoped, not dropped.
+**(C) An engine-declared state oracle**, a debug-only, non-persisted signal (structured logcat and/or
+`dumpsys com.applock`) naming request-identity, readiness, relock and self-gate state, is adopted as a
+**WP2 test layer** that replaces the UI-scrape assertions; it is built with the engine, not in this
+harness-only WP. **(B) Convergence onto one GMD/FTL instrumentation suite** proceeds **only by
+incremental parity migration**: each check moves to instrumentation once it reaches parity, never a
+big-bang rewrite. First increment: OV-4 already has instrumentation parity (the WP0 `OverlayRaceUiTest`),
+so the bash OV-4 wraps it (`am instrument`) rather than reimplementing the race, leaving one race truth to
+repoint at WP2. Window-truth (`dumpsys window`) for overlay presence is retained permanently, since an
+engine oracle cannot observe `HIDE_NON_SYSTEM_OVERLAY`.
 **Tasks.**
 - `scripts/e2e/lib.sh`: replace `is_lockscreen()`/`top_component` lock detection with an
   overlay-window probe (`dumpsys window windows` matching our overlay window title — set a stable
@@ -351,6 +363,13 @@ construction here.
   existing Compose lock UI via `ComposeView` + a lightweight
   `ViewTreeLifecycleOwner`/`ViewModelStoreOwner`/`SavedStateRegistryOwner`; set a **stable window
   title** so the WP1 harness can probe it.
+- **Keep the overlay window warm (WP0 swGPU finding — do NOT per-lock add/remove).** WP0's decisive
+  A/B (`docs/reports/campaigns/2026-08-28_m7-wp0-emulator_nucbox-g5.md`, Item 1) traced the residual
+  slow-rig ABSENT to the spike's per-lock `addView`/`removeView` + main-thread draw straddling the
+  1500 ms `T_appear`. Remedy (demonstrated then reverted in the spike; land it here): **`addView` once
+  and toggle presence via `updateViewLayout` + visibility, never per-lock add/remove**, so the window
+  is always present and ABSENT is impossible by construction (worst case a §11-allowed BEHIND). This
+  took the swGPU rig from **2/150 → 0/150 ABSENT** under 4× CPU load; pair with the WP3 off-main poll.
 - Move the auth UI out of `LockScreenActivity` into a reusable composable; keep `FLAG_SECURE`
   (non-debug), lockout countdown, PIN pad, biometric affordance.
 - **Request-identity model** (SDS §8.4) — four **distinct** concepts, never conflated (this is the
@@ -393,6 +412,14 @@ construction here.
 - **(Optional consolidation)** the R-005 readiness state (WP3) is mechanism-agnostic and touches this
   same engine core; it MAY be introduced here to avoid editing the engine twice, and cold-start-
   verified in WP3. Decide at WP2 start.
+- **Engine-declared state oracle: the WP1-decided Plan-C test layer** (§WP1 approach). Expose a
+  **debug-only, non-persisted** oracle (structured logcat and/or a `dumpsys com.applock` `Dumpable`)
+  naming the authoritative security state: current `LockRequest(target,id)`, policy readiness
+  (`loading` / `ready` / `failed`), relock-fired, self-gate re-gated. The harness asserts on this
+  contract instead of `dumpsys` / uiautomator UI scrapes, so OV-3 / F3 / smoke_core repoint off
+  screen-scraping here. **No new persistence** (invariant 6: logcat / `dumpsys` are runtime signals,
+  not DB writes). A real `dumpsys window` overlay-presence check is still kept for the R-002 property the
+  oracle cannot self-attest.
 **Dependencies.** WP0 (ADR-020), WP1 (harness).
 **Outputs.** `LockPresenter`/`OverlayLockPresenter`, `BiometricHostActivity`, request-identity engine
 change; DI wiring (`AppModule`).
@@ -423,6 +450,12 @@ and build the fail-secure readiness model so cold-start/pre-load events cannot f
   host, or a new `ProtectionDetectionService`); lifecycle per SDS §15.2 (start only when PIN set +
   ≥1 protected app + capabilities present; stop when none selected; stop querying + report *Action
   required* if Usage Access revoked); bounded retry + backoff, no tight loop (SDS §15.3).
+- **Poll + draw off the main thread (WP0 swGPU finding).** The spike polled/drew on the main thread, so
+  under load the poll tick or first-draw slipped past `T_appear` (the slow-rig ABSENT). Run the detector
+  on a `HandlerThread`, posting only the draw to main; with the WP2 warm overlay this held **0/150
+  ABSENT (TOP 150/150)** even at 4× CPU load, one first-draw at 5800 ms still passing TOP (presence +
+  focus decouples from the pixel draw). Evidence: `2026-08-28_m7-wp0-emulator_nucbox-g5.md` Item 1 /
+  Follow-up 3.
 - **Re-home the screen-state receiver — and gate resume on *unlock*, not screen-on.** `ACTION_SCREEN_OFF`
   currently lives in `AppDetectionService` and is the **only** driver of
   `ApplicationLockEngine.onScreenOff()` (session clear per SDS §8.6/§15.7 — and the sole clear path for

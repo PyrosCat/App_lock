@@ -4,6 +4,26 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP1: WP1 approach decided (Plan A now; C = WP2 test layer; B = incremental parity)   (2026-08-30)
+----------------------------------------------------------------------------------------------------
+Following a three-viewpoint plan exploration this session, the lead adopted:
+- WP1 = the in-place shell port (Plan A): rework scripts/e2e/ to overlay-window (dumpsys window) +
+  appops assertions, replacing the resumed-activity + a11y-rebind model that dies with the old engine.
+- Plan C (an engine-declared, non-persisted state oracle: logcat / dumpsys com.applock naming
+  request-identity, readiness, relock and self-gate state) is scoped into WP2 as a test layer that
+  replaces the UI-scrape assertions.
+- Plan B (converging onto one GMD/FTL instrumentation suite) proceeds only by incremental parity
+  migration, never a big-bang rewrite. First increment: the bash OV-4 wraps the WP0 OverlayRaceUiTest
+  (am instrument) since it already has instrumentation parity, leaving one race truth to repoint at WP2.
+- Also recorded WP0's swGPU appear-latency remedy as WP2/WP3 production to-dos (2026-08-28 emulator
+  report): keep the overlay warm (addView-once + updateViewLayout, never per-lock add/remove) and poll
+  off the main thread -- demonstrated 2/150 -> 0/150 ABSENT under 4x CPU load. The throwaway spike keeps
+  the un-fixed version, so WP1 validates probe/grep portability + the old-vs-new A/B delta on the NucBox
+  and takes the clean ABSENT=0 pass from the Moto G real hardware.
+- Recorded in M7_PLAN WP1 (approach note), WP2 (oracle task + warm-overlay finding), WP3 (off-main
+  finding). Plan-doc change only; no code or RTM.
+
+
 M7/WP0: reflect WP0 closure in roadmap.html + README; list WP1 to-do   (2026-08-30)
 -----------------------------------------------------------------------------------
 Propagated the now-committed WP0 closure into the two status surfaces the doc set links out to.
