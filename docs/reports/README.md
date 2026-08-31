@@ -51,7 +51,7 @@ measured, reviewed, or executed. Reports differ from the rest of `docs/` in natu
 |---|---|---|
 | 2012 i7 (primary dev) | — | Pixel_5 API 30 x86 emulator; WP1 CI baseline produced here |
 | NucBox G5 (Win 11, N-series) | [2026-08-30](campaigns/2026-08-30_m7-wp0-biometric-matrix_nucbox-g5.md) | Biometric-via-BAL **PASS** on api30/33/36 (Item A) + real-match on google_apis api33 (Item B) — closes the ADR-020 platform residual. |
-| Moto G 2025 (physical) | [2026-07-23](campaigns/2026-07-23_wp2-regression_moto-g-2025.md) | Connected (USB adb via 2012 host); WP2 gating all green on Android 15; a11y needs manual UI grant (Restricted Settings ≥ API 13) |
+| Moto G 2025 (physical) | [2026-08-31](campaigns/2026-08-31_m7-wp1-harness_moto-g-2025.md) | Connected (USB adb via 2012 host). M7 WP1 reworked harness **§11 gate PASS** on Android 15: OV-4 ABSENT=0 (TOP=250/250) ×2 + the missing-grant negative control. Now appops (no a11y). |
 | Firebase Test Lab (cloud, physical) | [2026-08-29](campaigns/2026-08-29_m7-wp0-ftl-sweep_firebase-test-lab.md) | M7 WP0 OEM/OS residual sweep **PASS**: ABSENT=0 across Motorola / Samsung One UI / OnePlus / Pixel, API 30–36 (incl. real API-36). b0q One UI BEHIND borderline (5%→1.7%), open for WP2. Spike overlay; authoritative re-run at WP6 |
 
 Keep this table to one line per host — details belong in the dated reports it links to.
