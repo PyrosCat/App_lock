@@ -4,6 +4,38 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+CI: fix the recurring GMD instrumentation-job setup failure   (2026-09-01)
+--------------------------------------------------------------------------
+The instrumentation job (the GMD smoke matrix; non-gating, continue-on-error) had gone red on
+every recent run, including docs-only commits. It is a CI-infrastructure race, not a product or
+test defect.
+- Symptom: api35Setup / api36Setup fail with InstallFailedException ("Failed to install ...
+  emulator") before any test runs.
+- Root cause: the api30/api35/api36 GMD setup tasks run as parallel Gradle work actions, and each
+  installs the shared "Android Emulator" SDK package into the same directory. The concurrent
+  installs race on that package's install-properties file, and one loses. maxConcurrentDevices=1
+  serializes only test execution, not the installs.
+- Fix (.github/workflows/ci.yml): the licences step now pre-installs the emulator and the three
+  system images (android-30/35/36;default;x86_64) serially in one sdkmanager call, so the setup
+  tasks find them present and skip the racing install.
+- Validation: watch the next Actions run. If the job stays green over a few merges, flip
+  continue-on-error off.
+
+
+M7/WP1: formally closed -- status surfaces synced to WP1 completion   (2026-09-01)
+----------------------------------------------------------------------------------
+Marked WP1 (harness rework) complete across the status docs now that both fleet halves
+are on record (Moto G §11 ABSENT=0 gate + NucBox API 30/33/35/36 probe portability, both
+2026-08-31). Doc-only sync; no code, RTM, or ADR change. WP2 (overlay lock + request-identity)
+is the next work package.
+- docs/roadmap.html: WP1 chip -> done, WP2 -> "Next"; M7 blurb + status date (1 Sep 2026).
+- README.md: M7 milestone row + the WP mermaid (WP1 done, WP2 next); replaced the WP1 to-do
+  block with a WP1-done summary and a WP2-next pointer.
+- docs/process/ROADMAP.md: M7 status row -> WP1 complete, WP2 next.
+- scripts/e2e/README.md + docs/testing/M7_WP1_HARNESS.md: validation status "pending/owed" ->
+  PASS (fleet), closed, with links to the two campaign reports.
+
+
 M7/WP1: NucBox emulator-lane probe/grep portability PASS 4/4 (API 30/33/35/36)   (2026-08-31)
 ---------------------------------------------------------------------------------------------
 The NucBox half of the WP1 harness baseline (docs/reports/campaigns/2026-08-31_m7-wp1-harness_nucbox-g5.md):

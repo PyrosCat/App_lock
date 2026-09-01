@@ -111,10 +111,21 @@ jobs:
       - name: Set up Gradle (with caching)
         uses: gradle/actions/setup-gradle@v4
 
-      # GMD auto-downloads the system image via sdkmanager; make sure the image licence is accepted
-      # non-interactively. Harmless (and skipped by `|| true`) if it is already accepted.
-      - name: Accept Android SDK licences
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+      # Accept the SDK licences, then pre-install the emulator + the three system images
+      # SERIALLY. If left to GMD, the api30/api35/api36 setup tasks run as parallel Gradle work
+      # actions that each shell out to sdkmanager to install the SHARED "emulator" package into the
+      # same SDK dir; the concurrent installs race on that package's install-properties file and one
+      # loses with InstallFailedException ("Failed to install ... emulator"). Installing everything
+      # once up front means the setup tasks find it present and skip the install, so there is no race.
+      # Image coords match systemImageSource="aosp" in build.gradle.kts (-> android-XX/default/x86_64).
+      - name: Accept licences + pre-install emulator and system images
+        run: |
+          SDKMGR="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMGR" --licenses > /dev/null || true
+          "$SDKMGR" "emulator" \
+            "system-images;android-30;default;x86_64" \
+            "system-images;android-35;default;x86_64" \
+            "system-images;android-36;default;x86_64"
 
       # ciGroupProdDebugAndroidTest = the `ci` device group (api30 + 35 + 36) × prodDebug androidTest.
       # maxConcurrentDevices=1 keeps the emulators sequential so the runner does not run out of RAM.
