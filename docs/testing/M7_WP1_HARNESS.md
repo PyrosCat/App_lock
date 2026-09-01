@@ -13,9 +13,9 @@ acceptance criteria, the slow-rig caveat, and the formal-review dispositions.
 ## 1. What WP1 delivers, and what "validated" means here
 
 The M1 device harness (`scripts/e2e/`) was reworked off the accessibility engine onto the M7
-overlay/appops engine (Plan A, in-place shell port). The code is authored, syntax-clean, and the OV-4
-instrumentation compiles; what remains is the baseline run against the WP0 spike build. Two hosts, two
-different jobs:
+overlay/appops engine (Plan A, in-place shell port). **WP1 is closed (2026-08-31): the baseline run
+against the WP0 spike build passed on both hosts** — see the two `docs/reports/campaigns/2026-08-31_m7-wp1-harness_*.md`
+records. Two hosts, two different jobs:
 
 - **Moto G 2025 (real hardware, from the dev box) = the clean gate pass.** Run the reworked harness at
   the §11 gate profile → OV-4 `ABSENT=0` plus the negative control. Real hardware does not coin-flip, so

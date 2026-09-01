@@ -92,10 +92,12 @@ Overridable env: `SERIAL`, `LOCK_ENGINE`, `APP_ID` (WP4 flavor suffixes), `PIN`,
 
 ## Validation status
 
-- **M7/WP1 — pending (fleet).** The reworked harness is authored + syntax-clean and the OV-4
-  instrumentation compiles; the baseline run against the WP0 spike build is owed on the Moto G (real,
-  clean ABSENT=0) and the NucBox emulator lanes (grep portability across API 30/33/35/36). File a dated
-  `docs/reports/campaigns/…_m7-wp1-harness_*.md`.
+- **M7/WP1 — PASS (fleet), closed 2026-08-31.** The reworked harness was proven against the WP0 spike
+  build on both hosts: the Moto G 2025 §11 gate (OV-4 `ABSENT=0` twice over + the `neg_overlay_grant`
+  negative control; `docs/reports/campaigns/2026-08-31_m7-wp1-harness_moto-g-2025.md`) and the NucBox
+  emulator lanes (probe/grep portability PASS 4/4 across API 30/33/35/36, diagnostic non-gate profile;
+  `docs/reports/campaigns/2026-08-31_m7-wp1-harness_nucbox-g5.md`). WP2 flips `LOCK_ENGINE=prod` and
+  re-runs this matrix against the real engine.
 - **M1 (history).** The pre-rework harness gated M1: baseline 2026-07-22 (NucBox, API 33, all four
   checks PASS 2/2; `docs/reports/campaigns/2026-07-22_wp2-regression-baseline_nucbox-g5.md`) plus the
   WP5/WP8 device matrix at M1 exit. Superseded by this M7 rework.

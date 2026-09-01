@@ -17,7 +17,7 @@ consistent with ADR/FR practice). This scope cut is also the principal mitigatio
 |---|---|---|
 | M0 Baseline & governance | foundation | **Done** (2026-07-19) |
 | M1 Foundation retrofit | foundation | **Done** (2026-08-25) — exit granted; tag `M1_Exit` (`60265b6`) |
-| **M7 Detection & Enforcement Replacement** | 1.0.0 | **Current** — **WP0 complete (2026-08-30)**: platform validation done (decisive emulator A/B + FTL OEM sweep + Moto G no-regression + biometric-via-BAL matrix), **ADR-020/021 Accepted**, API-36 toolchain in; spike held to WP2; **WP1 (harness rework) next** |
+| **M7 Detection & Enforcement Replacement** | 1.0.0 | **Current** — **WP0 complete (2026-08-30)**: platform validation done (decisive emulator A/B + FTL OEM sweep + Moto G no-regression + biometric-via-BAL matrix), **ADR-020/021 Accepted**, API-36 toolchain in; spike held to WP2. **WP1 (harness rework) complete (2026-08-31)**: reworked `scripts/e2e` proven on the fleet (Moto G §11 `ABSENT=0` gate + NucBox API 30/33/35/36 probe portability). **WP2 (overlay lock + request-identity) next** |
 | **M8 1.0.0 Product Conformance** | 1.0.0 | Planned |
 | **M9 Hardening & Verification** | 1.0.0 | Planned |
 | **M10 Release** | 1.0.0 | Planned |

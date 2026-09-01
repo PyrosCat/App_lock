@@ -29,7 +29,7 @@ accessibility service in 1.0.0**.
 |---|---|---|
 | M0 Baseline & governance | foundation | 🟢 Done |
 | M1 Foundation retrofit (IS Phase 0) | foundation | 🟢 Done (2026-08-25) — exit granted, tag `M1_Exit` |
-| M7 Detection & enforcement replacement | 1.0.0 | 🟡 Current — the accessibility exit (Usage Access + overlay); **WP0 complete (2026-08-30)** — ADR-020/021 Accepted, targetSdk 36 (D0); **WP1 (harness rework) next** |
+| M7 Detection & enforcement replacement | 1.0.0 | 🟡 Current — the accessibility exit (Usage Access + overlay); **WP0–WP1 complete** — ADR-020/021 Accepted, targetSdk 36 (D0), harness reworked + fleet-proven (2026-08-31); **WP2 (overlay lock + request-identity) next** |
 | M8 Product & conformance | 1.0.0 | ⚪ Planned — UI/UX surfaces; vault/intruder removed from the 1.0.0 line |
 | M9 Hardening & verification | 1.0.0 | ⚪ Planned |
 | M10 Release | 1.0.0 | ⚪ Planned — signed v1.0.0 |
@@ -93,7 +93,7 @@ progress** — its WP0 platform spike closed 2026-08-30 with ADR-020/021 Accepte
 ([M7_PLAN.md](docs/process/M7_PLAN.md)). **WP0 (platform spike + design ADRs) closed 2026-08-30** —
 ADR-020/021 Accepted, targetSdk 36 adopted (D0), and the R-002 evidence set is complete (decisive
 emulator A/B + Firebase Test Lab OEM sweep + Moto G no-regression + biometric-via-BAL matrix); the
-throwaway spike is held to WP2. **WP1 (harness rework) is next:**
+throwaway spike is held to WP2. **WP1 (harness rework) closed 2026-08-31; WP2 (overlay lock) is next:**
 
 ```mermaid
 flowchart LR
@@ -102,8 +102,8 @@ flowchart LR
     classDef todo fill:#e6e8ea,stroke:#8a9199,color:#3a4149
 
     WP0["WP0<br/>Platform spike<br/>+ ADRs"]:::done
-    WP1["WP1<br/>Harness rework"]:::next
-    WP2["WP2<br/>Overlay lock<br/>+ request-identity"]:::todo
+    WP1["WP1<br/>Harness rework"]:::done
+    WP2["WP2<br/>Overlay lock<br/>+ request-identity"]:::next
     WP3["WP3<br/>UsageStats<br/>detection"]:::todo
     WP4["WP4<br/>Protection<br/>health"]:::todo
     WP5["WP5<br/>Accessibility<br/>cutover"]:::todo
@@ -112,22 +112,18 @@ flowchart LR
     WP0 --> WP1 --> WP2 --> WP3 --> WP4 --> WP5 --> WP6
 ```
 
-**WP1 — Harness rework (next):** rework the M1 on-device security harness (`scripts/e2e/`) so it
-asserts on the new engine — the resumed-`LockScreenActivity` and accessibility-rebind checks die with
-the old detector. Authoritative spec: [M7_PLAN.md](docs/process/M7_PLAN.md) §WP1. To do:
+**WP1 — Harness rework (done, 2026-08-31):** the M1 on-device security harness (`scripts/e2e/`) was
+reworked off the dying accessibility engine. Overlay-window probes (`dumpsys window`, matched on the
+overlay's stable title) replace the resumed-`LockScreenActivity` checks, and `appops` grants
+(`get_usage_stats` + `system_alert_window`) replace the accessibility rebind. Fleet-proven: the Moto G
+2025 §11 gate (OV-4 `ABSENT=0` twice over, plus a missing-grant negative control) and the NucBox
+emulator lanes (probe/grep portability across API 30/33/35/36). An independent formal review's six
+control fixes landed; three findings carry to WP2/WP6.
 
-- Replace lock detection (`is_lockscreen()` / `top_component`) with an **overlay-window probe**
-  (`dumpsys window windows` matched on the overlay's stable window title); reframe OV-4's "protected
-  content not foreground" as "our overlay is present, on top, and focus-holding".
-- Replace the a11y rebind (`rebind_a11y()` / `a11y_working()`) with **`appops` grants** —
-  `get_usage_stats` + `system_alert_window` — plus a behavioral `detection_working()` probe; drop the
-  `A11Y_*` constants.
-- Raise the OV-4 burst count and add an outer repeat so a green run is meaningful for the probabilistic
-  race; keep OV-3 (relock), F3 (self-gate), and smoke_core.
-- Update `setup_device.sh`, `scripts/e2e/README.md`, and the `run_all.sh` summary.
-- **Validate the reworked harness against the WP0 spike build** (it has a real overlay) and file a dated
-  baseline run; a deliberately-missing overlay grant must fail the probe (negative control). Validate the
-  `dumpsys window` grep across the API 30/33/35/36 lanes.
+**WP2 — Overlay lock + request-identity (next):** swap the lock *presentation* to the drawn
+`SYSTEM_ALERT_WINDOW` overlay while accessibility stays the detector, close R-002 by construction, and
+introduce the request-identity engine model (ADR-020). Authoritative spec:
+[M7_PLAN.md](docs/process/M7_PLAN.md) §WP2.
 
 Pre-rebaseline **Phases 1–3 are built and E2E-validated** — PIN/biometric auth, encryption, and
 brute-force defense carry into 1.0.0. The **vault and intruder capture are reserved for 2.0.0**
