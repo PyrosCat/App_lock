@@ -4,6 +4,24 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP1: NucBox emulator-lane probe/grep portability PASS 4/4 (API 30/33/35/36)   (2026-08-31)
+---------------------------------------------------------------------------------------------
+The NucBox half of the WP1 harness baseline (docs/reports/campaigns/2026-08-31_m7-wp1-harness_nucbox-g5.md):
+the reworked scripts/e2e harness ran against the WP0 spike on four aosp/default x86_64 emulator lanes to
+prove the probes/greps read the overlay z-order correctly per API level. NON-GATE / diagnostic profile
+(scaled OV4_T_APPEAR_MS=4000, default 25x20x1) -- reads for parser portability, NOT ABSENT=0; the clean
+ABSENT=0 gate evidence is the Moto G real-hardware §11 pass. No RTM/ADR change (test infrastructure). APKs
+built on this host at target SDK 36 (main @ b04e36b).
+- All four lanes PASS. OV-4 never assume-skipped (com.android.deskclock resolved on every image) and its
+  `dumpsys window` z-order grep parsed a valid tally on API 30/33/35 and real API-36: TOP=25 BEHIND=0
+  ABSENT=0 of 25 on each (the scaled T_appear absorbed the swGPU overlay appear-latency).
+- neg_overlay_grant PASS on every lane: sensitivity (overlay ABSENT with system_alert_window revoked) +
+  recovery (overlay TOP after re-grant + detector restart) -- the bash overlay_z probe reads present vs
+  absent correctly across API levels.
+- Completes WP1 acceptance: both halves now on record (this + the Moto G §11 gate PASS, b04e36b). WP2 flips
+  LOCK_ENGINE=prod and re-runs this matrix against the real engine with the warm-overlay/off-main remedy.
+
+
 M7/WP1: neg-control recovery restarts the detector after a SAW re-grant (Moto G finding)   (2026-08-31)
 ------------------------------------------------------------------------------------------------------
 The first Moto G §11 gate run surfaced a bug in neg_overlay_grant.sh (from the CR-006 hardening): the
