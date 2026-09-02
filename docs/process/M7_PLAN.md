@@ -325,10 +325,11 @@ WP0 spike build (which has a real overlay) before trusting it to gate production
 **Approach (decided 2026-08-30, from a three-viewpoint exploration this session).** WP1 is the
 **in-place shell port** (Plan A): keep the `scripts/e2e/` operator suite and swap its assertions to the
 overlay-window (`dumpsys window`) + `appops` model. Two adjacent viewpoints are scoped, not dropped.
-**(C) An engine-declared state oracle**, a debug-only, non-persisted signal (structured logcat and/or
-`dumpsys com.applock`) naming request-identity, readiness, relock and self-gate state, is adopted as a
-**WP2 test layer** that replaces the UI-scrape assertions; it is built with the engine, not in this
-harness-only WP. **(B) Convergence onto one GMD/FTL instrumentation suite** proceeds **only by
+**(C) An engine-declared state oracle**, a debug-only, non-persisted snapshot (read via
+`dumpsys activity service <APP_ID>/…ProtectionWatchdogService --applock-oracle-v1`; Decision #2)
+naming request-identity, readiness, relock and self-gate state, is adopted as a **WP2 test layer** that
+**augments** the UI/window-truth assertions (it attests engine intent, not pixels); it is built with the
+engine, not in this harness-only WP. **(B) Convergence onto one GMD/FTL instrumentation suite** proceeds **only by
 incremental parity migration**: each check moves to instrumentation once it reaches parity, never a
 big-bang rewrite. First increment: OV-4 already has instrumentation parity (the WP0 `OverlayRaceUiTest`),
 so the bash OV-4 wraps it (`am instrument`) rather than reimplementing the race, leaving one race truth to
@@ -477,14 +478,49 @@ construction here.
     `Ready(empty)`, never on `Loading` / `Failed`. The full health-truth rewrite stays WP4.
   Cold-start / process-restart **verification** on the real engine stays WP3; the capability-revoked rows
   and the health rewrite stay WP4; R-005 stays **Open** until WP6.
-- **Engine-declared state oracle: the WP1-decided Plan-C test layer** (§WP1 approach). Expose a
-  **debug-only, non-persisted** oracle (structured logcat and/or a `dumpsys com.applock` `Dumpable`)
-  naming the authoritative security state: current `LockRequest(target,id)`, policy readiness
-  (`loading` / `ready` / `failed`), relock-fired, self-gate re-gated. The harness asserts on this
-  contract instead of `dumpsys` / uiautomator UI scrapes, so OV-3 / F3 / smoke_core repoint off
-  screen-scraping here. **No new persistence** (invariant 6: logcat / `dumpsys` are runtime signals,
-  not DB writes). A real `dumpsys window` overlay-presence check is still kept for the R-002 property the
-  oracle cannot self-attest.
+- **Engine-declared state oracle: the WP1-decided Plan-C test layer (Decision #2, resolved 2026-09-01).**
+  A **debug-only, non-persisted** read-only view of the authoritative engine state, for the harness.
+  - **Contract shape (Phase 1) — it *is* the reducer `State`.** One immutable `EngineSnapshot` published
+    through a single atomic reference; consumers read it once. Fields (all emitted from WP2, dimensions
+    stubbed until their WP): `process.epoch` (random per process), `snapshot.seq` (per publish);
+    `policy.state`, `detector.state`, `capability.usage`, `capability.overlay`, `enforcement.health`;
+    `request.{id,target,phase}`, `surface.state` + last present-result; `lastForeground.{pkg,seq}`; and
+    monotonic edge counters (`relock.count`, `selfgate.count`, `supersede.count`) each incremented by its
+    **authoritative producer at the confirmed transition**, never on intent emission (relock =
+    `LockSessionManager`; self-gate = `MainActivity`/`SelfLock`). `lastForeground.seq` advances only after
+    the observation is processed and the resulting state is published.
+  - **Transport (Phase 3) — `ProtectionWatchdogService.dump()`**, read as
+    `adb shell dumpsys activity service <APP_ID>/com.applock.platform.ProtectionWatchdogService --applock-oracle-v1`
+    (`APP_ID` from the flavor — prod = `com.applock`, no suffix). This **requires D2 to resolve to
+    *repurpose* the watchdog** (§WP3, confirmed at WP3 start). A `src/debug` `ContentProvider` is **only a
+    live-process-only diagnostic fallback** if the dump command ever fails on a lane — **never** for
+    cold-start / process-death / `loading` observations: querying a provider **auto-starts a dead process**
+    (its `onCreate` runs in Application init → `startCaching()`), reviving the very state under test and
+    defeating `process.epoch`. `dumpsys activity service` on a stopped service, by contrast, prints
+    nothing and starts nothing (clean fail-closed). `dump()` reads the atomic reference once and formats it
+    with **no locks / `runBlocking` / DB / side-effects**, and never resets a counter.
+  - **Wire format — versioned flat `key=value`** (grep-parseable, no `jq`): unique **begin/end
+    sentinels**, `schema=1`, one key per line in canonical order, ASCII enums + decimal ints + `none` for
+    null, restricted encoding for package/request values, **no** free-text exception messages. The harness
+    parser is **fail-closed**: a missing service, missing sentinel, or missing/duplicate/malformed/
+    unsupported-version field is a hard failure, never an empty snapshot or skip. The harness must not
+    `am start` the service to inspect it.
+  - **Release silence.** Gated by `src/debug` (compile-time absence, the strong guarantee) plus a runtime
+    `FLAG_DEBUGGABLE` check (backstop); a release `dumpsys` of the service emits no sentinel and no state.
+  - **Roles — the oracle *augments*, it does not replace, rendered-boundary evidence.** It attests engine
+    *intent*, not pixels, so each check keeps independent boundary evidence: **OV-3** oracle relock-delta +
+    request identity, plus `dumpsys window` overlay present-and-topmost; **F3** oracle self-gate delta, plus
+    a uiautomator PIN-gate-visible / App-List-inaccessible check (the self-gate is App Lock's own single
+    window, so no window-level distinction exists); **smoke_core** oracle request lifecycle / readiness /
+    unlock, plus overlay+PIN renders and the target is reachable only after a valid PIN; **OV-4** oracle
+    limited to the neutral-foreground ack + correlation, `dumpsys window` authoritative for presence / z-order.
+  - **Closes CR-008 (when adopted).** `lastForeground.{epoch,seq}` is the ack that replaces
+    `OverlayRaceUiTest.settle()`'s blind 300 ms sleep (read baseline → HOME → poll until same epoch, seq
+    advanced, foreground = HOME, prior request cleared → fail on timeout/malformed). CR-008 is recorded
+    closed only when that path passes on the required lanes.
+  - **No new persistence** (invariant 6: rendered on demand from in-memory state; logcat is a runtime
+    signal, not a DB write). **Structured logcat is a diagnostic mirror only — never an assertion source**
+    (this is what removes the WP1 log-rotation race from the gate path).
 **Implementation sequence and gates (Decision #3, resolved 2026-09-01).** WP2 builds in four phases;
 the **gates** are normative, the tactical ordering within a phase is not.
 - **Phase 0 — policy-state foundation + watchdog compatibility.** Atomic `PolicyState`, its lifecycle
@@ -550,7 +586,11 @@ cold-start/pre-load events cannot fail open (R-005).
   `(package,timestamp)` dedup cursor, freshness `F`, wall-clock-jump guard, per-API event selection,
   `isUserUnlocked`/keyguard gating, process-restart bootstrap) at the WP0-chosen interval (ADR-021).
 - Host the detector in a foreground service (D2: repurpose `ProtectionWatchdogService` into the poll
-  host, or a new `ProtectionDetectionService`); lifecycle per SDS §15.2 (start only when PIN set +
+  host, or a new `ProtectionDetectionService`). **Decision #2 leans D2 toward *repurpose*** — the state
+  oracle's transport is `ProtectionWatchdogService.dump()`, so a new service moves the harness target; the
+  `ContentProvider` escape is unsafe for cold-start/process-death observations (it revives the process),
+  so repurpose is strongly preferred. Confirm D2 here at WP3 start. Lifecycle per SDS §15.2 (start only
+  when PIN set +
   ≥1 protected app + capabilities present; stop when none selected; stop querying + report *Action
   required* if Usage Access revoked); bounded retry + backoff, no tight loop (SDS §15.3).
 - **Poll + draw off the main thread (WP0 swGPU finding).** The spike polled/drew on the main thread, so

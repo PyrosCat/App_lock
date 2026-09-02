@@ -4,6 +4,33 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2: resolve decision #2 -- engine state oracle (transport + contract)   (2026-09-01)
+---------------------------------------------------------------------------------------
+Recorded the Plan-C state oracle in M7_PLAN §WP2, hardened against a formal review. Contract shape is a
+Phase-1 deliverable (it is the reducer State); transport + harness repoint are Phase 3.
+- Transport: ProtectionWatchdogService.dump(), read via
+  `dumpsys activity service <APP_ID>/...ProtectionWatchdogService --applock-oracle-v1`. This leans D2
+  toward *repurpose the watchdog* (noted on the WP3 host task; confirmed at WP3 start). A src/debug
+  ContentProvider is only a live-process-only diagnostic fallback, never for cold-start/process-death/
+  loading: querying a provider auto-starts a dead process (onCreate -> startCaching), reviving the state
+  under test; dumpsys of a stopped service starts nothing (clean fail-closed).
+- Snapshot: one immutable EngineSnapshot via a single atomic reference; dump() reads it once, formats
+  with no locks/runBlocking/DB/side-effects, never resets a counter. Fields include process.epoch +
+  snapshot.seq, the separated readiness dimensions (policy/detector/capability/enforcement.health),
+  request.{id,target,phase}, surface state, lastForeground.{pkg,seq}, and per-producer monotonic edge
+  counters incremented at the confirmed transition (not on intent emission).
+- Format: versioned flat key=value with begin/end sentinels; fail-closed parsing (missing service /
+  sentinel / field = hard failure, never empty/skip); the harness must not am-start the service.
+- Release silence: src/debug (compile-time absence) + a runtime FLAG_DEBUGGABLE backstop; sentinels
+  prove absence (ActivityManager still wraps the service dump).
+- Roles: the oracle AUGMENTS, does not replace, rendered-boundary evidence -- OV-3/F3/smoke_core keep an
+  independent overlay/PIN/window-truth check; logcat is a diagnostic mirror only, never an assertion
+  source (removes the WP1 log-rotation race from the gate path).
+- CR-008: lastForeground.{epoch,seq} is the ack that replaces OverlayRaceUiTest.settle()'s blind sleep;
+  recorded closed only when that path passes on the required lanes.
+- Fixed the misleading "dumpsys com.applock" shorthand (WP1 approach text + WP2 oracle bullet).
+
+
 M7/WP2: resolve decision #3 -- WP2 build sequence + normative gates   (2026-09-01)
 ---------------------------------------------------------------------------------
 Recorded the WP2 implementation order in M7_PLAN §WP2, hardened against a formal review of the
