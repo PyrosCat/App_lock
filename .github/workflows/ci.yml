@@ -38,7 +38,7 @@ jobs:
           java-version: "17"
 
       - name: Set up Gradle (with caching)
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # WP3 (M1, ADR-016): detekt = style/complexity + ktlint (detekt-formatting); the Konsist
       # architecture rules (R1-R4) run inside the unit-test task. Both gate on their baselines —
@@ -109,7 +109,7 @@ jobs:
           java-version: "17"
 
       - name: Set up Gradle (with caching)
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       # Accept the SDK licences, then pre-install the emulator + the three system images
       # SERIALLY. If left to GMD, the api30/api35/api36 setup tasks run as parallel Gradle work
