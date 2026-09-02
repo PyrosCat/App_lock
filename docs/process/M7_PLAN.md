@@ -166,28 +166,37 @@ Platform-uncertain cells (†) are WP0 acceptance items on the API-36 (D0) targe
 > rows, ADR-021. The overlay *draw* itself needs no start-exemption (the FGS is already running). Rows
 > marked † are the cells WP0 confirms before WP2 relies on them.
 
-### 2.3 Enforcement decision table — what "hold / interrupted" actually does *(WP3 implements)*
+### 2.3 Enforcement decision table — what "hold / interrupted" actually does *(readiness model WP2; detector/capability inputs WP3/WP4)*
 
-`evaluate()` maps **(policy readiness × capability state × observed target) → (decision × overlay
-surface × health)**. A non-`ready` readiness or a missing capability **never** yields *allow*
-(invariant 3); it yields an *interruption* with truthful notice, and every shield surface offers an
-escape so the user is never trapped behind an overlay.
+The engine composes four **separate** layers, never conflated. (1) A **pure policy decision**,
+`evaluate()` → `Allow / Lock / Hold / Recover`, over `(policy readiness × capability state × observed
+target)`. (2) The **requested surface** the engine maps that decision to. (3) The **presentation
+result** `present()` returns (`Presented / Unavailable / Failed`). (4) The **health transition** the
+engine derives from that result. A non-`ready` readiness or a missing capability **never** yields
+*allow* (invariant 3); it yields a *hold* / *interruption* with truthful notice, and every shield
+surface offers an escape so the user is never trapped. Overlay-draw failure (the last table row) is a
+**presentation result**, not an `evaluate()` output. `Allow` is not monolithic: allowing our own auth
+surface **preserves** the current request (ADR-020), while a launcher / unprotected `allow` may dismiss
+or supersede it; the engine's request-identity logic makes that call, not `evaluate()`.
 
 | Readiness | Capabilities | Observed target | → Decision | Overlay surface | Health |
 |---|---|---|---|---|---|
 | `ready` | both granted | protected package | **lock** | full lock surface (PIN / biometric) | Protected |
 | `ready` | both granted | unprotected / launcher / **our own package** (biometric host) | **allow** | none | Protected |
-| **`loading`** (pre-first-snapshot) | any | protected package | **hold** (never allow) | neutral **"Protection checking…"** shield; dismiss-to-launcher; **bounded timeout `T_ready`** (WP0-set) → on expiry treat as `failed` | Checking / Unknown |
+| **`loading`** (policy cache / detector not yet ready) | any | **any foreground not provably unprotected** (cannot classify while loading) | **hold** (never allow) | neutral **"Protection checking…"** shield covering from t=0 (warm overlay; no uncovered grace); **bounded timeout `T_ready`** (provisional 5 s, configurable, monotonic per load-generation) → on expiry **`Checking → Recovery`**, never reveal the target | Checking / Unknown |
 | **`failed`** (storage / Keystore / policy-load error) | any | protected package | **hold / interrupt** | **"Protection recovery required"** shield with an **escape affordance** (buttons deep-linking to App Lock and Android Settings) | Protection interrupted |
 | `ready` | **Usage Access revoked** | cannot observe | **cannot enforce** → interruption | none → notification only | Action required |
 | `ready` | **overlay revoked** | protected package | **cannot present** → interruption | none possible → notification only (SDS §8.3 step 4 / §8.8) | Protection interrupted |
 | `ready` | both granted | protected package, but **overlay draw fails** | **interrupt** (never a false *Protected*) | none | Protection interrupted |
 
 **Escape-hatch rule (no unrecoverable loop).** Every shield surface (checking / recovery) MUST
-(a) expose a control that reaches App Lock's main screen or Android Settings, (b) honor Home/Back to
-the launcher, and (c) self-dismiss at `T_ready`. The overlay is **modal to the protected task, never
-to the whole device** — no readiness/capability state can trap the user behind an undismissable
-window.
+(a) expose a control that reaches App Lock's main screen or Android Settings, and (b) honor Home/Back
+to the launcher. **The full lock surface never times out**, and **no shield is ever removed to reveal
+the guarded target**: every escape (Home / Back / deep-link) navigates to an approved safe destination
+(resolved HOME, App Lock, or Settings) *first*, then tears the overlay down. `T_ready` bounds only the
+`loading` state (`Checking → Recovery`), never the lock and never a dismiss-to-target. The overlay is
+**modal to the protected task, never to the whole device**: no readiness/capability state can trap the
+user behind an undismissable window.
 
 ### 2.4 UsageStats detection contract *(defined deliverable — WP3 implements + tests; ADR-021 fixes P)*
 
@@ -427,16 +436,47 @@ construction here.
 - `ApplicationLockEngine.launchLockScreen` → `presenter.present(request)`; `onLockScreenDismissed`
   → presenter dismiss + home. Delete `LockScreenActivity` **and its manifest `<activity>`
   declaration** (recommend delete + a dedicated `BiometricHostActivity`; decide in ADR-020, D4).
-- Update Konsist R2 baseline: the grandfathered `service/ApplicationLockEngine.kt -> presentation`
-  edge changes shape (now depends on the `LockPresenter` port, not `LockScreenActivity` directly) —
-  adjust the baseline entry, keep the rule green.
+- Update Konsist R2 baseline: once the engine depends on the `LockPresenter` port (a `service/` type)
+  instead of `LockScreenActivity`, the `service/ApplicationLockEngine.kt -> presentation` edge
+  **disappears entirely** (the `OverlayLockPresenter` adapter lives in `platform/`, which is R2-exempt).
+  So **remove** that grandfathered baseline exception (`ArchitectureRulesTest.kt`), not reshape it; keep
+  the port's vocabulary (surface kind, request) in `service/` so no `presentation` type leaks back
+  through it. (The adjacent `IntruderCaptureManager -> presentation` entry is unrelated and stays.)
 - **Rework the androidTest smoke seed:** `LockScreenLaunchTest` launches `LockScreenActivity` and is
   run by the GMD CI matrix — replace it with a smoke over the new surface (present the overlay with a
   target/requestId and assert the PIN prompt renders + FLAG_SECURE; and/or a `BiometricHostActivity`
   launch test). Keep the matrix green; update the WP8 GMD runbook reference.
-- **(Optional consolidation)** the R-005 readiness state (WP3) is mechanism-agnostic and touches this
-  same engine core; it MAY be introduced here to avoid editing the engine twice, and cold-start-
-  verified in WP3. Decide at WP2 start.
+- **R-005 fail-secure readiness model (resolved 2026-09-01: pulled forward from WP3 to here).** The
+  readiness *machinery* is presentation-coupled (its shields are overlay surfaces), so it lands with the
+  overlay and neither the engine core nor the overlay is edited twice:
+  - **Single atomic policy state.** Replace `LockPolicyManager`'s `emptySet()`-seeded
+    `StateFlow<Set<String>>` (`LockPolicyManager.kt:21-40`) with one
+    `sealed PolicyState { Loading; Ready(packages); Failed(reason) }`. The first emission, including a
+    legitimate empty set, publishes `Ready(packages)` **atomically** (no separate readiness flag that
+    could read `Ready` against a stale set). Define retry (`Failed` → backoff → `Ready`), idempotent
+    `startCaching()`, and **coroutine cancellation is not `Failed`** (only real load/storage errors are).
+  - **Engine-owned readiness aggregate.** The decision consumes a
+    `ReadinessContext(policy, detector, capability, foreground)` owned by the engine, **not** by
+    `LockPolicyManager` (which owns only `PolicyState`). WP2 wires `policy` for real and defaults
+    `detector = Ready` / `capability = Assumed`; WP3 fills `DetectorState`, WP4 `CapabilityState`. The
+    seam is defined now so WP3/WP4 slot values in without reshaping the engine.
+  - **Layered per §2.3.** `evaluate()` returns the pure decision (`Allow / Lock / Hold / Recover`); the
+    engine maps decision → surface, `present()` → result, result → health. Overlay-draw failure is a
+    presentation result, not an `evaluate()` output.
+  - **`loading` semantics.** While `Loading` the cache cannot classify, so the engine **holds any
+    foreground it cannot prove unprotected**, drawing the "checking" shield from t=0 on the warm overlay
+    (no uncovered grace). Exempt **only** the exact own package and the dynamically-resolved current HOME;
+    treat System UI as a transient non-target observation, not a safe exemption. On `Loading → Ready`,
+    re-evaluate the held foreground (unprotected → dismiss to reveal; protected → `Checking → Lock`).
+  - **Timers keyed to identity.** Every grace / timeout / present callback is keyed to
+    `(requestId, load-generation)`; a stale timer or result is rejected (the R-002 discipline extended to
+    readiness). `T_ready` is provisional 5 s, configurable, monotonic (`elapsedRealtime`) per generation;
+    on expiry `Checking → Recovery`, never a dismiss-to-target.
+  - **Watchdog minimal-correct here (forced by the API change).** `ProtectionWatchdogService:87-88` reads
+    the cache the `PolicyState` change replaces, so WP2 updates it to stand down **only** on PIN-unset or
+    `Ready(empty)`, never on `Loading` / `Failed`. The full health-truth rewrite stays WP4.
+  Cold-start / process-restart **verification** on the real engine stays WP3; the capability-revoked rows
+  and the health rewrite stay WP4; R-005 stays **Open** until WP6.
 - **Engine-declared state oracle: the WP1-decided Plan-C test layer** (§WP1 approach). Expose a
   **debug-only, non-persisted** oracle (structured logcat and/or a `dumpsys com.applock` `Dumpable`)
   naming the authoritative security state: current `LockRequest(target,id)`, policy readiness
@@ -445,27 +485,65 @@ construction here.
   screen-scraping here. **No new persistence** (invariant 6: logcat / `dumpsys` are runtime signals,
   not DB writes). A real `dumpsys window` overlay-presence check is still kept for the R-002 property the
   oracle cannot self-attest.
+**Implementation sequence and gates (Decision #3, resolved 2026-09-01).** WP2 builds in four phases;
+the **gates** are normative, the tactical ordering within a phase is not.
+- **Phase 0 — policy-state foundation + watchdog compatibility.** Atomic `PolicyState`, its lifecycle
+  tests, and a pure `shouldStandDown(pinSet, policyState)` the watchdog delegates to (the `Service`
+  lifecycle stays an Android test). The production engine is untouched.
+- **Phase 1 — pure decision/request reducer.** Extract a pure `(State, Event) → (State, List<Effect>)`
+  reducer holding the request-identity + readiness logic. **Identity is classified at the edge**
+  (`ForegroundObserved(Own|Home|Other)`), **navigation and logging are emitted Effects**, and **timers
+  are `ScheduleTimer(gen)` / `TimerFired(gen)`** — so the pure core needs no injected Android ports, only
+  a fake to interpret effects. Ship the port/types, the fake clock/scheduler/presenter, and the read-only
+  engine **state-snapshot** the oracle later exposes (its transport is Phase 3). Readiness and identity
+  are designed together, shipped as separately reviewable changes. **The production
+  `ApplicationLockEngine` still drives the old `LockScreenActivity` path** — it is not switched to the
+  reducer + port here (a fake cannot satisfy the Hilt graph, and the completion API is still
+  package-keyed at the old call sites). Phase 1 proves the *reducer logic*, not R-002/R-005 closure.
+- **Phase 2 — real surface + production cutover.** Extract the auth composable (the full biometric /
+  auto-launch / lockout-polling / PIN ownership currently in `LockScreenActivity`, **not** in
+  `AuthGateViewModel`); build `OverlayLockPresenter` (three surfaces; **`FLAG_SECURE` re-applied to the
+  overlay `LayoutParams`**) and `BiometricHostActivity` (**its own `FLAG_SECURE`**, `exported=false`,
+  result keyed by `requestId`); switch production DI + the engine + the completion call sites to the
+  reducer + port (request-id-keyed for the overlay; the `MainActivity` self-gate stays its own
+  package-keyed path, never forced through a request-id overload); land the overlay/shield
+  instrumentation + the **replacement smoke**. **Delete `LockScreenActivity` + its manifest entry and
+  remove the R2 baseline exception only after that replacement path is green.**
+- **Phase 3 — oracle transport + harness + evidence.** Wire the debug oracle transport (Decision #2)
+  over the Phase-1 snapshot; repoint OV-3 / F3 / smoke_core; add CR-004 prod a11y provisioning
+  (Decision #4); capture the WP2 device evidence.
+
+**Mandatory gates:** (1) pure state-machine tests pass before any WindowManager integration; (2) a
+real-surface test accompanies each surface; (3) the replacement smoke passes before `LockScreenActivity`
+is deleted; (4) the oracle/harness evidence is the final WP2 gate.
 **Dependencies.** WP0 (ADR-020), WP1 (harness).
 **Outputs.** `LockPresenter`/`OverlayLockPresenter`, `BiometricHostActivity`, request-identity engine
 change; DI wiring (`AppModule`).
 **RTM (this WP's commit):** **FR-027** Lock Screen Display (`partial`→`implemented`) and **FR-028**
 Overlay Security (`not-started`→`implemented`) — the overlay presentation lands here;
 `implemented-verified` at the WP6 matrix. Request-identity is the R-002 remediation *by construction*
-(risk-register note; evidenced at WP6).
+(risk-register note; evidenced at WP6). The **R-005** readiness *model* also lands here (register note;
+detector-bootstrap + cold-start verification in WP3; Closed at WP6).
 **Acceptance.** With accessibility still the detector, **per the canonical R-002 standard + §11
 protocol**: the emulator A/B shows the overlay eliminates `ABSENT`, the Moto G shows no-regression
 (this WP *re-validates* the remediation — it is **not** "closed on real hardware"); biometric unlock
 works from the overlay; OV-3 relock, F3 self-gate, smoke_core green; JVM + instrumentation tests for
 request-identity pass — **supersession, stale-result rejection, biometric cancel, rotation/recreation,
-and process death** each leave the correct single request state (R7).
+and process death** each leave the correct single request state (R7). Plus the **R-005 readiness suite,
+engine-level (not only the mapping matrix)**: a withheld first emission holds any unclassifiable
+foreground behind the "checking" shield (never *allow*); `Loading → Ready` re-evaluates the current
+foreground; first-emission-empty and error-before/after-`Ready` behave per §2.3; **coroutine cancellation
+is not `Failed`**; `T_ready` expiry gives `Checking → Recovery` (never reveals the target); stale
+timers/results are rejected; and a shield actually blocks touches to the task beneath.
 **Risks / implications.** Compose-in-overlay lifecycle plumbing is the fiddliest code in M7 (owner
 wiring, `WindowManager` add/remove ordering, back-key handling; Home cannot be intercepted and
 dismisses to launcher — acceptable per SDS §8.5). This WP re-validates R-002; a real-hardware OV-4
 pass here is the primary closure evidence.
 
-### WP3 — Detection swap: UsageStats poll + fail-secure readiness *(keep the overlay; R-005)*
-**Purpose.** Swap the *detection* mechanism to the Usage Access poll feeding the same engine seam,
-and build the fail-secure readiness model so cold-start/pre-load events cannot fail open (R-005).
+### WP3 — Detection swap: UsageStats poll + readiness verification *(keep the overlay; R-005)*
+**Purpose.** Swap the *detection* mechanism to the Usage Access poll feeding the same engine seam, and
+add the **detector-bootstrap** readiness input to the model **built in WP2**, then verify it so
+cold-start/pre-load events cannot fail open (R-005).
 **Tasks.**
 - Introduce `ForegroundDetectionSource` port (emits normalized `current package + observation time`);
   implement `UsageAccessDetector` **exactly per the §2.4 detection contract** (query window + overlap,
@@ -492,22 +570,24 @@ and build the fail-secure readiness model so cold-start/pre-load events cannot f
   relock silently breaks.
 - Wire the detector to `ApplicationLockEngine.onAppForegrounded`; retire the accessibility service as
   the *input* (still present in the manifest until WP5, now disconnected/disabled for testing).
-- **Fail-secure readiness (R-005):** model `LockPolicyManager` cache state as `loading / ready /
-  failed` (replace the `emptySet()` seeded fill, `LockPolicyManager.kt:21-40`); `evaluate()` maps
-  non-`ready` to the **§2.3 hold/interrupt decisions** (never *not-protected*), and a decision before
-  the first confirmed snapshot does not allow. The user-visible surfaces (checking / recovery shields,
-  `T_ready`, the escape affordance) are the §2.3 table. Deterministic cold-start / process-restart unit
-  + instrumentation tests.
+- **Fail-secure readiness (R-005) — detector-bootstrap input + verification (the model landed in WP2).**
+  The `PolicyState` machinery, engine-owned `ReadinessContext`, §2.3 shields, and `T_ready` were built in
+  WP2. WP3 adds the **detector-bootstrap** as the second `loading` input (`DetectorState`: no lock before
+  the first confirmed post-start observation, so no retroactive lock), and lands the deterministic
+  **cold-start / process-restart** unit + instrumentation tests on the real poll engine (a protected app
+  opened in the pre-load window is held, never allowed).
 - NFR-PERF-012 instrumentation: measure enforcement response (foreground result → presentation begin,
   ≤250 ms) and end-to-end (transition → overlay), **reported p50/p95/p99 per the §11 protocol** and
   recorded under NFR-PERF-015.
 **Dependencies.** WP2 (overlay presentation must exist so the poll drives a real lock), WP0 (ADR-021).
 **Outputs.** `ForegroundDetectionSource`/`UsageAccessDetector`, the poll foreground service, the
-readiness state model, benchmark harness.
+detector-bootstrap readiness input + cold-start/process-restart tests (the readiness *model* is WP2),
+benchmark harness.
 **RTM (this WP's commit):** **FR-026** Foreground Application Detection (`not-started`→`implemented`;
 Usage Access baseline replaces the a11y detector — its M1 burndown note is resolved); **NFR-PERF-012**
 (`not-started`→`partial`; figures recorded, `implemented-verified` at the WP6 matrix). **R-005**
-readiness lands here (register note; Closed at WP6 on the cold-start tests).
+readiness *model* landed in WP2; WP3 adds the detector-bootstrap input and the cold-start verification
+(register note; Closed at WP6 on the cold-start tests).
 **Acceptance.** Accessibility **off**, Usage Access **on** → protected apps detected and locked via
 the overlay; OV-3 relock via poll; OV-4 still green (§11); **screen-off relock verified for both the
 IMMEDIATE and the `SCREEN_OFF` relock policies** (screen off → return to a protected app → lock
@@ -530,9 +610,10 @@ surface the SDS §8.7 states truthfully, so the watchdog cannot read an empty/un
   `AppDetectionService.isEnabled(this)` with checks for Usage Access grant + overlay grant +
   detector liveness; the alert notification deep-links to the correct settings (Usage Access /
   "Display over other apps"), not `ACTION_ACCESSIBILITY_SETTINGS` (`:152-167`).
-- Health readiness: the watchdog treats non-`ready` policy state and unverified detector/presentation
-  capability as *Unknown/not verified* or *Protection interrupted*, never as "nothing to protect"
-  (R-005 watchdog half, `:87-90`).
+- Health readiness (full rewrite; WP2 already made the watchdog minimal-correct against `PolicyState`,
+  standing down only on PIN-unset or `Ready(empty)`): the watchdog treats non-`ready` policy state and
+  unverified detector/presentation capability as *Unknown/not verified* or *Protection interrupted*,
+  never as "nothing to protect" (R-005 watchdog half, `:87-90`).
 - **Detector-liveness — three timestamps, not "a recent observation" (R9).** A quiet phone has no app
   transitions, so "produced a foreground observation recently" would falsely flip to *interrupted*.
   Track **three** independent signals, each judged against a condition-aware threshold:
@@ -656,7 +737,7 @@ gate unremediated (TM §14.9/§14.10).
 | **Fleet: only one real device, one OEM/OS** (Moto G 2025 / Android 15) — OEM window-manager overlay handling unverified | OV-4-as-instrumentation-test runs on FTL's multi-OEM/multi-API physical catalog; residual carried as a TM §14.10 compensating treatment + review trigger if FTL deferred; a cheap second-OEM used device is the alternative |
 | `BiometricPrompt` unhostable in an overlay; transparent-Activity path flaky under targetSdk-36 BAL rules | WP0 proves the transparent-`FragmentActivity`-via-BAL path on API 30/33/35/36; PIN fallback is always present so biometric is never a hard dependency |
 | Poll latency misses an acceptable end-to-end target | WP0 sets the interval on measured data; NFR-PERF-012's documented figure is "poll + 250 ms", not a hard sub-second cap — the bar is honesty + acceptance, not a promise the platform can't keep |
-| Cold-start / process-restart fail-open (R-005) | Readiness model built into WP3 (`loading/ready/failed`, non-ready ⇒ hold), deterministic cold-start tests; watchdog readiness in WP4 |
+| Cold-start / process-restart fail-open (R-005) | Readiness model built in WP2 (`loading/ready/failed`, non-ready ⇒ hold); WP3 adds the detector-bootstrap input + deterministic cold-start tests; watchdog readiness in WP4 |
 | Refactor regresses the F3/F4/OV gating semantics the M1 harness protects | WP1 lands the reworked harness first and gates every later WP; one-mechanism-per-WP isolation; nothing proceeds while the harness is red |
 | `specialUse` FGS rejected by Play / battery policy penalty | Frugal poll loop (stop on screen-off / no protected selections), battery profile recorded in WP0; the FGS justification string set in WP5; Play review itself is M10 |
 | targetSdk-35 FGS-from-background start blocked (boot / app-open) | WP0 confirms start paths under the SAW + visible-overlay rule; the service starts from foreground (MainActivity) as today, boot-start treated as best-effort (existing `ProtectionWatchdogService.start` pattern) |

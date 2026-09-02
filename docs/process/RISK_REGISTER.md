@@ -356,15 +356,21 @@ bypass window) but rooted in initialization rather than a presentation race.
 - App startup warms the cache early (`startCaching` at application init), shortening the window.
 - No fail-secure gate exists for the pre-load state — that absence is the risk.
 
-### Planned actions (M2 — no M1 logic per the review)
-1. Model explicit **loading / ready / failed** policy states; treat unknown readiness as
-   **fail-secure** (block or hold locked until the first snapshot is confirmed).
-2. Deterministic cold-start / process-restart tests + watchdog readiness/restart tests.
-3. On implementation, reassess FR-001/FR-017/FR-179 RTM rows with evidence (no promotion without it).
+### Planned actions (M7, staged across WP2–WP6)
+1. **WP2** — the readiness *model*: one atomic `PolicyState { Loading / Ready(packages) / Failed }`
+   replacing the `emptySet()` fill; an engine-owned readiness aggregate; the §2.3 hold / recover shields;
+   `loading` holds any foreground not provably unprotected; the watchdog made minimal-correct against
+   `PolicyState` (stands down only on PIN-unset or `Ready(empty)`).
+2. **WP3** — the detector-bootstrap as a second `loading` input; deterministic cold-start /
+   process-restart tests on the real poll engine (a pre-load launch is held, never allowed).
+3. **WP4** — the full watchdog health rewrite (usage / overlay grant + detector liveness), never
+   "nothing to protect".
+4. **WP6** — evidence complete → **Closed**; reassess FR-001/FR-017/FR-179 RTM rows with evidence (no
+   promotion without it).
 
 ### Review triggers
-The M2 core-security work; any change to policy-cache initialization or watchdog readiness logic;
-the M1 gate record (as an open-risk input, not an M1 blocker).
+The M7 engine-replacement work (WP2–WP6); any change to policy-cache initialization or watchdog
+readiness logic.
 
 ---
 
