@@ -4,6 +4,44 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2: resolve decision #3 -- WP2 build sequence + normative gates   (2026-09-01)
+---------------------------------------------------------------------------------
+Recorded the WP2 implementation order in M7_PLAN §WP2, hardened against a formal review of the
+sequencing. Four phases with normative gates; execution order only, no scope change.
+- New "Implementation sequence and gates" subsection: Phase 0 policy-state + watchdog compat;
+  Phase 1 a pure (State,Event)->(State,Effects) reducer (identity classified at the edge, navigation/
+  logging/timers as effects -- no injected Android ports; production engine stays on the old path);
+  Phase 2 auth-composable extraction + overlay/biometric surfaces + production cutover, with FLAG_SECURE
+  re-applied to the overlay LayoutParams and BiometricHostActivity, and LockScreenActivity deleted only
+  after the replacement smoke passes; Phase 3 oracle transport + harness + device evidence.
+- Mandatory gates: pure state-machine tests before WindowManager; a real-surface test per surface;
+  replacement smoke before old-Activity deletion; oracle/harness evidence as the final WP2 gate.
+- Konsist note corrected: the service->presentation edge is REMOVED (not reshaped) once the engine uses
+  the port; keep the port vocabulary in service/ so no presentation type leaks back.
+- Fixed stale decision-#1 text: WP3 heading/purpose/outputs and the risk table no longer say WP3 builds
+  the readiness model (WP2 builds it; WP3 adds the detector-bootstrap input + cold-start verification).
+
+
+M7/WP2: resolve decision #1 -- pull the R-005 readiness model forward into WP2   (2026-09-01)
+--------------------------------------------------------------------------------------------
+Recorded the reviewed design in the authoritative docs before WP2 code, per GOVERNANCE (ADRs/plan
+lead the code). R-005 stays Open until WP6. Decision + design hardened against a formal review.
+- M7_PLAN §WP2: the "(Optional consolidation)" note becomes a resolved decision. The readiness model
+  lands in WP2 (its shields are overlay surfaces, so building it now avoids editing the engine and the
+  overlay twice): one atomic sealed PolicyState { Loading / Ready(packages) / Failed }; an engine-owned
+  ReadinessContext(policy, detector, capability, foreground) with detector/capability defaulted in WP2
+  and filled in WP3/WP4; layered decision/surface/present-result/health; loading holds any foreground
+  not provably unprotected (exempt only own package + resolved HOME); timers keyed to
+  (requestId, load-generation); the watchdog made minimal-correct against PolicyState.
+- M7_PLAN §2.3: fixed the T_ready fail-open ambiguity -- the full lock surface never times out, no
+  shield is removed to reveal the target, Checking --T_ready--> Recovery, escapes route to a safe
+  destination first; and named the four separate layers (decision vs surface vs present-result vs
+  health) so overlay-draw failure is not an evaluate() output.
+- M7_PLAN §WP3/§WP4: WP3 adds the detector-bootstrap input + real cold-start verification; WP4 does the
+  full watchdog health rewrite. RTM notes + the WP2 acceptance (engine-level readiness suite) updated.
+- RISK_REGISTER R-005: planned actions restaged across WP2-WP6; stale "M2" references corrected to M7.
+
+
 CI: fix the recurring GMD instrumentation-job setup failure   (2026-09-01)
 --------------------------------------------------------------------------
 The instrumentation job (the GMD smoke matrix; non-gating, continue-on-error) had gone red on
@@ -1826,7 +1864,7 @@ Changed:
   marked as M4 design inputs, superseded as the active plan.
 
 
-Phase 3 — Encrypted vault + intruder selfie   (2026-07-15, uncommitted)
+Phase 3 — Encrypted vault + intruder selfie   (2026-07-15)
 ----------------------------------------------------------------------
 Encrypted media vault and intruder-selfie capture, plus two security
 fixes found during validation.
