@@ -372,10 +372,35 @@ fail-closed APK / androidTest install with a `USE_PREINSTALLED` escape (CR-005);
 missing-grant negative control (CR-006); OV-4 requires + arithmetic-validates its retained count line
 (CR-007); prod-only checks skip with exit 3 and `run_all` labels the §11 gate vs a non-gate/diagnostic
 profile (CR-009 / CR-003). Three findings are deferred with owners:
-- **CR-004 → WP2:** WP1 removed a11y provisioning (its own task), but WP2 keeps a11y as the *detector*.
-  WP2 re-adds a **scoped a11y-detector enable** for the prod-presentation run (the `prod` harness path is
-  a not-wired stub until then); dropped at WP5. Kept simple in WP1 rather than building a
-  presentation×detector seam ahead of need.
+- **CR-004 → WP2 (resolved, Decision #4, 2026-09-01):** WP1 removed a11y provisioning; WP2 keeps a11y as
+  the *detector*, so the `prod` path re-adds a **scoped, non-destructive** enable of `AppDetectionService`
+  (ADR-018 FQCN; component `${APP_ID}/com.applock.applocker.service.AppDetectionService`, suffix on the
+  app id only). Edit `enabled_accessibility_services` per-user by **appending only the exact component and
+  preserving all others** — never delete/rewrite the list or set `accessibility_enabled` off globally (the
+  M1 non-destructive lesson: `2026-07-23_wp2-regression_moto-g-2025.md` §2 / item 4). **Delivery, not
+  binding, is the gate** (R-001c: bound ≠ delivering) — the `prod` *test checks* read detector delivery
+  from the Decision-#2 oracle `lastForeground` ack and the overlay independently via `dumpsys window`
+  (the setup preflight may stay end-to-end, since either-layer failure should fail setup). **Failure
+  classification:** a run failure is an a11y *detector artifact* **only** when the oracle shows **no fresh
+  foreground ack**; if the ack occurred but the surface failed, it is a **presentation defect** (a real
+  WP2 bug, not a re-run) — this keeps "Moto G a11y flakiness" from masking an overlay bug. Also fix the
+  existing circular inference (`setup_device.sh:79` reads "no lock" as "not protected" and would toggle a
+  protected app **off** when the detector is bound-but-dead): read the switch's actual `checked` state,
+  tap only if explicitly `false`, fail on ambiguous. adb-enable works on emulators; for sideloaded
+  services on Android 13+ (observed: Moto G 2025 / Android 15) it lands bound-but-not-delivering (R-001a),
+  so real HW needs a **one-time** operator Settings toggle. Provisioning is **check-then-act**: if the
+  component is present and behaviorally *delivering* (oracle reverify), **preserve it untouched** — the
+  `-r` install keeps the setting, so subsequent runs reverify without rewriting or toggling; act only on
+  failure — **default fail-closed with exact remediation; `ALLOW_MANUAL_A11Y=1` bounded-waits (~120 s,
+  ~2 s cadence) for a fresh delivery ack**; `--skip-setup` cannot bypass the delivery preflight. `neg_a11y_disabled` (proves the probe catches a bound-but-dead
+  detector) runs **emulator-only / behind a destructive flag** — adb cannot restore delivery on real HW —
+  removing only our component and restoring in an unconditional trap after a session-clear + oracle
+  epoch/seq baseline. Scripts are `set -uo pipefail` (not `-e`) and `sh_` swallows stderr, so every
+  settings read/write, membership check, unbind wait, and restore needs an **explicit check with retained
+  diagnostics**. **Lifecycle:** provisioning + neg-control invocation are **removed at the WP3 cutover**
+  (WP3 must prove UsageStats is the *sole* detector, a11y off) — not WP5; WP5 removes the product
+  component + confirms no stale test-device setting remains. **No RTM promotion or R-001 reduction**
+  results from this temporary bridge. Kept simple: no presentation×detector seam.
 - **CR-002 → WP6 / R-002 closure:** the OV-4 BEHIND score is present/absent per burst, not a streak
   duration; before R-002 closure evidence, measure the max BEHIND streak, reject BEHIND-at-deadline, and
   tighten the small-N `maxOf(1, …)` tolerance to the exact 2 %.

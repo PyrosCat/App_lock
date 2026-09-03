@@ -4,6 +4,37 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2: resolve decision #4 -- CR-004 prod-path a11y detector provisioning   (2026-09-01)
+----------------------------------------------------------------------------------------
+Recorded the CR-004 disposition in M7_PLAN §WP1, hardened against a formal review. Harness test
+infrastructure; no RTM/ADR change, and explicitly no R-001 reduction (it is a temporary bridge).
+- WP2 prod path re-adds a scoped, NON-DESTRUCTIVE enable of AppDetectionService (append only the exact
+  ADR-018-pinned component per-user, preserve other a11y services, never rewrite the list / global-off --
+  the M1 lesson from the 2026-07-23 Moto G report; "always adb-enable" would have regressed it).
+- Delivery, not binding, is the gate (R-001c): the prod test checks read detector delivery from the
+  Decision-#2 oracle lastForeground ack and the overlay independently via dumpsys window; the setup
+  preflight may stay end-to-end. Failure classification: a11y detector artifact ONLY when the oracle
+  shows no fresh ack; ack-present + surface-fail = a presentation defect (a real WP2 bug, not a re-run).
+- Fixes an existing circular inference in setup_device.sh (no-lock read as not-protected would toggle a
+  protected app OFF when the detector is bound-but-dead): inspect the switch's actual checked state.
+- Real HW (sideloaded a11y, Android 13+; observed Moto G 2025 / Android 15 = bound-but-not-delivering,
+  R-001a): provisioning is check-then-act -- if present + delivering (oracle reverify), preserve untouched
+  (the `install -r` update keeps the setting), so the manual toggle is ONE-TIME on failure, not per run;
+  subsequent runs reverify without rewriting/toggling. Act only on failure: default fail-closed with
+  remediation; ALLOW_MANUAL_A11Y=1 bounded-waits (~120s) for a fresh ack; --skip-setup cannot bypass the
+  delivery preflight.
+- neg_a11y_disabled: emulator-only / destructive-flag-gated (adb cannot restore delivery on real HW),
+  removes only our component, restores in an unconditional trap.
+- Lifecycle: provisioning + neg-control removed at the WP3 cutover (WP3 proves UsageStats is the sole
+  detector), NOT WP5; WP5 removes the product component + confirms no stale test-device setting.
+- Moto G WP2 scope: full functional suite (smoke_core/OV-3/F3/biometric/shield/oracle/OV-4) via a
+  one-time manual a11y toggle (preserved + behaviorally reverified across runs); a failure counts as an
+  a11y detector artifact only when the oracle shows no fresh ack (else it is a presentation defect),
+  re-confirmed under the poll detector at WP3. OV-4 stays no-regression; the emulator A/B stays the
+  decisive R-002 evidence.
+- Explicit shell error checks throughout (scripts are set -uo pipefail, not -e; sh_ swallows stderr).
+
+
 M7/WP2: resolve decision #2 -- engine state oracle (transport + contract)   (2026-09-01)
 ---------------------------------------------------------------------------------------
 Recorded the Plan-C state oracle in M7_PLAN §WP2, hardened against a formal review. Contract shape is a
