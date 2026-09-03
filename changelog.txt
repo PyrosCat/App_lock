@@ -4,6 +4,21 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Process: add SCHEDULE.md (milestone effort estimate vs actual) + verify the CI GMD fix   (2026-09-02)
+----------------------------------------------------------------------------------------------------
+- New docs/process/SCHEDULE.md: per-milestone effort estimate vs actual for the 1.0.0 line, in the
+  MIGRATION_ASSESSMENT.md Phase-12 style (per-milestone table + running total). Effort unit =
+  developer-days (M0 = 5, M1 = 15-20 from MA; M7 = 22-30, re-baselined from actuals after WP0 ran ~5
+  against a 1-2 plan estimate; M8-M10 provisional, firmed at the M7 gate). 1.0.0-line total 78-110
+  developer-days. Milestone estimates include planning, design decisions, and device/build setup, not
+  just WP execution. Actuals tracked as calendar elapsed only (labor effort is not logged under a solo
+  cadence), with the caveat that calendar elapsed != the effort estimate.
+- Verified the CI GMD instrumentation fix (c9d22fb) works: the instrumentation job is GREEN on both
+  post-fix main runs (d087301, 9de84f5) -- all three apiXXSetup tasks succeed, 4 tests run per lane
+  (api30/35/36), BUILD SUCCESSFUL. It had been red on every prior run. Two clean merges = the bar for
+  eventually flipping continue-on-error off.
+
+
 M7/WP2: resolve decision #4 -- CR-004 prod-path a11y detector provisioning   (2026-09-01)
 ----------------------------------------------------------------------------------------
 Recorded the CR-004 disposition in M7_PLAN §WP1, hardened against a formal review. Harness test
