@@ -4,6 +4,34 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 Phase 1 (change A): pure request-identity reducer + scope record   (2026-09-07)
+-------------------------------------------------------------------------------------
+Change A of Phase 1: the pure, JVM-only lock-engine reducer holding the request-identity / lock
+lifecycle. Readiness (PolicyState folded into Checking/Recovery, the T_ready timer, PolicyStateChanged)
+is change B. The production ApplicationLockEngine still drives the old LockScreenActivity path; nothing
+is rewired here, so no production source and no verified requirement is touched.
+- New com.applock.service.engine package: EngineModel.kt (State/Event/Effect/Surface types and the
+  process-scoped Epoch + RequestId/FailureId tokens) and LockEngineReducer.kt, a deterministic
+  (State, Event) -> (State, List<Effect>) reducer. Side effects (navigation, logging, session/lockout/
+  intruder mutations) are emitted Effects an adapter performs, so the core needs no Android ports.
+- Request identity: one active request at a time; re-lock on every foreground event but audit-log only
+  the first entry into a target's lock; a different target supersedes (new id + supersede count); Own
+  and Transient are no-ops; Home dismisses and relocks the previous app exactly once. Completions
+  (unlock/failure/dismiss/biometric-cancel) are rejected unless their token matches the active request,
+  including a foreign process epoch after a restart.
+- Lockout/intruder: a failed attempt is held as a per-FailureId pending entry; the adapter records it
+  and returns a token-keyed LockoutRecorded follow-up, so the lockout audit + intruder capture fire
+  exactly once per real failure and a duplicated/unsolicited callback cannot fabricate them. The
+  projected LockoutState updates only from the current lockout streak (a generation bumped on success)
+  and, within it, only from a newer failure count, so a pre-success or out-of-order follow-up cannot
+  re-lock or regress the projection while its capture/audit still fire.
+- Rotation/recreation and biometric-cancel need no request re-mint: the surface is a pure projection of
+  state (carrying the RequestId) that a state-observing presenter reconstructs; process death is
+  covered by the per-process epoch.
+- 30 pure-JVM reducer tests (LockEngineReducerTest); full prod-debug unit suite green; detekt clean.
+- Recorded the ratified Phase 1 reducer model in docs/process/M7_PLAN.md WP2.
+
+
 M7/WP2 Phase 0: atomic PolicyState + pure watchdog stand-down (R-005 readiness foundation)   (2026-09-06)
 -------------------------------------------------------------------------------------------------------
 First code of WP2. Pure-JVM foundation only; the production lock engine and the overlay presentation

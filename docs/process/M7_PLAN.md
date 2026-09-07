@@ -577,6 +577,68 @@ the **gates** are normative, the tactical ordering within a phase is not.
 **Mandatory gates:** (1) pure state-machine tests pass before any WindowManager integration; (2) a
 real-surface test accompanies each surface; (3) the replacement smoke passes before `LockScreenActivity`
 is deleted; (4) the oracle/harness evidence is the final WP2 gate.
+
+**Phase 1 reducer model (resolved 2026-09-07).** The pure reducer is `reduce(State, Event) ->
+(State, List<Effect>)`, deterministic, no I/O and no clock (time enters via `atElapsed` on events and
+via `TimerFired`). Shipped as two separately-reviewable changes: **A** the identity/lock lifecycle with
+readiness assumed `Ready`; **B** the readiness fold-in (`PolicyState` -> `Checking`/`Recovery`, the
+`T_ready` timer, and the `PolicyStateChanged` re-evaluations).
+
+- **Two independent lifecycles in `State`, mutually exclusive** (`require(activeRequest == null ||
+  readinessHold == null)`): `activeRequest: LockRequest?(id, target)` for the lock/unlock path (its
+  `RequestId` is minted only on entry to `Lock`), and `readinessHold: ReadinessHold?(target, phase in
+  {Checking, Recovery}, generation, timer?)` for the not-ready path (`timer` non-null iff `Checking`).
+  Also `epoch`, `generation`, `nextRequestId`, `policy`, `lastForeground: {Home|Other}?`, and snapshot
+  counters. The **surface is a pure projection**, never independent state: `activeRequest -> Lock`;
+  `readinessHold.Checking -> Checking`; `readinessHold.Recovery -> Recovery`; both null -> none.
+- **Identity classified at the edge** to `Own | Home | Transient | Other(pkg, hasValidSession)`. Only
+  **`Own` and `Transient` are true no-ops** (preserve `lastForeground`/`activeRequest`/`readinessHold`/
+  timer/surface; emit nothing; optional `lastTransient` projection for diagnostics). **`Home` is not a
+  no-op**: advances `lastForeground`, emits `NoteAppLeft(prev)` when `prev is Other`, clears the
+  hold/request (`CancelTimer` if a `Checking` timer was live), and `DismissSurface`. `NoteAppLeft` is
+  emitted **exactly once per genuine real-app switch** (`prev is Other && prev.pkg != current`).
+- **`evaluate` truth table** (only real foregrounds reach it; `Home` always dismisses):
+  `Ready`: protected+no-session -> `LOCK`, else `ALLOW`. `Loading`: any `Other` -> `HOLD` (`Checking`
+  + `T_ready`). `Failed`: any `Other` -> `RECOVER` (no timer). `Loading`/`Failed` hold every `Other`
+  because none can be proven unprotected without the set (R-005 core); `Failed` never yields `ALLOW`.
+- **`PolicyStateChanged(Failed)`** (direct, pure, no session lookup): `activeRequest` -> preserve
+  `Lock`; `readinessHold` -> ensure `Recovery` (`Checking` cancels its timer); both null &
+  `lastForeground is Other(A)` -> create `readinessHold(A, Recovery, timer=null)` + `Present(Recovery)`
+  (closes the standing-allow fail-open — no detector re-emission required); else no surface.
+- **`PolicyStateChanged(Ready)`**: `readinessHold` -> re-evaluate its `target` by `isProtected` against
+  `Ready.packages` only, **session not consulted (fail-secure override:** re-authenticate a
+  possibly-sessioned protected target rather than risk a bypass): protected -> `Lock` (mint, log-once,
+  cancel `Checking` timer); not protected -> clear + `DismissSurface`. `activeRequest` -> preserve.
+- **Tokens & stale rejection.** `epoch` is random per process (seeded into `State`); a foreign epoch is
+  rejected (process-death ghosts). Timer token `(epoch, generation)`; completion token `(epoch,
+  RequestId)`. `TimerFired(t)` accepted iff `t.epoch == epoch && readinessHold?.phase == Checking &&
+  t == readinessHold.timer`; `UnlockSucceeded/Failed/Dismissed(r)` accepted iff `r.epoch == epoch &&
+  r.id == activeRequest?.id`.
+- **`generation` increments exactly once per invalidating transition** — supersession (active
+  hold/request replaced by a different target/`Home`), `ScreenOff`/reset, or opening a new `Checking`
+  hold. A single event that is both a supersession and a new hold increments **once**, emits one
+  `CancelTimer`, and schedules one new-generation timer. `Recovery` holds carry the current generation
+  inertly (no timer). `CancelTimer` is always emitted when a `Checking` timer's owner resolves or is
+  superseded. Lock audit (`LOCK_TRIGGERED`) is logged only on the first entry into locking a target
+  (same-target re-observation re-presents idempotently without a new id or log).
+- **Completions & lifecycle.** Lockout audit + intruder capture stay pure via a **per-failure-token**
+  follow-up: `UnlockFailed` mints a `FailureId` into a per-id `pendingFailures` **map** (so concurrent
+  in-flight failures each keep their outcome and a later success drops none), the adapter records the
+  failure and dispatches `LockoutRecorded(FailureToken, LockoutState, count)`, and the reducer consumes
+  the matching entry **exactly once** — emitting `LOCKOUT_TRIGGERED` (iff `LockedOut`) then
+  `CaptureIntruder`, in the legacy order — so a duplicated or unsolicited callback cannot fabricate a
+  lockout/capture. The follow-up carries the real `LockoutState` (remaining-ms), stored on
+  `EngineState.lockout` so the state-observing lock surface can render it (seeded from the persisted
+  `LockoutManager` at adapter construction); the projection updates only from the **current lockout
+  streak** (a generation bumped on each success) and, within it, only from the newest outcome (the
+  monotonic `failureCount`) — so a pre-success or out-of-order follow-up cannot re-lock or regress it,
+  while capture/audit still fire for every consumed failure. **Biometric-cancel** is a token-keyed no-op on request
+  state (re-asserts the lock surface; a stale cancel is ignored). **Rotation /
+  recreation** needs no reducer event: the presenter is **state-observing** and reconstructs from
+  `state.surface`, which carries the `RequestId`, so a recreated surface completes correctly and no
+  request is lost or duplicated. **Process death** is covered by `epoch`: a fresh process rejects any
+  pre-death token and starts with no active request (no ghost).
+
 **Dependencies.** WP0 (ADR-020), WP1 (harness).
 **Outputs.** `LockPresenter`/`OverlayLockPresenter`, `BiometricHostActivity`, request-identity engine
 change; DI wiring (`AppModule`).
