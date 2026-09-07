@@ -20,6 +20,7 @@ import com.applock.data.SecurityEventEntity
 import com.applock.data.SecurityEventType
 import com.applock.di.ApplicationScope
 import com.applock.domain.LockPolicyManager
+import com.applock.domain.shouldStandDown
 import com.applock.presentation.applist.MainActivity
 import com.applock.security.CredentialRepository
 import dagger.hilt.android.AndroidEntryPoint
@@ -84,9 +85,14 @@ class ProtectionWatchdogService : Service() {
     }
 
     private fun checkProtectionHealth() {
-        val expectProtection = credentialRepository.isPinSet() &&
-            policyManager.protectedPackages.value.isNotEmpty()
-        if (!expectProtection) {
+        // Stand down only when there is provably nothing to protect (no PIN, or an empty *Ready*
+        // policy). While policy is Loading/Failed the watchdog stays up — it must not tear down
+        // during a cold-start load (R-005 fail-open the old empty-set read allowed).
+        if (shouldStandDown(
+                pinSet = credentialRepository.isPinSet(),
+                policyState = policyManager.state.value,
+            )
+        ) {
             stopSelf()
             return
         }
