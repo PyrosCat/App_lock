@@ -4,6 +4,41 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 Phase 1 (change B): fold readiness into the pure reducer   (2026-09-07)
+----------------------------------------------------------------------------
+Change B of Phase 1: the atomic PolicyState now drives the reducer's readiness holds, so a foreground
+that cannot yet be classified is held behind a shield instead of failing open (R-005). Still pure and
+JVM-only; the production ApplicationLockEngine keeps driving the old LockScreenActivity path and no
+verified requirement is touched (Phase 2 rewires it).
+- The reducer now holds PolicyState and derives whether an app is protected from PolicyState.Ready,
+  rather than an edge-supplied flag (Foreground.Other drops "protected"; hasValidSession stays edge-
+  supplied). New state slot readinessHold, mutually exclusive with activeRequest; new Surface.Checking /
+  Surface.Recovery; new Generation + TimerToken; new PolicyStateChanged / TimerFired events and
+  ScheduleTimer / CancelTimer effects.
+- Loading holds any Other behind a "checking" shield and schedules T_ready (5 s); Failed holds behind a
+  "recovery" shield with no timer and never allows. Loading/Failed -> Ready re-evaluates the held target
+  (protected -> Lock as a fail-secure override that ignores a possibly-stale session, else dismiss).
+  Ready -> Failed raises a recovery shield over a standing allowed foreground (closing the fail-open a
+  detector that does not re-fire would otherwise leave), converts a checking hold to recovery, and
+  preserves an active lock. T_ready expiry escalates checking -> recovery, never revealing the target.
+- Timers are keyed (epoch, generation) with a fresh generation per scheduled T_ready; a repeated Loading
+  foreground re-presents without restarting the timer; a superseding target cancels and reschedules;
+  stale or foreign-epoch timers are rejected. The generation advances once on any invalidating
+  transition -- one that tears down or replaces the current surface (superseding a lock or hold with a
+  different target, or taking it Home/allow) or opens a new checking hold, plus screen off as a reset
+  boundary that always advances (even from a surface-free state) -- so it stays a clean monotonic view
+  for the state snapshot; a fresh lock over nothing and an idempotent same-target re-present do not
+  advance it.
+- State invariants are enforced, not just documented: EngineState requires activeRequest and
+  readinessHold to be mutually exclusive and a live checking timer to carry the state's epoch and current
+  generation; ReadinessHold requires a timer iff CHECKING (a checking hold that could never time out, or
+  a recovery hold with an unowned timer, is now unconstructable).
+- 24 new reducer tests (54 total in LockEngineReducerTest); full prod-debug unit suite green; detekt and
+  the Konsist architecture rules green (the reducer's service -> domain / security reads are within the
+  allowed layering).
+- Updated the Phase 1 reducer model record in docs/process/M7_PLAN.md WP2 to match the implementation.
+
+
 M7/WP2 Phase 1 (change A): pure request-identity reducer + scope record   (2026-09-07)
 -------------------------------------------------------------------------------------
 Change A of Phase 1: the pure, JVM-only lock-engine reducer holding the request-identity / lock

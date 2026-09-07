@@ -579,15 +579,18 @@ real-surface test accompanies each surface; (3) the replacement smoke passes bef
 is deleted; (4) the oracle/harness evidence is the final WP2 gate.
 
 **Phase 1 reducer model (resolved 2026-09-07).** The pure reducer is `reduce(State, Event) ->
-(State, List<Effect>)`, deterministic, no I/O and no clock (time enters via `atElapsed` on events and
-via `TimerFired`). Shipped as two separately-reviewable changes: **A** the identity/lock lifecycle with
+(State, List<Effect>)`, deterministic, no I/O and no clock (time enters via `elapsedRealtimeMs` on
+events and via `TimerFired`). Shipped as two separately-reviewable changes: **A** the identity/lock lifecycle with
 readiness assumed `Ready`; **B** the readiness fold-in (`PolicyState` -> `Checking`/`Recovery`, the
 `T_ready` timer, and the `PolicyStateChanged` re-evaluations).
 
 - **Two independent lifecycles in `State`, mutually exclusive** (`require(activeRequest == null ||
   readinessHold == null)`): `activeRequest: LockRequest?(id, target)` for the lock/unlock path (its
   `RequestId` is minted only on entry to `Lock`), and `readinessHold: ReadinessHold?(target, phase in
-  {Checking, Recovery}, generation, timer?)` for the not-ready path (`timer` non-null iff `Checking`).
+  {Checking, Recovery}, timer?)` for the not-ready path (`timer`, a `(epoch, generation)` token, is
+  non-null iff `Checking`; it carries the generation, so the hold needs no separate field). `ReadinessHold`
+  enforces the `Checking` <-> `timer != null` invariant, and `EngineState.init` requires a live timer to
+  carry the state's own `epoch` and current `generation`.
   Also `epoch`, `generation`, `nextRequestId`, `policy`, `lastForeground: {Home|Other}?`, and snapshot
   counters. The **surface is a pure projection**, never independent state: `activeRequest -> Lock`;
   `readinessHold.Checking -> Checking`; `readinessHold.Recovery -> Recovery`; both null -> none.
@@ -614,13 +617,17 @@ readiness assumed `Ready`; **B** the readiness fold-in (`PolicyState` -> `Checki
   RequestId)`. `TimerFired(t)` accepted iff `t.epoch == epoch && readinessHold?.phase == Checking &&
   t == readinessHold.timer`; `UnlockSucceeded/Failed/Dismissed(r)` accepted iff `r.epoch == epoch &&
   r.id == activeRequest?.id`.
-- **`generation` increments exactly once per invalidating transition** — supersession (active
-  hold/request replaced by a different target/`Home`), `ScreenOff`/reset, or opening a new `Checking`
-  hold. A single event that is both a supersession and a new hold increments **once**, emits one
-  `CancelTimer`, and schedules one new-generation timer. `Recovery` holds carry the current generation
-  inertly (no timer). `CancelTimer` is always emitted when a `Checking` timer's owner resolves or is
-  superseded. Lock audit (`LOCK_TRIGGERED`) is logged only on the first entry into locking a target
-  (same-target re-observation re-presents idempotently without a new id or log).
+- **`generation` advances exactly once per invalidating transition** — one that tears down or replaces
+  the current surface (superseding a lock or hold with a different target, or taking it `Home` / allowing
+  it) **or** opens a new `Checking` hold; `ScreenOff` always advances it as a reset boundary, even from a
+  surface-free state. A fresh lock/hold over nothing and an idempotent same-target re-present do not
+  advance it. A single event that both cancels the old checking
+  timer and opens a new hold advances **once** (the schedule), emitting one `CancelTimer` and scheduling
+  one new-generation timer; a `Recovery` hold carries the generation inertly (no timer). `supersedeCount`
+  separately counts lock/hold supersessions by a different target. The invariant `activeRequest == null
+  || readinessHold == null` is enforced in `EngineState.init`. Lock audit (`LOCK_TRIGGERED`) is logged
+  only on the first entry into locking a target (same-target re-observation re-presents idempotently
+  without a new id or log).
 - **Completions & lifecycle.** Lockout audit + intruder capture stay pure via a **per-failure-token**
   follow-up: `UnlockFailed` mints a `FailureId` into a per-id `pendingFailures` **map** (so concurrent
   in-flight failures each keep their outcome and a later success drops none), the adapter records the
