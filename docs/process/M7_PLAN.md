@@ -657,101 +657,128 @@ extensions land here because Phase 2 is the first phase with a state-observing s
   RTM (behavior-preserving; FR-027 stays `partial`).
 - **C2 — pure reducer: token-keyed safe-dismiss protocol.** A state-observing overlay makes the current
   `onDismissed` reveal latent-real: it clears `activeRequest` in the same reduction that returns `GoHome`
-  as a *later* effect, so publish-before-interpret drops the surface before navigation runs, flashing the
-  guarded app. Replace it — and add the shield escape — with **one generic protocol** over a
-  `SurfaceToken = RequestToken(epoch,id) | ReadinessToken(epoch,generation)`: `SafeDismissRequested(token,
-  destination)` validates against the live surface, **preserves it**, and emits `NavigateSafely(destination,
-  token)` (no state change); the interpreter launches the destination, then enqueues
-  `SafeDismissNavigationIssued(token)`; that follow-up re-validates the *same still-live* surface, clears
-  it, advances `generation`, emits `DismissSurface`. A supersession in between makes the follow-up stale
-  and dropped (fail-safe: never tear down the newer surface; the already-issued navigation is benign, the
-  live surface re-asserts). `destination: SafeDestination` is a **closed enum** `HOME | APP_LOCK |
-  OVERLAY_SETTINGS`, never an arbitrary intent; `Effect.GoHome` is subsumed by `NavigateSafely`. Only
-  leave-without-auth paths use the handshake — unlock-success intentionally reveals and keeps its
-  immediate `DismissSurface`. C2 adds only the pure `ReadinessToken` + these events / effects; the
-  presentation DTOs are D's. Tests: stale-follow-up rejection, both surface kinds, generation advance.
+  as a *later* effect, so publish-before-interpret drops the surface before navigation runs and flashes the
+  guarded app. Replace it, and add the shield escape, with one generic two-step handshake. Only
+  leave-without-auth paths use it; unlock-success keeps its immediate `DismissSurface`.
+  - **Tokens.** `SurfaceToken = RequestToken(epoch,id) | ReadinessToken(epoch,generation)` identifies the
+    live surface a request comes from. A per-request `AttemptToken(epoch,attemptId)` keys the navigation
+    round-trip, so a follow-up from a since-reverted attempt over the same surface cannot act on a later
+    one. `destination: SafeDestination` is a closed enum `HOME | APP_LOCK | OVERLAY_SETTINGS`, never an
+    arbitrary intent.
+  - **Step 1.** `SafeDismissRequested(surfaceToken, destination)` validates the live surface, transitions
+    the guard slot `Guarding -> LeavingFor` over the same `BlockingGuard` (the surface stays visible), and
+    emits `NavigateSafely(destination, attemptToken)`. A request while an escape already stands is dropped,
+    not allowed to replace it.
+  - **Step 2.** The interpreter launches the destination, then enqueues exactly one attempt-keyed follow-up.
+    `SafeDismissNavigationIssued(attemptToken)` clears the escape, advances `generation`, and emits
+    `DismissSurface`. `SafeDismissNavigationFailed(attemptToken)` reverts `LeavingFor -> Guarding`
+    (reconciled with the current policy) so the control can be retried. A supersession in between makes
+    either follow-up stale, and it is dropped: the newer surface never comes down for an old navigation.
+  - **Model.** The on-screen surface becomes one sum: `GuardState = None | Guarding | LeavingFor` over
+    `BlockingGuard = Lock | Checking | Recovery`, plus a separate `ArrivalExemption` for the post-navigation
+    OVERLAY_SETTINGS arrival, and the pure `ReadinessToken` and these events / effects (`Effect.GoHome` is
+    subsumed by `NavigateSafely`). The presentation DTOs are D's.
+  - **Tests.** stale-follow-up rejection, both surface kinds, generation advance, the OVERLAY_SETTINGS
+    arrival exemption, navigation-failure retry, and Failed / Ready escape handling (including a preserved
+    Checking escape's timer staying inert under Ready).
 - **D — `LockPresenter` port + `LockEngineRuntime` interpreter (JVM, no cutover).** `LockPresenter`
   (`service/`, `present(LockPresentation): PresentResult { Success | Unavailable | Failed(reason) }`,
   `dismiss()`) keeps its vocabulary in `service/` (no `presentation` type leaks). `LockEngineRuntime`
   (`service/`, `@Singleton`) owns the atomic `EngineState`, exposes the old public API + the request-token
   completions, and delegates the package-keyed self-gate to `SelfGateAuthPort` (F).
   - **Single logical consumer.** Every event enters one `Channel<EngineEvent>` drained by one coroutine
-    confined to a single logical thread (`Dispatchers.Default.limitedParallelism(1)` or a `HandlerThread` —
+    confined to a single logical thread (`Dispatchers.Default.limitedParallelism(1)` or a `HandlerThread`:
     serialized execution, *not* thread affinity). It runs `reduce -> publish (single-writer
     `MutableStateFlow<EngineState>`) -> ordered, sequential effect interpretation`. Effect-produced
     follow-ups (`RecordUnlockFailure->LockoutRecorded`, `ScheduleTimer->TimerFired`,
-    `NavigateSafely->SafeDismissNavigationIssued`) are **enqueued**, never reentrant `reduce`. "Effects
-    fully dispatched" = each safety-critical presenter / navigation effect completes synchronously **or is
-    accepted onto the single ordered Main queue** before event N+1 is taken; bare async posting that N+1
-    could overtake is insufficient. Atomic reads stay for the lock-free presenter and do not substitute
-    for serialization.
+    `NavigateSafely->SafeDismissNavigationIssued`/`SafeDismissNavigationFailed`) are **enqueued**, never a
+    reentrant `reduce`; the interpreter emits the failure follow-up when the launch throws or nothing
+    resolves. "Effects fully dispatched" means each safety-critical presenter or navigation effect
+    completes synchronously, **or is accepted onto the single ordered Main queue**, before event N+1 is
+    taken. Bare async posting that N+1 could overtake is insufficient. Atomic reads stay for the lock-free
+    presenter and do not substitute for serialization.
   - **Presentation DTOs from post-reduction state:** `LockPresentation(target, RequestToken(epoch, id))`,
     `CheckingPresentation(target, ReadinessToken(epoch, generation))`, `RecoveryPresentation(...)`.
-    `Surface.Lock` stays id-only — `epoch` is process-constant, so it belongs at the interpreter boundary,
+    `Surface.Lock` stays id-only: `epoch` is process-constant, so it belongs at the interpreter boundary,
     not in the pure projection.
   - **Edge classifier / Home resolver.** Raw package -> `Own | Transient | Home | Other(pkg,
-    sessionManager.hasValidSession(pkg))`. Home is load-bearing (a misclassified launcher draws a Recovery
-    shield via `enterRecoveryIfNeeded`). Resolve the current home via `PackageManager.resolveActivity(MAIN/
-    HOME)` (min-26+); `RoleManager.ROLE_HOME` is 29+ and does not expose the holder to a non-system app, so
+    sessionManager.hasValidSession(pkg))`. Home is load-bearing: a misclassified launcher draws a Recovery
+    shield via `enterRecoveryIfNeeded`. Resolve the current home via `PackageManager.resolveActivity(MAIN/
+    HOME)` (min-26+). `RoleManager.ROLE_HOME` is 29+ and does not expose the holder to a non-system app, so
     it serves only as a 29+ invalidation signal. Cache with invalidation, not permanent memoization:
-    broadcasts are the optimization, the correctness rule is **re-resolve `MAIN/HOME` whenever an observed
-    package differs from the cached launcher before classifying it `Other`** (covers missed signals /
-    default-launcher change). A short-TTL memo can bound the resolve cost.
+    broadcasts are the optimization, and the correctness rule is to **re-resolve `MAIN/HOME` whenever an
+    observed package differs from the cached launcher before classifying it `Other`** (this covers missed
+    signals and a default-launcher change). A short-TTL memo can bound the resolve cost.
   - **Biometric mapping invariant (preserve today's semantics).** PIN rejection -> `UnlockFailed(PIN)`;
     biometric success -> `UnlockSucceeded(BIOMETRIC)`; biometric cancel / hardware error -> `BiometricCancelled`;
     `onAuthenticationFailed()` (unrecognized) -> **no event**. Biometric never routes through `UnlockFailed`
     and never touches the lockout counter.
-  - **Three-fact `EnforcementHealth` owner (`service/`).** One serialized owner stores independent facts —
-    `detector: Enabled|Disabled`, `overlayGrant: Granted|Missing`, `presentation: Unknown|Succeeded|
-    Failed(reason)` — and **only the owner mutates** the derived-health `StateFlow`; producers submit facts.
+  - **Three-fact `EnforcementHealth` owner (`service/`).** One serialized owner stores three independent
+    facts (`detector: Enabled|Disabled`, `overlayGrant: Granted|Missing`, `presentation: Unknown|Succeeded|
+    Failed(reason)`), and **only the owner mutates** the derived-health `StateFlow`; producers submit facts.
     Phase-2 `Healthy` = `detector=Enabled ∧ overlayGrant=Granted ∧ presentation≠Failed`. This is the
-    `enforcement.health` oracle dimension (Phase 3); WP3 swaps the `detector` fact for Usage Access and WP4
+    `enforcement.health` oracle dimension (Phase 3). WP3 swaps the `detector` fact for Usage Access and WP4
     does the full watchdog rewrite, both without changing the aggregation.
   - Seed `EngineState.lockout` from `LockoutManager.currentState()` at construction. JVM-tested with fakes:
     the four concurrency cases (timer vs `Loading->Ready`; completion vs supersession; synchronous
     `RecordUnlockFailure` follow-up; N's effects not overtaken by N+1), biometric-never-locks-out, health
     aggregation, safe-dismiss ordering. **No Hilt cutover** (a fake cannot satisfy the graph); production
     stays on `ApplicationLockEngine`.
-- **E — real adapters + overlay capability (fleet).** `OverlayLockPresenter` (`platform/`, R2-exempt):
-  warm `TYPE_APPLICATION_OVERLAY`, **add-once + `updateViewLayout` / visibility toggle** (WP0 swGPU finding,
-  never per-lock add/remove), **`FLAG_SECURE` on the overlay `LayoutParams`** (non-debug; dropped on
-  debuggable so fleet screencap works), stable window title for the harness, hosting the C1 composable via
-  `ComposeView` + a lightweight `ViewTreeLifecycleOwner` / `ViewModelStoreOwner` / `SavedStateRegistryOwner`;
-  three surfaces (Lock / Checking / Recovery). A draw / `addView` failure or missing grant returns
-  `Unavailable/Failed`. `BiometricHostActivity` (`presentation/`, `FragmentActivity`): transparent, own
-  `FLAG_SECURE`, `exported=false`, `excludeFromRecents`, `taskAffinity=""`; launched from the overlay as a
-  BAL permitted by the visible overlay window (ADR-020 case (a)); **its intent carries `epoch`+`requestId`,
-  saved in `savedInstanceState` and returned as both**, so a host recreated in a fresh process returns the
-  old epoch and `matchedRequest` rejects it (no id-0 collision). `TimerScheduler` (Handler / `HandlerThread`)
-  posts `TimerFired`. **Overlay capability:** move `SYSTEM_ALERT_WINDOW` out of the throwaway spike block
-  (currently manifest line 18, otherwise deleted with the spike) into the permanent permissions; add the
-  `Settings.canDrawOverlays()` check + an `ACTION_MANAGE_OVERLAY_PERMISSION` grant path (onboarding + a
-  settings entry); the check submits `overlayGrant`, each `PresentResult` submits `presentation`. Shield
-  Back controls emit `SafeDismissRequested`. Real-surface instrumentation per surface (Lock renders PIN +
-  FLAG_SECURE; Checking / Recovery shields block touch; `BiometricHostActivity` launch), device-run on the
-  fleet. RTM: **FR-044** Overlay Permission Verification (`not-started`->`partial`; verification WP6).
-- **F — production cutover (fleet).** DI swap (`AppModule`) to `LockEngineRuntime` built with the real
-  adapters; `AppDetectionService` injects the runtime (edge classification is internal, so it still forwards
-  the raw package + `onScreenOff`). **`SelfGateAuthPort` (`service/`)** carries the old engine's package-keyed
-  bodies verbatim: `recordUnlockSuccess(pkg)` = `sessionManager.markUnlocked` + `lockoutManager.recordSuccess`
-  + `UNLOCK_SUCCESS` audit; `recordUnlockFailure(pkg): LockoutState` = `UNLOCK_FAILURE` audit + `recordFailure`
-  + conditional `LOCKOUT_TRIGGERED` + `intruderCapture.onAuthFailure(pkg, PIN, failureCount())` + return state.
-  `AuthGateViewModel` is rewired to it. Two `LockoutManager` writers (runtime + self-gate) are safe: every
-  mutator is `@Synchronized`. Overlay + host completions are request-token-keyed (token read from the observed
+- **E — real adapters + overlay capability (fleet).**
+  - **`OverlayLockPresenter`** (`platform/`, R2-exempt): warm `TYPE_APPLICATION_OVERLAY`, **add-once +
+    `updateViewLayout` / visibility toggle** (WP0 swGPU finding; never per-lock add/remove), **`FLAG_SECURE`
+    on the overlay `LayoutParams`** (non-debug; dropped on debuggable so fleet screencap works), a stable
+    window title for the harness, and the C1 composable hosted via `ComposeView` + a lightweight
+    `ViewTreeLifecycleOwner` / `ViewModelStoreOwner` / `SavedStateRegistryOwner`. It has three surfaces
+    (Lock / Checking / Recovery). A draw / `addView` failure or a missing grant returns `Unavailable/Failed`.
+  - **`BiometricHostActivity`** (`presentation/`, `FragmentActivity`): transparent, own `FLAG_SECURE`,
+    `exported=false`, `excludeFromRecents`, `taskAffinity=""`. It is launched from the overlay as a BAL
+    permitted by the visible overlay window (ADR-020 case (a)). **Its intent carries `epoch`+`requestId`,
+    saved in `savedInstanceState` and returned as both**, so a host recreated in a fresh process returns the
+    old epoch and `matchedRequest` rejects it (no id-0 collision). `TimerScheduler` (Handler /
+    `HandlerThread`) posts `TimerFired`.
+  - **Overlay capability.** Move `SYSTEM_ALERT_WINDOW` out of the throwaway spike block (currently manifest
+    line 18, otherwise deleted with the spike) into the permanent permissions. Add the
+    `Settings.canDrawOverlays()` check and an `ACTION_MANAGE_OVERLAY_PERMISSION` grant path (onboarding + a
+    settings entry). The check submits `overlayGrant`; each `PresentResult` submits `presentation`. Shield
+    Back controls emit `SafeDismissRequested`.
+  - **Safe-dismiss contract with C2 (as implemented).** The `OVERLAY_SETTINGS` escape must carry the
+    *resolved* destination package(s) in `SafeDismissRequested.exemptPackages` (E resolves the
+    `ACTION_MANAGE_OVERLAY_PERMISSION` target via `PackageManager` before dispatching), and must use the
+    shield's `ReadinessToken`. The reducer rejects an `OVERLAY_SETTINGS` request with no package or a
+    `RequestToken`, so a lock may only escape to `HOME`/`APP_LOCK` (this keeps the arrival exemption from
+    ever arming under a `Ready` policy). After attempting the launch, the interpreter enqueues exactly one
+    attempt-keyed follow-up carrying the `NavigateSafely.attempt` token:
+    `SafeDismissNavigationIssued(attempt)` once the destination launches, or
+    `SafeDismissNavigationFailed(attempt)` if it could not (launch threw or nothing resolved). A transient
+    failure then reverts the escape for retry instead of stranding the surface.
+  - **Instrumentation.** Real-surface instrumentation per surface (Lock renders PIN + FLAG_SECURE; Checking
+    / Recovery shields block touch; `BiometricHostActivity` launch), device-run on the fleet. RTM:
+    **FR-044** Overlay Permission Verification (`not-started`->`partial`; verification WP6).
+- **F — production cutover (fleet).** Swap DI (`AppModule`) to `LockEngineRuntime` built with the real
+  adapters. `AppDetectionService` injects the runtime (edge classification is internal, so it still forwards
+  the raw package + `onScreenOff`). **`SelfGateAuthPort` (`service/`)** carries the old engine's
+  package-keyed bodies verbatim: `recordUnlockSuccess(pkg)` = `sessionManager.markUnlocked` +
+  `lockoutManager.recordSuccess` + `UNLOCK_SUCCESS` audit; `recordUnlockFailure(pkg): LockoutState` =
+  `UNLOCK_FAILURE` audit + `recordFailure` + conditional `LOCKOUT_TRIGGERED` +
+  `intruderCapture.onAuthFailure(pkg, PIN, failureCount())` + return state. `AuthGateViewModel` is rewired
+  to it. The two `LockoutManager` writers (runtime + self-gate) are safe, because every mutator is
+  `@Synchronized`. Overlay + host completions are request-token-keyed (the token is read from the observed
   `EngineState`); the self-gate stays package-keyed, never forced through a request-id overload. The watchdog
   and the MainActivity banner read the **derived health**, so "Protected" requires detector-enabled ∧
   overlay-granted ∧ no present-failure; a `PresentResult.Unavailable/Failed` is recorded, never swallowed.
-  **Protection is gated on the overlay grant (Decision D-P2-2):** it cannot be reported / enabled active
-  without `canDrawOverlays`, and the grant path is verified **before** the cutover flips, else ungranted
-  users lose locking entirely (a regression vs the Activity, which needs no overlay grant). Replace
-  `LockScreenLaunchTest` with a **replacement smoke** over the overlay / biometric-host surface; keep the GMD
-  matrix green; update the WP8 runbook reference. RTM (same commit): **FR-027** `partial`->`implemented`,
-  **FR-028** `not-started`->`implemented`.
+  **Protection is gated on the overlay grant (Decision D-P2-2):** it cannot be reported or enabled active
+  without `canDrawOverlays`, and the grant path is verified **before** the cutover flips. Otherwise
+  ungranted users lose locking entirely, a regression against the Activity, which needs no overlay grant.
+  Replace `LockScreenLaunchTest` with a **replacement smoke** over the overlay / biometric-host surface,
+  keep the GMD matrix green, and update the WP8 runbook reference. RTM (same commit): **FR-027**
+  `partial`->`implemented`, **FR-028** `not-started`->`implemented`.
 - **G — retire the old path (this box).** Delete `LockScreenActivity.kt` + its manifest `<activity>` +
-  `ApplicationLockEngine.kt`; **remove** (not reshape) the `service/ApplicationLockEngine.kt -> presentation`
-  R2 baseline row (`ArchitectureRulesTest.kt`); the `IntruderCaptureManager -> presentation` row stays. Only
-  after F's replacement smoke is green. Gate: R2 + full suite green. (The `platform.spike` package + its
-  manifest block + the OV-4 UIAutomator test are deleted in **Phase 3** with the harness repoint, not here.)
+  `ApplicationLockEngine.kt`. **Remove** (not reshape) the `service/ApplicationLockEngine.kt -> presentation`
+  R2 baseline row (`ArchitectureRulesTest.kt`); the `IntruderCaptureManager -> presentation` row stays. Do
+  this only after F's replacement smoke is green. Gate: R2 + full suite green. (The `platform.spike` package
+  + its manifest block + the OV-4 UIAutomator test are deleted in **Phase 3** with the harness repoint, not
+  here.)
 
 **Phase 2 decisions (resolved 2026-09-07).**
 - **D-P2-1 lockout projection = option A.** The overlay reads `LockoutManager.currentState()` directly for

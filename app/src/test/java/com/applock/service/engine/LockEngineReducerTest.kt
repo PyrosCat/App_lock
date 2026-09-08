@@ -28,13 +28,24 @@ class LockEngineReducerTest {
 
     // ---- State invariant -----------------------------------------------------------------------
 
+    // A lock and a shield can no longer coexist by construction (GuardState is one slot), so that is a
+    // compile-time guarantee rather than a runtime test. What remains runtime-checked:
     @Test(expected = IllegalArgumentException::class)
-    fun `EngineState rejects a coexisting active request and readiness hold`() {
+    fun `EngineState rejects an in-flight escape coexisting with an arrival exemption`() {
         EngineState(
             epoch = epoch,
-            generation = Generation(1),
-            activeRequest = LockRequest(RequestId(0), "com.a"),
-            readinessHold = ReadinessHold("com.a", HoldPhase.CHECKING, TimerToken(epoch, Generation(1))),
+            guardState = GuardState.LeavingFor(
+                BlockingGuard.Lock("com.a", RequestId(0)),
+                RequestToken(epoch, RequestId(0)),
+                AttemptToken(epoch, AttemptId(0)),
+                SafeDestination.HOME,
+                emptySet(),
+            ),
+            exemption = ArrivalExemption(
+                ReadinessToken(epoch, Generation(0)),
+                "com.b",
+                setOf("com.android.settings"),
+            ),
         )
     }
 
@@ -53,7 +64,7 @@ class LockEngineReducerTest {
         EngineState(
             epoch = epoch,
             generation = Generation(2),
-            readinessHold = ReadinessHold("com.a", HoldPhase.CHECKING, TimerToken(epoch, Generation(1))),
+            guardState = GuardState.Guarding(BlockingGuard.Checking("com.a", TimerToken(epoch, Generation(1)))),
         )
     }
 
@@ -419,24 +430,6 @@ class LockEngineReducerTest {
         val reduction = LockEngineReducer.reduce(reborn, EngineEvent.UnlockSucceeded(preDeathToken, UnlockMethod.PIN))
         assertNull(reduction.state.activeRequest)
         assertEquals(reborn, reduction.state)
-        assertTrue(reduction.effects.isEmpty())
-    }
-
-    @Test
-    fun `dismiss clears the request and sends the user home`() {
-        val locked = initial().observe(other("com.a")).state
-        val token = RequestToken(epoch, locked.activeRequest!!.id)
-        val reduction = LockEngineReducer.reduce(locked, EngineEvent.Dismissed(token))
-        assertNull(reduction.state.activeRequest)
-        assertEquals(listOf(Effect.GoHome, Effect.DismissSurface), reduction.effects)
-    }
-
-    @Test
-    fun `a stale dismiss is rejected`() {
-        val locked = initial().observe(other("com.a")).state
-        val staleToken = RequestToken(epoch, RequestId(99))
-        val reduction = LockEngineReducer.reduce(locked, EngineEvent.Dismissed(staleToken))
-        assertEquals(locked, reduction.state)
         assertTrue(reduction.effects.isEmpty())
     }
 

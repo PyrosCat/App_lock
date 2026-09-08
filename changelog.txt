@@ -4,6 +4,72 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 Phase 2 (change C2): pure token-keyed safe-dismiss protocol   (2026-09-08)
+--------------------------------------------------------------------------------
+Replaced the reducer's dismiss path with a generic, token-keyed safe-dismiss handshake, so a
+leave-without-auth navigation never flashes the guarded app as the surface comes down. Pure and JVM-only;
+the production engine still drives the old LockScreenActivity path, so no requirement changes (FR-027 stays
+partial).
+
+Model
+- The on-screen surface is one GuardState sum: None | Guarding(BlockingGuard) | LeavingFor, over
+  BlockingGuard = Lock | Checking | Recovery. A lock, a shield, and an in-flight escape are thus mutually
+  exclusive by construction, not by an invariant over separate fields.
+- The post-navigation arrival exemption outlives the surface, so it is a separate ArrivalExemption field.
+  It can then coexist with the shield an intervening app raises while the destination is awaited.
+- activeRequest, readinessHold, surface, and pendingSafeDismiss stay derived read-projections.
+- RequestToken (a lock) and ReadinessToken(epoch, generation) (a shield) validate a request against the
+  live surface. A per-request AttemptToken(epoch, id) keys the navigation round-trip. SafeDestination is a
+  closed enum: HOME, APP_LOCK, OVERLAY_SETTINGS.
+- New events SafeDismissRequested / SafeDismissNavigationIssued / SafeDismissNavigationFailed and the
+  NavigateSafely effect replace the old Dismissed event and GoHome effect.
+
+Handshake (two steps; the in-flight request is held as engine state)
+- Step 1 validates the live surface, mints an AttemptToken, records the escape (surface token = which guard
+  authorized it, attempt token = which attempt), preserves the surface, and emits only NavigateSafely.
+- Step 2 (navigation-issued) requires that exact attempt token and a still-live escape. It then relocks the
+  app being left, clears the escape, cancels any checking timer, advances the generation, and dismisses.
+- A supersession between the steps makes a follow-up stale, so it is dropped: the newer surface never comes
+  down for an old navigation.
+- At most one escape is in flight: a request that arrives while one is recorded is dropped, never allowed to
+  replace it.
+- Navigation-failed reverts the escape to its plain guard so the control can retry, instead of stranding the
+  surface. The revert reconciles with the current policy: Ready re-evaluates (a protected target locks
+  fail-secure, an unprotected one dismisses), Failed escalates a Checking to Recovery. A shield restored
+  under Ready is therefore never left frozen.
+- The AttemptToken keeps a failed attempt and its same-surface retry distinct, so a late or duplicate
+  follow-up from the first attempt cannot complete or cancel the second.
+
+Overlay-settings arrival exemption
+- OVERLAY_SETTINGS surfaces as a normal foreground (the settings app), which a Loading/Failed shield would
+  otherwise re-shield, trapping the user before the grant screen.
+- The request carries the resolved destination package(s). Only an exact match is allowed through, and it
+  stays exempt across the repeated window events one settings visit emits; any other app stays shielded.
+- After the destination arrives, only that exact package stays exempt. Leaving it (Home, screen-off, another
+  app, or a Ready policy) ends the escape.
+- Both event orders are handled: settings arriving before or after the navigation-issued follow-up.
+- The origin re-emitting before confirmation is an idempotent re-presentation, not an arrival. This test
+  runs ahead of the arrival test, so a guarded app that is itself the destination package is not mistaken
+  for its own arrival.
+- A Failed re-emission mid-escape does not re-raise a shield over the abandoned target (zero flash).
+- A preserved Checking escape's surface is frozen for the navigation: its T_ready timer escalates only while
+  Loading, so a timer that fires after Ready or Failed is inert.
+
+Guards enforced as model invariants
+- An OVERLAY_SETTINGS escape, and its arrival exemption, is accepted only from a readiness shield with at
+  least one resolved package. A lock-backed one is not representable (it could bypass a protected app once
+  Ready). The exemption type carries no destination, since it always represents OVERLAY_SETTINGS.
+- A pending safe-dismiss must carry the current process epoch, and a not-yet-confirmed one must sit over its
+  live originating surface.
+
+Scope and tests
+- Only leave-without-auth paths use the handshake; unlock success keeps its immediate dismiss.
+- LockEngineSafeDismissTest (53 tests) covers both surface kinds, the two event orders, the arrival
+  exemption, stale and foreign-epoch rejection, the single-flight drop, navigation-failure retry with its
+  policy reconciliation, per-attempt follow-up isolation, the frozen-timer case, relock-on-leave, and the
+  model invariants. The reducer suite is 52 tests.
+
+
 M7/WP2 Phase 2: record the scoped design in the plan   (2026-09-07)
 ------------------------------------------------------------------
 Scoped Phase 2 (real surface + production cutover) and recorded it in M7_PLAN.md as a Phase 2 detail
