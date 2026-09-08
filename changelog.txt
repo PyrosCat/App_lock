@@ -4,6 +4,28 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 Phase 2: record the scoped design in the plan   (2026-09-07)
+------------------------------------------------------------------
+Scoped Phase 2 (real surface + production cutover) and recorded it in M7_PLAN.md as a Phase 2 detail
+block parallel to the Phase 1 reducer model, plus the resolved Phase 2 decisions and gates. No code
+changed; the production engine still drives the old LockScreenActivity path. Phase 2 is broken into six
+separately-reviewable changes:
+- C1 extract the auth UI out of LockScreenActivity into a reusable composable (behavior-preserving).
+- C2 a pure token-keyed safe-dismiss protocol in the reducer, which also fixes a latent reveal in the
+  current dismiss path once a state-observing overlay exists.
+- D the LockPresenter port + a serialized single-consumer LockEngineRuntime interpreter, with full-token
+  presentation DTOs, a three-fact enforcement-health owner, and a revalidated home resolver (JVM, no
+  cutover).
+- E the real overlay presenter + biometric host (epoch+id in the intent and result) + the
+  overlay-permission capability flow.
+- F the DI cutover, a package-keyed self-gate port, health-gated protection, and the replacement smoke.
+- G deletion of the old Activity and engine plus the R2 baseline row.
+Decisions recorded: the overlay reads the lockout manager directly and EngineState.lockout is an
+overlay-only projection; protection is gated on the overlay grant with no Activity fallback; launcher
+(home) resolution is in scope and revalidated on change. RTM moves land with the code: FR-044 partial at
+E, FR-027/FR-028 implemented at F.
+
+
 M7/WP2 Phase 1 (change B): fold readiness into the pure reducer   (2026-09-07)
 ----------------------------------------------------------------------------
 Change B of Phase 1: the atomic PolicyState now drives the reducer's readiness holds, so a foreground
