@@ -4,6 +4,39 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 Phase 2 (change C1): extract the reusable LockScreen composable   (2026-09-09)
+-------------------------------------------------------------------------------------
+Pulled the authentication UI out of LockScreenActivity into a standalone, host-agnostic @Composable
+LockScreen, so the overlay presenter can host the same surface later. Behavior is unchanged: the Activity
+still hosts it and drives the old lock path, so no requirement changes (FR-027 stays partial).
+
+- New LockScreen.kt holds the app-label header, lockout countdown, PIN pad and biometric affordance, plus
+  the lockout-remaining poll and the wrong-PIN error state it now owns.
+- The host supplies the app label, biometric availability, a lockout-remaining reader, the outcome
+  callbacks, and an optional Modifier. A small PinAttemptResult (CORRECT / INCORRECT / IGNORED) lets the
+  host report the PIN outcome without owning the error display. IGNORED (a lockout landing during the poll
+  race) clears the input and leaves the error prompt untouched, matching the old race guard; setting it
+  false would wrongly drop a prior wrong-PIN prompt after the lockout expires.
+- The lockout poll reads the latest lockoutRemaining callback each tick (rememberUpdatedState), so a
+  persistent host cannot leave it bound to a stale one.
+- Per-request state reset is the host's contract. A warm, add-once host (the overlay presenter of change E)
+  must scope the call as key(requestToken) { LockScreen(...) } so a supersession cannot leak the prior
+  request's entered PIN or wrong-PIN prompt. The Activity gets a fresh instance per request, so it needs no
+  key. Recorded in the composable KDoc and the change-E plan bullet.
+- LockScreenActivity keeps FLAG_SECURE, the back handler, the biometric prompt, the resume-finish logic and
+  the immediate biometric offer. onCreate now just hosts LockScreen under AppLockTheme, and a new
+  onPinEntered() holds the former inline verify/unlock/failure logic.
+- Moved strings render via stringResource, so the composable no longer depends on an Activity Context.
+- Updated the detekt baseline: eight findings relocated from LockScreenActivity.kt to LockScreen.kt, plus
+  two genuinely new suppressions for the new public composable, a Compose PascalCase FunctionNaming (as
+  every screen here is baselined) and LongParameterList for its six parameters (the required Modifier is
+  the sixth).
+- Validation: full JVM unit suite plus detekt green on this box; no instrumentation was run here (this box
+  cannot boot the emulator, so androidTest runs on the fleet). The three PinAttemptResult outcomes and the
+  key(requestToken) reset contract are behavior-preserving here and get focused real-surface coverage at
+  change E (Gate 2) and the WP6 matrix; LockScreenLaunchTest stays valid until then.
+
+
 M7/WP2 Phase 2 (change C2): pure token-keyed safe-dismiss protocol   (2026-09-08)
 --------------------------------------------------------------------------------
 Replaced the reducer's dismiss path with a generic, token-keyed safe-dismiss handshake, so a

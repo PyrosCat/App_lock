@@ -11,33 +11,6 @@ import androidx.activity.compose.setContent
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
 import androidx.biometric.BiometricPrompt
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.applock.R
@@ -49,13 +22,17 @@ import com.applock.security.LockoutState
 import com.applock.service.ApplicationLockEngine
 import com.applock.service.ApplicationLockEngine.UnlockMethod
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.delay
 import javax.inject.Inject
 
 /**
  * Shown on top of a protected app when authentication is required.
  * FragmentActivity (not ComponentActivity) because androidx.biometric
  * requires one to host its prompt.
+ *
+ * The authentication UI is the reusable [LockScreen] composable. This Activity gives it the
+ * inputs and keeps the platform concerns: FLAG_SECURE, the back handler, the biometric prompt,
+ * and the finish on pause. The system makes a new Activity instance for each lock request, so
+ * [LockScreen] does not need a per-request key here.
  */
 @AndroidEntryPoint
 class LockScreenActivity : FragmentActivity() {
@@ -109,70 +86,13 @@ class LockScreenActivity : FragmentActivity() {
 
         setContent {
             AppLockTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    var error by rememberSaveable { mutableStateOf(false) }
-                    var lockoutRemainingMs by remember { mutableLongStateOf(lockoutRemaining()) }
-                    LaunchedEffect(Unit) {
-                        while (true) {
-                            lockoutRemainingMs = lockoutRemaining()
-                            delay(250)
-                        }
-                    }
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(
-                            text = appLabel,
-                            style = MaterialTheme.typography.headlineSmall,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        if (lockoutRemainingMs > 0) {
-                            LockoutCountdown(lockoutRemainingMs)
-                        } else {
-                            Text(
-                                text = getString(
-                                    if (error) R.string.pin_incorrect else R.string.enter_pin
-                                ),
-                                color = if (error) MaterialTheme.colorScheme.error
-                                else MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.height(32.dp))
-                            PinPad(
-                                onPinComplete = { pin ->
-                                    if (lockoutRemaining() > 0) return@PinPad true
-                                    if (credentialRepository.verifyPin(pin)) {
-                                        authenticated = true
-                                        lockEngine.onUnlockSuccess(targetPackage)
-                                        finish()
-                                        false // don't clear — we're leaving
-                                    } else {
-                                        error = true
-                                        lockEngine.onUnlockFailure(targetPackage)
-                                        true // clear input, let the user retry
-                                    }
-                                },
-                            )
-                            if (biometricsAvailable) {
-                                Spacer(Modifier.height(16.dp))
-                                TextButton(onClick = { showBiometricPrompt(appLabel) }) {
-                                    Icon(
-                                        Icons.Filled.Fingerprint,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                    Text(
-                                        text = getString(R.string.unlock_with_biometrics),
-                                        modifier = Modifier.padding(start = 8.dp),
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                LockScreen(
+                    appLabel = appLabel,
+                    biometricsAvailable = biometricsAvailable,
+                    lockoutRemaining = ::lockoutRemaining,
+                    onPinEntered = ::onPinEntered,
+                    onBiometricClick = { showBiometricPrompt(appLabel) },
+                )
             }
         }
 
@@ -180,6 +100,26 @@ class LockScreenActivity : FragmentActivity() {
         // the prompt as the fallback.
         if (biometricsAvailable && lockoutRemaining() == 0L) {
             showBiometricPrompt(appLabel)
+        }
+    }
+
+    /**
+     * Checks a completed PIN entry and does the unlock work. It returns the result for [LockScreen]
+     * to show. This is the former inline PinPad callback, without changes: during a lockout it
+     * returns [PinAttemptResult.IGNORED] (the input clears, the error prompt does not change); a
+     * correct PIN unlocks the app and closes the screen; a wrong PIN records the failure and returns
+     * [PinAttemptResult.INCORRECT].
+     */
+    private fun onPinEntered(pin: CharArray): PinAttemptResult {
+        if (lockoutRemaining() > 0) return PinAttemptResult.IGNORED
+        return if (credentialRepository.verifyPin(pin)) {
+            authenticated = true
+            lockEngine.onUnlockSuccess(targetPackage)
+            finish()
+            PinAttemptResult.CORRECT
+        } else {
+            lockEngine.onUnlockFailure(targetPackage)
+            PinAttemptResult.INCORRECT
         }
     }
 
@@ -241,31 +181,5 @@ class LockScreenActivity : FragmentActivity() {
         fun createIntent(context: Context, targetPackage: String): Intent =
             Intent(context, LockScreenActivity::class.java)
                 .putExtra(EXTRA_TARGET_PACKAGE, targetPackage)
-    }
-}
-
-@Composable
-private fun LockoutCountdown(remainingMs: Long) {
-    val totalSeconds = (remainingMs + 999) / 1000
-    val formatted = "%d:%02d".format(totalSeconds / 60, totalSeconds % 60)
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.height(24.dp))
-        Icon(
-            Icons.Filled.Lock,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.error,
-            modifier = Modifier.size(48.dp),
-        )
-        Spacer(Modifier.height(16.dp))
-        Text(
-            text = stringResource(R.string.lockout_title),
-            style = MaterialTheme.typography.titleMedium,
-            color = MaterialTheme.colorScheme.error,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.lockout_countdown, formatted),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }

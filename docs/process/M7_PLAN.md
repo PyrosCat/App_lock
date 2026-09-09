@@ -731,6 +731,10 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     window title for the harness, and the C1 composable hosted via `ComposeView` + a lightweight
     `ViewTreeLifecycleOwner` / `ViewModelStoreOwner` / `SavedStateRegistryOwner`. It has three surfaces
     (Lock / Checking / Recovery). A draw / `addView` failure or a missing grant returns `Unavailable/Failed`.
+    Because the `ComposeView` is warm and add-once, E MUST scope the hosted `LockScreen` by the live request
+    token (`key(requestToken) { LockScreen(...) }`, the C1 contract): the composable is state-observing and
+    keeps its own wrong-PIN prompt and entered digits, so a direct lock-request supersession over the retained
+    composition would otherwise leak the prior request's input into the next.
   - **`BiometricHostActivity`** (`presentation/`, `FragmentActivity`): transparent, own `FLAG_SECURE`,
     `exported=false`, `excludeFromRecents`, `taskAffinity=""`. It is launched from the overlay as a BAL
     permitted by the visible overlay window (ADR-020 case (a)). **Its intent carries `epoch`+`requestId`,

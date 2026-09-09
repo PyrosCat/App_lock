@@ -9,7 +9,8 @@
     <ID>CyclomaticComplexMethod:VaultScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun VaultScreen( onBack: () -&gt; Unit, viewModel: VaultViewModel = hiltViewModel(), )</ID>
     <ID>FunctionNaming:IntruderLogScreen.kt$@Composable private fun IntruderEventCard( event: IntruderEventEntity, viewModel: IntruderLogViewModel, onDelete: () -&gt; Unit, )</ID>
     <ID>FunctionNaming:IntruderLogScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun IntruderLogScreen( onBack: () -&gt; Unit, viewModel: IntruderLogViewModel = hiltViewModel(), )</ID>
-    <ID>FunctionNaming:LockScreenActivity.kt$@Composable private fun LockoutCountdown(remainingMs: Long)</ID>
+    <ID>FunctionNaming:LockScreen.kt$@Composable fun LockScreen( appLabel: String, biometricsAvailable: Boolean, lockoutRemaining: () -&gt; Long, onPinEntered: (CharArray) -&gt; PinAttemptResult, onBiometricClick: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
+    <ID>FunctionNaming:LockScreen.kt$@Composable private fun LockoutCountdown(remainingMs: Long)</ID>
     <ID>FunctionNaming:MainActivity.kt$@Composable private fun AppLockNav()</ID>
     <ID>FunctionNaming:MainActivity.kt$@Composable private fun PinEntryScaffold( title: String, subtitle: String?, onPinComplete: (CharArray) -&gt; Boolean, )</ID>
     <ID>FunctionNaming:MainActivity.kt$@Composable private fun PinSetupScreen(onDone: () -&gt; Unit)</ID>
@@ -28,7 +29,7 @@
     <ID>FunctionNaming:VaultScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun VaultScreen( onBack: () -&gt; Unit, viewModel: VaultViewModel = hiltViewModel(), )</ID>
     <ID>LongMethod:IntruderLogScreen.kt$@Composable private fun IntruderEventCard( event: IntruderEventEntity, viewModel: IntruderLogViewModel, onDelete: () -&gt; Unit, )</ID>
     <ID>LongMethod:IntruderLogScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun IntruderLogScreen( onBack: () -&gt; Unit, viewModel: IntruderLogViewModel = hiltViewModel(), )</ID>
-    <ID>LongMethod:LockScreenActivity.kt$LockScreenActivity$override fun onCreate(savedInstanceState: Bundle?)</ID>
+    <ID>LongMethod:LockScreen.kt$@Composable fun LockScreen( appLabel: String, biometricsAvailable: Boolean, lockoutRemaining: () -&gt; Long, onPinEntered: (CharArray) -&gt; PinAttemptResult, onBiometricClick: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
     <ID>LongMethod:MainActivity.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun AppListScreen( onOpenSettings: () -&gt; Unit, onOpenVault: () -&gt; Unit, viewModel: AppListViewModel = hiltViewModel(), )</ID>
     <ID>LongMethod:SettingsScreen.kt$@Composable private fun IntruderSettings(onOpenIntruderLog: () -&gt; Unit)</ID>
     <ID>LongMethod:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen( onBack: () -&gt; Unit, onOpenIntruderLog: () -&gt; Unit, )</ID>
@@ -36,12 +37,13 @@
     <ID>LongMethod:VaultScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun VaultScreen( onBack: () -&gt; Unit, viewModel: VaultViewModel = hiltViewModel(), )</ID>
     <ID>LongParameterList:ApplicationLockEngine.kt$ApplicationLockEngine$( private val context: Context, private val policyManager: LockPolicyManager, private val sessionManager: LockSessionManager, private val lockoutManager: LockoutManager, private val securityEventDao: SecurityEventDao, private val intruderCapture: IntruderCaptureManager, private val scope: CoroutineScope, )</ID>
     <ID>LongParameterList:Argon2PinHasher.kt$Argon2PinHasher$( pin: CharArray, salt: ByteArray, memoryKib: Int, iterations: Int, parallelism: Int, expected: ByteArray, )</ID>
+    <ID>LongParameterList:LockScreen.kt$( appLabel: String, biometricsAvailable: Boolean, lockoutRemaining: () -&gt; Long, onPinEntered: (CharArray) -&gt; PinAttemptResult, onBiometricClick: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
     <ID>MagicNumber:DatabaseKeyProvider.kt$DatabaseKeyProvider$32</ID>
     <ID>MagicNumber:DatabaseKeyProvider.kt$DatabaseKeyProvider$64</ID>
-    <ID>MagicNumber:LockScreenActivity.kt$1000</ID>
-    <ID>MagicNumber:LockScreenActivity.kt$60</ID>
-    <ID>MagicNumber:LockScreenActivity.kt$999</ID>
-    <ID>MagicNumber:LockScreenActivity.kt$LockScreenActivity$250</ID>
+    <ID>MagicNumber:LockScreen.kt$1000</ID>
+    <ID>MagicNumber:LockScreen.kt$250</ID>
+    <ID>MagicNumber:LockScreen.kt$60</ID>
+    <ID>MagicNumber:LockScreen.kt$999</ID>
     <ID>MagicNumber:LockoutManager.kt$LockoutManager.Companion$20</ID>
     <ID>MagicNumber:MainActivity.kt$1000</ID>
     <ID>MagicNumber:MainActivity.kt$250</ID>
@@ -52,8 +54,8 @@
     <ID>MaximumLineLength:LockPolicyManagerTest.kt$LockPolicyManagerTest$ </ID>
     <ID>MultiLineIfElse:AppListViewModel.kt$AppListViewModel$SecurityEventType.APP_PROTECTED</ID>
     <ID>MultiLineIfElse:AppListViewModel.kt$AppListViewModel$SecurityEventType.APP_UNPROTECTED</ID>
-    <ID>MultiLineIfElse:LockScreenActivity.kt$LockScreenActivity$MaterialTheme.colorScheme.error</ID>
-    <ID>MultiLineIfElse:LockScreenActivity.kt$LockScreenActivity$MaterialTheme.colorScheme.onSurfaceVariant</ID>
+    <ID>MultiLineIfElse:LockScreen.kt$MaterialTheme.colorScheme.error</ID>
+    <ID>MultiLineIfElse:LockScreen.kt$MaterialTheme.colorScheme.onSurfaceVariant</ID>
     <ID>MultiLineIfElse:LockSessionManager.kt$LockSessionManager$unlockedApps.remove(packageName)</ID>
     <ID>MultiLineIfElse:LockSessionManager.kt$LockSessionManager$unlockedApps[packageName] = STILL_FOREGROUND</ID>
     <ID>MultiLineIfElse:PinPad.kt$MaterialTheme.colorScheme.primary</ID>
