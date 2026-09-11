@@ -36,3 +36,11 @@ complexity:
   TooManyFunctions:
     # Compose screens + DAOs legitimately group many small functions
     active: false
+
+naming:
+  FunctionNaming:
+    # Jetpack Compose Unit-returning UI functions intentionally use PascalCase. Keep this
+    # exception limited to @Composable; ordinary Kotlin functions remain checked.
+    active: true
+    ignoreAnnotated:
+      - Composable

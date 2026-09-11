@@ -7,26 +7,6 @@
     <ID>ArgumentListWrapping:LockPolicyManagerTest.kt$LockPolicyManagerTest$(kotlinx.coroutines.Dispatchers.Unconfined)</ID>
     <ID>CyclomaticComplexMethod:MainActivity.kt$@Composable private fun AppLockNav()</ID>
     <ID>CyclomaticComplexMethod:VaultScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun VaultScreen( onBack: () -&gt; Unit, viewModel: VaultViewModel = hiltViewModel(), )</ID>
-    <ID>FunctionNaming:IntruderLogScreen.kt$@Composable private fun IntruderEventCard( event: IntruderEventEntity, viewModel: IntruderLogViewModel, onDelete: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:IntruderLogScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun IntruderLogScreen( onBack: () -&gt; Unit, viewModel: IntruderLogViewModel = hiltViewModel(), )</ID>
-    <ID>FunctionNaming:LockScreen.kt$@Composable fun LockScreen( appLabel: String, biometricsAvailable: Boolean, lockoutRemaining: () -&gt; Long, onPinEntered: (CharArray) -&gt; PinAttemptResult, onBiometricClick: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
-    <ID>FunctionNaming:LockScreen.kt$@Composable private fun LockoutCountdown(remainingMs: Long)</ID>
-    <ID>FunctionNaming:MainActivity.kt$@Composable private fun AppLockNav()</ID>
-    <ID>FunctionNaming:MainActivity.kt$@Composable private fun PinEntryScaffold( title: String, subtitle: String?, onPinComplete: (CharArray) -&gt; Boolean, )</ID>
-    <ID>FunctionNaming:MainActivity.kt$@Composable private fun PinSetupScreen(onDone: () -&gt; Unit)</ID>
-    <ID>FunctionNaming:MainActivity.kt$@Composable private fun SelfGateScreen(onUnlocked: () -&gt; Unit)</ID>
-    <ID>FunctionNaming:MainActivity.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable private fun AppListScreen( onOpenSettings: () -&gt; Unit, onOpenVault: () -&gt; Unit, viewModel: AppListViewModel = hiltViewModel(), )</ID>
-    <ID>FunctionNaming:PinPad.kt$@Composable fun PinPad( onPinComplete: (CharArray) -&gt; Boolean, pinLength: Int = 4, )</ID>
-    <ID>FunctionNaming:PinPad.kt$@Composable private fun PinKey(label: String, onClick: () -&gt; Unit)</ID>
-    <ID>FunctionNaming:SettingsScreen.kt$@Composable private fun IntruderSettings(onOpenIntruderLog: () -&gt; Unit)</ID>
-    <ID>FunctionNaming:SettingsScreen.kt$@Composable private fun PolicyOption( title: String, description: String, selected: Boolean, onClick: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:SettingsScreen.kt$@Composable private fun ToggleOption( title: String, description: String, checked: Boolean, onCheckedChange: (Boolean) -&gt; Unit, )</ID>
-    <ID>FunctionNaming:SettingsScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun SettingsScreen( onBack: () -&gt; Unit, onOpenIntruderLog: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:Theme.kt$@Composable fun AppLockTheme( darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:VaultScreen.kt$@Composable private fun EmptyVaultHint()</ID>
-    <ID>FunctionNaming:VaultScreen.kt$@Composable private fun PreviewDialog( item: VaultItemEntity, viewModel: VaultViewModel, onClose: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:VaultScreen.kt$@Composable private fun VaultItemRow( item: VaultItemEntity, viewModel: VaultViewModel, onClick: () -&gt; Unit, onExport: () -&gt; Unit, onDelete: () -&gt; Unit, )</ID>
-    <ID>FunctionNaming:VaultScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun VaultScreen( onBack: () -&gt; Unit, viewModel: VaultViewModel = hiltViewModel(), )</ID>
     <ID>LongMethod:IntruderLogScreen.kt$@Composable private fun IntruderEventCard( event: IntruderEventEntity, viewModel: IntruderLogViewModel, onDelete: () -&gt; Unit, )</ID>
     <ID>LongMethod:IntruderLogScreen.kt$@OptIn(ExperimentalMaterial3Api::class) @Composable fun IntruderLogScreen( onBack: () -&gt; Unit, viewModel: IntruderLogViewModel = hiltViewModel(), )</ID>
     <ID>LongMethod:LockScreen.kt$@Composable fun LockScreen( appLabel: String, biometricsAvailable: Boolean, lockoutRemaining: () -&gt; Long, onPinEntered: (CharArray) -&gt; PinAttemptResult, onBiometricClick: () -&gt; Unit, modifier: Modifier = Modifier, )</ID>
