@@ -20,6 +20,7 @@ compensating treatment.
 | [R-004](#r-004) | `fallbackToDestructiveMigration` — silent data-loss trap on schema mismatch | **High** | M1 (WP7) | Closed (2026-08-16) — WP7 device drills PASS (NucBox, API 33): fail-safe preserves data, no wipe |
 | [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** | M7 | Open |
 | [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **Medium** | M1/WP7 | Closed (2026-08-15) — eliminated by WP7(b) path deletion |
+| [R-007](#r-007) | Degraded-storage lockout is unenforced and over-reported: the runtime's fail-closed fallback lives only in `EngineState`, while the real gate reads `LockoutManager.currentState()` | **Medium** | M7 | Open |
 
 *Gate identifiers re-pointed 2026-08-14 to the 1.0.0 milestone line M7–M10 (ADR-019 / `ROADMAP.md`):
 old M2-gate risks now block M7 (the detection/enforcement replacement); Play-compliance review moved
@@ -50,7 +51,9 @@ a pre-existing impact *range* is involved. Worked examples: R-002 (Medium × Hig
 
 ---
 
-## R-001 — Accessibility-based foreground detection: platform lockdown, Play policy, and silent failure
+## R-001
+
+**Risk:** Accessibility-based foreground detection: platform lockdown, Play policy, and silent failure
 
 **Category:** Architecture / Compliance / Security · **Likelihood:** High · **Impact:** High–Critical
 · **Severity:** High · **Status:** Open · **Opened:** 2026-07-23 · **Owner:** project lead
@@ -133,7 +136,9 @@ updates, and the M2 and M6 gates.
 
 ---
 
-## R-002 — Lock-engine rapid-relaunch window-ordering race
+## R-002
+
+**Risk:** Lock-engine rapid-relaunch window-ordering race
 
 **Category:** Security / Enforcement · **Likelihood:** Medium (pending real-hardware) · **Impact:** High
 · **Severity:** High · **Status:** Open · **Opened:** 2026-08-06 · **Owner:** project lead
@@ -209,7 +214,9 @@ Any lock-engine or lock-screen-presentation change; the M2 presentation-mechanis
 
 ---
 
-## R-003 — Schedule/capacity: enterprise-scale baseline vs solo-developer cadence
+## R-003
+
+**Risk:** Schedule/capacity: enterprise-scale baseline vs solo-developer cadence
 
 **Category:** Programme · **Likelihood:** High · **Impact:** Medium–High
 · **Severity:** High · **Status:** Open · **Opened:** 2026-08-10 (promoted; risk first
@@ -253,7 +260,9 @@ any material scope addition (new spec revisions, new mandated deliverables).
 
 ---
 
-## R-004 — `fallbackToDestructiveMigration`: silent data-loss trap on schema mismatch
+## R-004
+
+**Risk:** `fallbackToDestructiveMigration`: silent data-loss trap on schema mismatch
 
 **Category:** Reliability / Data integrity · **Likelihood:** Medium · **Impact:** High
 · **Severity:** High · **Status:** **Closed (2026-08-16)** — WP7 device drills PASS (NucBox G5, API 33); fail-safe preserves the unreadable DB, no silent wipe · **Opened:**
@@ -324,7 +333,9 @@ flavor that adds an upgrade path.
 
 ---
 
-## R-005 — Cold-start policy fail-open (protection cache empty until async load)
+## R-005
+
+**Risk:** Cold-start policy fail-open (protection cache empty until async load)
 
 **Category:** Security / Enforcement / Initialization · **Likelihood:** Medium · **Impact:** High
 · **Severity:** **High** (Medium × High per the scoring rubric) · **Status:** Open
@@ -374,7 +385,9 @@ readiness logic.
 
 ---
 
-## R-006 — Non-atomic legacy plaintext→encrypted migration (rollback source removed before commit)
+## R-006
+
+**Risk:** Non-atomic legacy plaintext→encrypted migration (rollback source removed before commit)
 
 **Category:** Reliability / Data integrity / Security-policy preservation · **Likelihood:** Low
 · **Impact:** High · **Severity:** **Medium** · **Status:** **Closed** (2026-08-15) · **Opened:** 2026-08-11
@@ -433,6 +446,54 @@ re-scoped accordingly. Superseded original actions, kept for history:
 
 ### Review triggers
 The WP7 scope decision; any change to `AppLockDatabase` migration; M3 backup/restore design.
+
+---
+
+## R-007
+
+**Risk:** Degraded-storage lockout — the runtime's fail-closed fallback is not enforced and over-reports
+
+**Category:** Security / Enforcement · **Likelihood:** Low · **Impact:** High · **Severity:** **Medium**
+(Low × High) · **Status:** Open · **Opened:** 2026-09-11 · **Owner:** project lead
+**Affected gate(s):** **M7** — the fix lands with change F (real adapters + DI cutover), to converge before the
+Phase-3 `enforcement.health` oracle becomes authoritative. Latent until F: the runtime is not yet wired to
+production (the legacy `ApplicationLockEngine` still serves `AuthGateViewModel`).
+**Provenance:** M7 WP2 change-D 6th review pass (finding 3), 2026-09-11.
+**Related:** FR-009, FR-010, FR-174 (brute-force lockout) · `LockEngineRuntime.recordFailureSafely()`
+(fabricates `LockedOut(BASE) + count=THRESHOLD` on any storage throw) · `LockScreenActivity.lockoutRemaining()`
+and `AuthGateViewModel.lockoutState()` (both read `LockoutManager.currentState()` directly).
+
+### Description
+When the Android-backed lockout storage (EncryptedSharedPreferences) throws on a failure write, change D's
+total-lockout boundary fabricates a threshold `LockoutState.LockedOut` outcome so the drain / self-gate survive
+and fail secure. Two consequences follow. (1) The fabricated outcome drives a `LOCKOUT_TRIGGERED` audit and a
+threshold-count intruder capture though no deadline was persisted, so those signals are untruthful. (2) The
+fail-closed lockout exists only in `EngineState.lockout` and the method return value; the actual brute-force gate
+reads `LockoutManager.currentState()`, which returns `Available` after the failed write, so the lockout is not
+enforced against the next attempt.
+
+### Impact
+Under a persistent storage-write fault, brute-force protection (FR-174) is not enforced — the next attempt reads
+`Available` and proceeds — while the audit trail claims a lockout was triggered. Bounded by the low likelihood
+of an EncryptedPrefs write fault, and latent until change F wires the runtime into the production auth path.
+
+### Current mitigations
+- The interpreter still fails secure at its own boundary (the return value / projection deny, the drain
+  survives, the intruder capture is not skipped) and reports the fault to diagnostics (`lockout_record`).
+- The self-gate keeps the legacy audit-first ordering, so a degraded attempt is still recorded.
+
+### Planned actions (change F)
+1. Converge the two sources of truth: one manager-owned authoritative countdown (an in-memory degraded deadline
+   when the store is unwritable) queried by both hosts (overlay + self-gate), so a failed write still blocks the
+   next attempt until the fallback deadline expires.
+2. Represent a storage failure distinctly from a recorded threshold lockout, so `LOCKOUT_TRIGGERED` and the
+   threshold count are not fabricated and diagnostics stay truthful.
+3. Add a test proving a failed write followed by successful reads still blocks another attempt until the
+   fallback deadline expires.
+
+### Review triggers
+Change F (the DI cutover and real adapters); any change to `LockoutManager` or the lockout read path; the M7
+gate and Phase-3 oracle enablement.
 
 ---
 
