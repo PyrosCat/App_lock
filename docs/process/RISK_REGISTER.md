@@ -466,7 +466,8 @@ and `AuthGateViewModel.lockoutState()` (both read `LockoutManager.currentState()
 ### Description
 When the Android-backed lockout storage (EncryptedSharedPreferences) throws on a failure write, change D's
 total-lockout boundary fabricates a threshold `LockoutState.LockedOut` outcome so the drain / self-gate survive
-and fail secure. Two consequences follow. (1) The fabricated outcome drives a `LOCKOUT_TRIGGERED` audit and a
+and produce a synthetic deny-shaped observation (a `LockedOut` in the return value / projection that enforces
+nothing on its own). Two consequences follow. (1) The fabricated outcome drives a `LOCKOUT_TRIGGERED` audit and a
 threshold-count intruder capture though no deadline was persisted, so those signals are untruthful. (2) The
 fail-closed lockout exists only in `EngineState.lockout` and the method return value; the actual brute-force gate
 reads `LockoutManager.currentState()`, which returns `Available` after the failed write, so the lockout is not
@@ -478,8 +479,9 @@ Under a persistent storage-write fault, brute-force protection (FR-174) is not e
 of an EncryptedPrefs write fault, and latent until change F wires the runtime into the production auth path.
 
 ### Current mitigations
-- The interpreter still fails secure at its own boundary (the return value / projection deny, the drain
-  survives, the intruder capture is not skipped) and reports the fault to diagnostics (`lockout_record`).
+- The interpreter still contains the fault at its own boundary: the return value / projection is a synthetic
+  deny-shaped `LockedOut` observation (it enforces nothing on its own), the drain survives, and the intruder
+  capture is not skipped; the fault is reported to diagnostics (`lockout_record`).
 - The self-gate keeps the legacy audit-first ordering, so a degraded attempt is still recorded.
 
 ### Planned actions (change F)
