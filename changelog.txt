@@ -4,6 +4,114 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 Phase 2 (change D): LockPresenter port + LockEngineRuntime interpreter   (2026-09-12)
+-------------------------------------------------------------------------------------------
+Added the impure host around the pure reducer. LockEngineRuntime owns the EngineState, classifies raw inputs
+at the edge, and interprets every reducer effect against the real (in tests, faked) collaborators. It is a
+JVM-testable rewrite of ApplicationLockEngine and does NOT replace it: there is no Hilt cutover, so production
+still drives the old LockScreenActivity path (FR-027 stays partial). The DI swap and the real adapters are E/F.
+
+Ports (service/engine; real adapters land in E/F)
+- LockPresenter, with present and dismiss both returning SurfaceApplyResult and its LockPresentation DTOs;
+  SafeNavigator; TimerScheduler (schedule/cancel plus a terminal shutdown); HomeResolver.
+- AuditLog, IntruderCapturePort, and RuntimeDiagnostics (a required no-throw sink).
+- The self-gate is not a port; the runtime implements it directly.
+- The observational ports carry a documented delivery contract for F: thread-safe (the drain and the
+  self-gate call them concurrently), non-blocking, order-preserving, and self-reporting an async failure to
+  RuntimeDiagnostics, because the interpreter's guard sees only a synchronous throw.
+
+Single logical consumer
+- Every input rides one unbounded channel drained by one coroutine (receive, reduce, publish, then interpret
+  the effects in order); serialization is structural, and effect follow-ups are enqueued, never a reentrant
+  reduce.
+- Presenter and navigator effects run on an injected main dispatcher, so N completes before N+1.
+- A raw foreground is classified in the consumer, in queue order, so its session fact is read after any
+  preceding ScreenOff.
+- Publishing state before interpreting is C2-safe.
+
+Resilience
+- Every Android-bound port has an explicit failure policy, so no adapter fault (a throw or a non-throwing
+  rejection; cancellation is rethrown) can kill the consumer.
+- present/dismiss feed the presentation health fact (success self-heals) and, on a non-success, schedule a
+  bounded per-surface re-drive (reset on a surface change; on exhaustion it stops, but a surface change or
+  retryPresentation() restarts it).
+- A timer that cannot arm escalates the shield to Recovery; audit, capture, timer-cancel, and home-resolution
+  report and continue; a throwing home resolver is fail-secure not-home.
+- Every report routes through safeReport, which contains a throwing sink.
+
+Lifetime
+- A process-lifetime singleton on the application scope (F).
+- shutdown() initiates teardown under one lifecycle monitor: it is a barrier for the synchronous self-gate,
+  closes the channel, and terminally shuts down the timer scheduler, then requests (does not join) drain
+  cancellation, so an in-flight drain effect may finish after it returns.
+- Later channel input is rejected and reported, never accumulated.
+- The Android-backed LockoutManager can throw, so a total lockout boundary contains it: the seed read degrades
+  to Available, a failed reset is reported, and a failed failure-record returns a contained synthetic LockedOut
+  (a deny-shaped observation that is not persisted and enforces nothing on its own; durable degraded-storage
+  enforcement is R-007, F).
+
+Behavior preserved
+- Edge classification (Own/Transient/Home via HomeResolver, else Other), the lockout projection seeded from
+  currentState(), and the atomic recordFailureAndCount() (state + count under one lock).
+- The package-keyed self-gate lives in the runtime, splitting authoritative (session/lockout) from
+  observational (audit/capture, contained), with audit-first ordering; after shutdown() it reports and mutates
+  nothing.
+- F wires AuthGateViewModel to the runtime directly (no SelfGateAuthPort); onLockScreenDismissed is dropped
+  with LockScreenActivity in G.
+
+Enforcement health
+- EnforcementHealth folds three independent facts (detector, overlayGrant, presentation) into one derived
+  StateFlow; Phase-2 healthy = detector Enabled AND overlay Granted AND presentation not Failed.
+- The runtime is the sole presenter caller, so the fact is authoritative; E signals a host recreation or a
+  restored capability via retryPresentation() rather than reconciling on its own.
+
+Validation
+- 48 new LockEngineRuntime tests and 2 LockoutManager tests, driven through the channel on a
+  StandardTestDispatcher: the four concurrency cases, queue-order classification, biometric never counting a
+  lockout, the three-fact health aggregation, safe-dismiss ordering, the resilience policies (a throwing or
+  failing present, a dismiss re-drive, navigation, timer, home/audit/capture, a throwing diagnostics sink),
+  the per-surface re-drive budget and retryPresentation, shutdown (channel close, timer teardown, the
+  self-gate barrier and post-shutdown rejection, the terminal scheduler and its real-thread race), the total
+  lockout boundary, and the atomic recordFailureAndCount (a self-consistent pair plus a latch race).
+- Full JVM suite 242 tests plus detekt green on this box; no instrumentation was run here (this box cannot
+  boot the emulator).
+
+
+Risk register: R-007 wording -- synthetic observation, not enforcement   (2026-09-11)
+-------------------------------------------------------------------------------------
+Tightened the R-007 language so it does not overstate the degraded-storage fallback as a real defence. No
+code changed.
+- The fallback is now described as a synthetic deny-shaped LockedOut observation that enforces nothing on its
+  own, replacing the earlier "fail secure" phrasing.
+- The mitigation is reworded to "the interpreter contains the fault at its own boundary": the return value and
+  projection are a synthetic observation, the drain survives, and the intruder capture is not skipped.
+
+
+Risk register: add R-007 -- degraded-storage lockout is unenforced and over-reported   (2026-09-11)
+---------------------------------------------------------------------------------------------------
+Filed R-007 (Medium; gate M7; Open) for a gap change D surfaces: when the Android-backed lockout storage
+throws on a failure write, D's total-lockout boundary fabricates a threshold LockedOut that the real
+brute-force gate never applies. No code changed.
+- The fabricated lockout lives only in EngineState and the method return; the real gate reads
+  LockoutManager.currentState(), which returns Available after the failed write, so no attempt is blocked.
+- It also over-reports: a LOCKOUT_TRIGGERED audit and a threshold intruder capture fire with no persisted
+  deadline.
+- Latent until change F wires the runtime into the production auth path (production still runs the legacy
+  engine). F converges it: one manager-owned authoritative countdown queried by both hosts, and a
+  storage-failure representation distinct from a recorded threshold lockout.
+- Also normalised the R-001..R-006 section headings to a uniform "## R-00X" + "**Risk:**" style.
+
+
+Detekt: exempt @Composable from FunctionNaming, retire 20 baseline entries   (2026-09-11)
+-----------------------------------------------------------------------------------------
+Made the Compose PascalCase naming exception a config rule instead of per-function baseline suppressions.
+- detekt.yml now enables FunctionNaming with ignoreAnnotated: [Composable], so @Composable Unit UI functions
+  may keep PascalCase while ordinary Kotlin functions stay checked.
+- Removed the 20 now-redundant Composable FunctionNaming entries from the detekt baseline.
+- Added DetektPolicyTest, which guards that the exemption stays configured so the baseline entries are not
+  silently reintroduced.
+
+
 M7/WP2 Phase 2 (change C1): extract the reusable LockScreen composable   (2026-09-09)
 -------------------------------------------------------------------------------------
 Pulled the authentication UI out of LockScreenActivity into a standalone, host-agnostic @Composable

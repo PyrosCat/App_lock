@@ -1,13 +1,39 @@
 package com.applock.security
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.concurrent.thread
 
 class LockoutManagerTest {
 
     private class FakeStorage : LockoutStorage {
         override var failureCount: Int = 0
+        override var lockoutUntil: Long = 0L
+    }
+
+    /**
+     * Storage that parks the writer inside a `failureCount` write, holding the [LockoutManager] lock, until
+     * [proceed] is released. It lets a test deterministically hold one thread mid-`recordFailureAndCount` and
+     * prove a second writer cannot interleave.
+     */
+    private class LatchStorage(
+        private val entered: CountDownLatch,
+        private val proceed: CountDownLatch,
+    ) : LockoutStorage {
+        private var count = 0
+        override var failureCount: Int
+            get() = count
+            set(value) {
+                count = value
+                entered.countDown()
+                proceed.await() // pause here, while the LockoutManager monitor is held
+            }
         override var lockoutUntil: Long = 0L
     }
 
@@ -162,5 +188,66 @@ class LockoutManagerTest {
         assertEquals(LockoutState.Available, manager.currentState())
         // And the stored deadline is cleared, not just reported clear.
         assertEquals(0L, storage.lockoutUntil)
+    }
+
+    // ---- recordFailureAndCount: the atomic (state, count) read used by the engine interpreter --------
+
+    @Test
+    fun `recordFailureAndCount returns the state and count of the same failure`() {
+        repeat(LockoutManager.FAILURE_THRESHOLD + 2) { i ->
+            val outcome = manager.recordFailureAndCount()
+            val expectedCount = i + 1
+            assertEquals(expectedCount, outcome.count)
+            // The pair describes one operation: LockedOut exactly when the count is at/over the threshold.
+            assertEquals(expectedCount >= LockoutManager.FAILURE_THRESHOLD, outcome.state is LockoutState.LockedOut)
+        }
+    }
+
+    // Outer timeout (15s) comfortably exceeds the sum of the inner bounded waits (entered.await 2s + spin
+    // deadline 2s + two 2s joins = 8s worst case), so a regression fails on a specific inner assertion rather
+    // than on the blunt outer @Test timeout.
+    @Test(timeout = 15_000)
+    fun `recordFailureAndCount holds the lock so a concurrent reset cannot interleave`() {
+        // Deterministic (latch-controlled, bounded waits): while thread A is parked mid-recordFailureAndCount
+        // holding the lock, thread B's recordSuccess must block, so A's returned (state, count) pair is a single
+        // consistent operation and B only runs after A releases. Bounded waits and a finally that always
+        // releases A make a lost-synchronization regression fail fast and leak no parked thread.
+        val entered = CountDownLatch(1)
+        val proceed = CountDownLatch(1)
+        val manager = LockoutManager(LatchStorage(entered, proceed), clock = { 1_000_000L })
+        val outcome = AtomicReference<LockoutManager.FailureOutcome>()
+        val resetDone = AtomicBoolean(false)
+
+        val failer = thread { outcome.set(manager.recordFailureAndCount()) }
+        var resetter: Thread? = null
+        try {
+            // A enters recordFailureAndCount and parks at the storage write, holding the lock.
+            assertTrue("failer never entered recordFailureAndCount", entered.await(2, TimeUnit.SECONDS))
+            val resetterThread = thread {
+                manager.recordSuccess()
+                resetDone.set(true)
+            }
+            resetter = resetterThread
+            // B must block acquiring the monitor A holds. Wait (bounded) until it is BLOCKED; if it instead
+            // interleaves (a lost @Synchronized), resetDone flips or B never reaches BLOCKED. Fail fast rather
+            // than spin until the @Test timeout.
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
+            while (resetterThread.state != Thread.State.BLOCKED) {
+                assertFalse("recordSuccess interleaved while recordFailureAndCount held the lock", resetDone.get())
+                assertTrue(
+                    "reset thread never blocked on the lock (synchronization lost?)",
+                    System.nanoTime() < deadline,
+                )
+                Thread.onSpinWait()
+            }
+            assertFalse("recordSuccess ran while recordFailureAndCount held the lock", resetDone.get())
+        } finally {
+            proceed.countDown() // always release A (and any parked B), even if an assertion above failed
+            failer.join(2_000)
+            resetter?.join(2_000)
+        }
+        assertTrue(resetDone.get())
+        assertEquals(1, outcome.get().count)
+        assertTrue(outcome.get().state is LockoutState.Available)
     }
 }

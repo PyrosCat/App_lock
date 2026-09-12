@@ -56,6 +56,17 @@ class LockoutManager(
         return LockoutState.LockedOut(duration)
     }
 
+    /** The [state] of a recorded failure and the [count] that produced it, read as one observation. */
+    data class FailureOutcome(val state: LockoutState, val count: Int)
+
+    /**
+     * Records a failure and returns its state and its resulting count under one lock, so the two describe the
+     * same operation. If a caller reads [recordFailure] and [failureCount] in two separate calls, another writer
+     * (for example, the self-gate) can interleave between the calls, and the caller can then read a mismatched pair.
+     */
+    @Synchronized
+    fun recordFailureAndCount(): FailureOutcome = FailureOutcome(recordFailure(), storage.failureCount)
+
     @Synchronized
     fun recordSuccess() {
         storage.failureCount = 0

@@ -682,13 +682,19 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     arrival exemption, navigation-failure retry, and Failed / Ready escape handling (including a preserved
     Checking escape's timer staying inert under Ready).
 - **D — `LockPresenter` port + `LockEngineRuntime` interpreter (JVM, no cutover).** `LockPresenter`
-  (`service/`, `present(LockPresentation): PresentResult { Success | Unavailable | Failed(reason) }`,
-  `dismiss()`) keeps its vocabulary in `service/` (no `presentation` type leaks). `LockEngineRuntime`
-  (`service/`, `@Singleton`) owns the atomic `EngineState`, exposes the old public API + the request-token
-  completions, and delegates the package-keyed self-gate to `SelfGateAuthPort` (F).
-  - **Single logical consumer.** Every event enters one `Channel<EngineEvent>` drained by one coroutine
-    confined to a single logical thread (`Dispatchers.Default.limitedParallelism(1)` or a `HandlerThread`:
-    serialized execution, *not* thread affinity). It runs `reduce -> publish (single-writer
+  (`service/`, `present(LockPresentation): SurfaceApplyResult { Success | Unavailable | Failed(reason) }`,
+  `dismiss(): SurfaceApplyResult`) keeps its vocabulary in `service/` (no `presentation` type leaks).
+  `LockEngineRuntime` (`service/`; provided as a **process-lifetime singleton on the application scope** in
+  F's `@Provides`, so D itself carries no Hilt annotation) owns the atomic `EngineState`, exposes the old
+  public API + the request-token completions, and implements the package-keyed self-gate directly (the
+  authoritative session / lockout mutations via the in-process managers; the observational audit / capture
+  contained).
+  - **Single logical consumer.** Every input enters one `Channel<Input>` (a private sum of a ready
+    `EngineEvent` and a raw foreground that the consumer classifies, so the session fact is read in queue
+    order, not snapshotted at the caller) drained by one coroutine confined to a single logical thread
+    (`Dispatchers.Default.limitedParallelism(1)` or a `HandlerThread`: serialized execution, *not* thread
+    affinity — though the single drain coroutine already serializes, so the confinement is defence in depth).
+    It runs `reduce -> publish (single-writer
     `MutableStateFlow<EngineState>`) -> ordered, sequential effect interpretation`. Effect-produced
     follow-ups (`RecordUnlockFailure->LockoutRecorded`, `ScheduleTimer->TimerFired`,
     `NavigateSafely->SafeDismissNavigationIssued`/`SafeDismissNavigationFailed`) are **enqueued**, never a
@@ -724,6 +730,87 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     `RecordUnlockFailure` follow-up; N's effects not overtaken by N+1), biometric-never-locks-out, health
     aggregation, safe-dismiss ordering. **No Hilt cutover** (a fake cannot satisfy the graph); production
     stays on `ApplicationLockEngine`.
+  - **As landed.** A JVM-testable rewrite of `ApplicationLockEngine` with no Hilt cutover (production stays on
+    the old path). The pieces:
+    - **Ports** (`service/engine`): `LockPresenter` (`present` / `dismiss` both return `SurfaceApplyResult`,
+      with the `LockPresentation` DTOs), `SafeNavigator`, `TimerScheduler` (`schedule` returns whether it
+      armed), `HomeResolver`, `AuditLog`, `IntruderCapturePort`, and `RuntimeDiagnostics` (a REQUIRED no-throw
+      sink for contained adapter faults); E and F supply the adapters. The self-gate is NOT a port: the runtime
+      implements it directly with its in-process managers.
+    - **Single consumer.** Serialization is structural (one drain coroutine over an unbounded channel), so
+      confining the dispatcher is defence in depth, not the correctness boundary; the presenter and navigator
+      effects hop through an injected main dispatcher. A raw foreground rides the same channel and is classified
+      **in the consumer, in queue order**, so its session fact is read after any preceding `ScreenOff`.
+    - **Resilience.** Every Android-bound port is called through an explicit failure policy (reports route
+      through `safeReport`, which contains a throwing sink), so no adapter fault (a throw or a non-throwing
+      rejection) can terminate the single consumer. present / dismiss record their outcome to health (a success
+      clears a prior failure, so health self-heals) and, on a non-success, schedule a bounded delayed
+      **surface-keyed re-drive** (per-surface budget, reset when the desired surface changes; on exhaustion the
+      re-drives stop and health stays Failed, and a later surface change or `retryPresentation()` restarts it).
+      Navigation failure emits a follow-up; a timer-schedule that fails (false OR throw) escalates the shield to
+      Recovery (both modes reported); audit / capture / timer-cancel / home-resolution report and continue (home
+      additionally fail-secure not-home).
+    - **Total lockout boundary.** `LockoutManager`'s storage is Android-backed and can throw, so the seed read
+      degrades to `Available` (reported), a failed reset on success is reported and does not kill the drain, and
+      a failed failure-record returns and projects a **contained synthetic** `LockedOut` at the threshold (the
+      capture and drain survive). That observation is not persisted and enforces nothing on its own: no
+      brute-force attempt is blocked by it until F supplies the authoritative countdown (see contract (4) /
+      R-007).
+    - **Self-gate.** Lives in the runtime, splitting **authoritative** (session / lockout) from
+      **observational** (audit / capture, contained), audits `UNLOCK_FAILURE` first (legacy order, so a degraded
+      attempt is still recorded), and inherits the same contained-synthetic behaviour.
+    - **API + lifetime.** Keeps the old package-keyed API (`onAppForegrounded`, `onScreenOff`,
+      `onUnlockSuccess`, `onUnlockFailure`) and adds the request-token completions, `safeDismissRequested`,
+      `retryPresentation`, and `shutdown` (which INITIATES teardown under one lifecycle monitor: a barrier for
+      the synchronous self-gate, it closes the input channel and terminally shuts down the timer scheduler, then
+      REQUESTS drain cancellation, not joined, so an in-flight effect may complete after it returns). It drops
+      `onLockScreenDismissed`, whose only caller `LockScreenActivity` is deleted in G.
+    - **Footprint.** Four new `service/engine` files (the ports, `EnforcementHealth`, `LockEngineRuntime`, its
+      test) PLUS the atomic `LockoutManager.recordFailureAndCount()` (state + count under one lock) and its
+      added tests.
+  - **Deferred to E / F (contracts recorded).**
+    - **(1) Lifetime / channel.** The runtime is a process-lifetime singleton, so F MUST give it the
+      **application scope** (not a service scope: the detector service restarts, the engine must not die with
+      it). The input channel is unbounded so it never drops a security transition, and closes when the drain
+      ends (`shutdown` / scope cancellation), after which a send is rejected and reported, not accumulated. F
+      must NOT coalesce raw foreground observations: the engine re-locks on every foreground event by design
+      (fast-switch defence), so dedup would reopen that bypass.
+    - **(2) `HomeResolver` under failure.** E's adapter should keep a last-known-good launcher and be tested
+      for a working Home escape while resolution is unavailable, so a transient `PackageManager` failure does
+      not repeatedly shield the launcher.
+    - **(3) Presenter driving.** The **runtime is the sole caller of `present` / `dismiss`**, so every apply
+      outcome feeds the authoritative `presentation` health fact. E's presenter may READ
+      `LockEngineRuntime.state` to know what to render, but it MUST NOT apply a health-affecting surface change
+      on its own: a host recreation (the `ComposeView` rebuilding) or a restored capability calls
+      **`retryPresentation()`**, so the re-apply runs through the runtime and health stays truthful (an E-driven
+      reconcile could leave health stale `Succeeded` after a failed recreation, or stale `Failed` after a
+      success the runtime had given up on). Wiring stays acyclic (the presenter depends on the runtime's state /
+      port, not the reverse).
+    - **(4) Lockout enforcement convergence (R-007).** D's total-lockout boundary is fail-closed-SHAPED only
+      inside the engine (`EngineState.lockout` and the self-gate return value observe a `LockedOut` but enforce
+      nothing on their own); the real brute-force gate reads `LockoutManager.currentState()`, which returns
+      `Available` after a failed write, so a fabricated fallback lockout is not enforced, and the fabricated
+      threshold outcome over-reports (`LOCKOUT_TRIGGERED` / a threshold capture with no persisted deadline). F
+      MUST converge this: one manager-owned authoritative countdown (an in-memory degraded deadline when the
+      store is unwritable) queried by both hosts, and a storage-failure representation distinct from a recorded
+      threshold lockout. Deferred here because the fix belongs with F's real adapters and the shared countdown
+      query; latent until the F cutover (production still runs the legacy engine). See RISK_REGISTER R-007.
+    - **(5) Queue-lag observability (WP4).** The input channel is unbounded (contract (1)) so it never drops a
+      security transition, but a stalled `mainDispatcher` (a wedged present / dismiss on the UI thread) would
+      let the backlog grow with no health or backlog signal today. WP4's watchdog / health rewrite SHOULD
+      surface a queue-lag diagnostic (the age or depth of the oldest un-drained input), so a stuck consumer is
+      observable rather than silent unbounded growth. Not a D behaviour change; the seam is the single drain.
+    - **(6) Observational-adapter delivery contract (F).** `AuditLog` and `IntruderCapturePort` are called
+      concurrently by the drain AND the synchronous self-gate, and they persist off-thread, so the interpreter's
+      `guard` (which contains only a synchronous throw before the method returns) cannot see an async failure.
+      F's real adapters MUST therefore be **thread-safe**, **non-blocking** (the self-gate holds the lifecycle
+      monitor across them, so a slow adapter delays `shutdown`), **order-preserving** for audit, and MUST
+      **catch failures inside their own async job and report them to `RuntimeDiagnostics`** (never drop them).
+      An application-scope single-consumer adapter (one queue draining to the DAO, serializing drain + self-gate
+      calls) satisfies all of it; the existing `IntruderCaptureManager` is fire-and-forget and does NOT
+      self-report, so F must wrap it accordingly. F tests: an async-failure-after-return reports to diagnostics,
+      and a concurrent drain/self-gate delivery preserves ordering and loses nothing. The D KDocs on these ports
+      record this contract.
 - **E — real adapters + overlay capability (fleet).**
   - **`OverlayLockPresenter`** (`platform/`, R2-exempt): warm `TYPE_APPLICATION_OVERLAY`, **add-once +
     `updateViewLayout` / visibility toggle** (WP0 swGPU finding; never per-lock add/remove), **`FLAG_SECURE`
@@ -731,6 +818,11 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     window title for the harness, and the C1 composable hosted via `ComposeView` + a lightweight
     `ViewTreeLifecycleOwner` / `ViewModelStoreOwner` / `SavedStateRegistryOwner`. It has three surfaces
     (Lock / Checking / Recovery). A draw / `addView` failure or a missing grant returns `Unavailable/Failed`.
+    Its `present` / `dismiss` MUST be **idempotent and non-throwing** (the D interpreter contains a throw and,
+    for dismiss, leaves the surface up, so a throwing hide could otherwise strand the overlay). Reconciliation
+    of a failed apply is the runtime's bounded re-drive, not an E-driven re-apply: E does not reconcile the
+    overlay on its own (that would desync the authoritative health fact) — a host recreation or a restored
+    grant calls **`retryPresentation()`** so the re-apply runs through the runtime (see D's contract (3)).
     Because the `ComposeView` is warm and add-once, E MUST scope the hosted `LockScreen` by the live request
     token (`key(requestToken) { LockScreen(...) }`, the C1 contract): the composable is state-observing and
     keeps its own wrong-PIN prompt and entered digits, so a direct lock-request supersession over the retained
@@ -744,7 +836,8 @@ extensions land here because Phase 2 is the first phase with a state-observing s
   - **Overlay capability.** Move `SYSTEM_ALERT_WINDOW` out of the throwaway spike block (currently manifest
     line 18, otherwise deleted with the spike) into the permanent permissions. Add the
     `Settings.canDrawOverlays()` check and an `ACTION_MANAGE_OVERLAY_PERMISSION` grant path (onboarding + a
-    settings entry). The check submits `overlayGrant`; each `PresentResult` submits `presentation`. Shield
+    settings entry). The check submits `overlayGrant`; each `SurfaceApplyResult` (via the runtime, the sole
+    presenter caller) submits `presentation`, and a restored grant calls `retryPresentation()`. Shield
     Back controls emit `SafeDismissRequested`.
   - **Safe-dismiss contract with C2 (as implemented).** The `OVERLAY_SETTINGS` escape must carry the
     *resolved* destination package(s) in `SafeDismissRequested.exemptPackages` (E resolves the
@@ -760,17 +853,15 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     / Recovery shields block touch; `BiometricHostActivity` launch), device-run on the fleet. RTM:
     **FR-044** Overlay Permission Verification (`not-started`->`partial`; verification WP6).
 - **F — production cutover (fleet).** Swap DI (`AppModule`) to `LockEngineRuntime` built with the real
-  adapters. `AppDetectionService` injects the runtime (edge classification is internal, so it still forwards
-  the raw package + `onScreenOff`). **`SelfGateAuthPort` (`service/`)** carries the old engine's
-  package-keyed bodies verbatim: `recordUnlockSuccess(pkg)` = `sessionManager.markUnlocked` +
-  `lockoutManager.recordSuccess` + `UNLOCK_SUCCESS` audit; `recordUnlockFailure(pkg): LockoutState` =
-  `UNLOCK_FAILURE` audit + `recordFailure` + conditional `LOCKOUT_TRIGGERED` +
-  `intruderCapture.onAuthFailure(pkg, PIN, failureCount())` + return state. `AuthGateViewModel` is rewired
-  to it. The two `LockoutManager` writers (runtime + self-gate) are safe, because every mutator is
-  `@Synchronized`. Overlay + host completions are request-token-keyed (the token is read from the observed
-  `EngineState`); the self-gate stays package-keyed, never forced through a request-id overload. The watchdog
-  and the MainActivity banner read the **derived health**, so "Protected" requires detector-enabled ∧
-  overlay-granted ∧ no present-failure; a `PresentResult.Unavailable/Failed` is recorded, never swallowed.
+  adapters and the **application scope** (not a service scope — see D's lifetime contract). `AppDetectionService`
+  injects the runtime (edge classification is internal, so it still forwards the raw package + `onScreenOff`),
+  and **`AuthGateViewModel` is rewired to the runtime's `onUnlockSuccess` / `onUnlockFailure`** (the self-gate
+  is implemented in the runtime as of D — there is no separate `SelfGateAuthPort`). F therefore only supplies
+  the real `AuditLog`, `IntruderCapturePort`, and `RuntimeDiagnostics` adapters the self-gate uses. Overlay +
+  host completions are request-token-keyed (the token is read from the observed `EngineState`); the self-gate
+  stays package-keyed, never forced through a request-id overload. The watchdog and the MainActivity banner
+  read the **derived health**, so "Protected" requires detector-enabled ∧ overlay-granted ∧ no present-failure;
+  a `SurfaceApplyResult.Unavailable/Failed` is recorded, never swallowed.
   **Protection is gated on the overlay grant (Decision D-P2-2):** it cannot be reported or enabled active
   without `canDrawOverlays`, and the grant path is verified **before** the cutover flips. Otherwise
   ungranted users lose locking entirely, a regression against the Activity, which needs no overlay grant.
@@ -803,8 +894,8 @@ gate in Phase 3**, not Phase 2.
 
 **Dependencies.** WP0 (ADR-020), WP1 (harness).
 **Outputs.** `LockPresenter`/`OverlayLockPresenter`, `BiometricHostActivity`, `LockEngineRuntime` +
-request-identity engine change, `SelfGateAuthPort`, the `EnforcementHealth` owner, `TimerScheduler`, the
-reusable `LockScreen` composable; DI wiring (`AppModule`).
+request-identity engine change (self-gate implemented in the runtime), the `EnforcementHealth` owner,
+`TimerScheduler`, `RuntimeDiagnostics`, the reusable `LockScreen` composable; DI wiring (`AppModule`).
 **RTM (this WP's commit):** **FR-027** Lock Screen Display (`partial`→`implemented`) and **FR-028**
 Overlay Security (`not-started`→`implemented`) — the overlay presentation lands here;
 `implemented-verified` at the WP6 matrix. Request-identity is the R-002 remediation *by construction*
