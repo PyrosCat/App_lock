@@ -56,6 +56,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.applock.R
 import com.applock.applocker.service.AppDetectionService
 import com.applock.platform.ProtectionWatchdogService
+import com.applock.platform.lock.OverlayEnforcement
+import com.applock.platform.lock.OverlayPermission
 import com.applock.presentation.SelfLock
 import com.applock.presentation.authentication.AuthGateViewModel
 import com.applock.presentation.authentication.PinPad
@@ -70,15 +72,15 @@ import kotlinx.coroutines.delay
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    // Same activity-scoped instance the gate composables get via hiltViewModel() — used here for
-    // the onCreate PIN-set check (formerly Graph.credentialRepository).
+    // The same activity-scoped instance the gate composables get via hiltViewModel(), used here for the
+    // onCreate PIN-set check (formerly Graph.credentialRepository).
     private val authGate: AuthGateViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // FR-171: settings/app-list show what's protected — keep them out of
-        // screenshots in release. Debug stays capturable for emulator E2E.
+        // FR-171: settings and the app-list show what is protected, so keep them out of release
+        // screenshots. Debug stays capturable for emulator E2E.
         val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
         if (!debuggable) {
             window.setFlags(
@@ -192,8 +194,8 @@ private fun SelfGateScreen(onUnlocked: () -> Unit) {
     val authGate: AuthGateViewModel = hiltViewModel()
     var error by remember { mutableStateOf(false) }
 
-    // The app's own gate counts toward the same lockout as protected apps
-    // (FR-174) — otherwise it would be a free brute-force surface.
+    // The app's own gate counts toward the same lockout as protected apps (FR-174); otherwise it would be a
+    // free brute-force surface.
     var lockoutRemainingMs by remember { mutableLongStateOf(0L) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -273,13 +275,15 @@ private fun AppListScreen(
     val apps by viewModel.apps.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // Re-check accessibility permission every time we come back to the app.
+    // Re-check the permissions every time we come back to the app (both grants happen in system UI).
     var serviceEnabled by remember { mutableStateOf(AppDetectionService.isEnabled(context)) }
+    var overlayGranted by remember { mutableStateOf(OverlayPermission.canDrawOverlays(context)) }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 serviceEnabled = AppDetectionService.isEnabled(context)
+                overlayGranted = OverlayPermission.canDrawOverlays(context)
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -327,6 +331,33 @@ private fun AppListScreen(
                         Spacer(Modifier.height(12.dp))
                         Button(onClick = {
                             context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        }) {
+                            Text(stringResource(R.string.open_settings))
+                        }
+                    }
+                }
+            }
+            // Overlay grant-path onboarding (M7 WP2 change E, FR-044). Authored now, hidden until F
+            // reveals it (OverlayEnforcement.uiEnabled) alongside the grant-before-cutover flow.
+            if (OverlayEnforcement.uiEnabled && !overlayGranted) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                ) {
+                    Column(Modifier.padding(16.dp)) {
+                        Text(
+                            stringResource(R.string.overlay_needed_title),
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            stringResource(R.string.overlay_needed_body),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                        Button(onClick = {
+                            context.startActivity(OverlayPermission.manageOverlayIntent(context))
                         }) {
                             Text(stringResource(R.string.open_settings))
                         }

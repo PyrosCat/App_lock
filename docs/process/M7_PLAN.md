@@ -829,10 +829,50 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     composition would otherwise leak the prior request's input into the next.
   - **`BiometricHostActivity`** (`presentation/`, `FragmentActivity`): transparent, own `FLAG_SECURE`,
     `exported=false`, `excludeFromRecents`, `taskAffinity=""`. It is launched from the overlay as a BAL
-    permitted by the visible overlay window (ADR-020 case (a)). **Its intent carries `epoch`+`requestId`,
-    saved in `savedInstanceState` and returned as both**, so a host recreated in a fresh process returns the
-    old epoch and `matchedRequest` rejects it (no id-0 collision). `TimerScheduler` (Handler /
+    permitted by the visible overlay window (ADR-020 case (a)). Its intent carries `epoch`+`requestId` plus a
+    single-flight lease id, all saved in `savedInstanceState`. It returns the token as both epoch and id, so a
+    host recreated in a fresh process returns the old epoch.
+
+    The `BiometricLaunchGate` is keyed by **token AND lease**. The presenter claims a lease before the BAL. The
+    host acknowledges (token + lease) in `onCreate`, which completes a one-shot latch that lives ON the lease
+    handle, so the latch stays observable even after the host releases the gate. Both release by (token +
+    lease). `startActivity` does not throw when the system aborts a background launch silently (`START_ABORTED`
+    is not fatal), so an unacknowledged lease expires and is reclaimable, and an aborted launch that never
+    started a host does not wedge the gate (the PIN pad stays available). The once-per-request auto-prompt is
+    consumed only after that latch completes (a host actually started), not when `startActivity` returns. If the
+    lease expires unacknowledged, the auto-launch makes one bounded, cancellable retry (its budget is tracked
+    outside Compose, so a host rebuild does not re-arm it), then gives up unmarked, leaving PIN and the manual
+    button. `acknowledge` accepts ONLY the gate's exact, unexpired (token, lease); it rejects a free gate, an
+    expired (abandoned) lease, and a foreign or reclaimed lease. Thus a host recreated after **full process
+    death** finds an empty gate, finishes SILENTLY, and never authenticates over or blocks the fresh runtime's
+    re-derived request (ADR-020: process death does not restore the old request).
+
+    A LOCKED_OUT launch is a documented no-retry suppression that matches the legacy Activity: the countdown and
+    the manual biometric button remain the paths, and a lockout that later expires does not auto-prompt
+    (accepted product behaviour, not a defect). The auto-prompt timing (a 4 s unacknowledged-lease timeout, a
+    ~5 s acknowledgement wait, one retry) is opinionated to prevent a runaway BAL launch loop; the fleet
+    confirms its aborted and slow-launch behaviour (API 35/36) before any tuning. `TimerScheduler` (Handler /
     `HandlerThread`) posts `TimerFired`.
+  - **`PackageManagerHomeResolver`** (`platform/`): resolves `MAIN/HOME`, keeps a last-known-good launcher,
+    never throws, and re-resolves whenever the cached entry is **stale** (older than a short TTL) regardless of
+    whether the observed package matches the cache, so a default-launcher change is picked up and a failed
+    resolve is TTL-bounded. Re-resolving only on a *differing* package trusted a
+    cached launcher forever, so a demoted FORMER launcher stayed classified `Home` and bypassed the lock (a
+    fail-dangerous gap): re-resolving once the cache is stale closes it, and a JVM test asserts the former
+    launcher is no longer `Home` after the default changes. **Two bounded within-TTL residuals remain, both
+    deferred to F (validate on-device).** (1) NEW-launcher direction, **fail-safe**: a just-changed default
+    launcher reads as `Other` for up to the TTL (~2 s); the new launcher is not a locked app, so it is
+    user-visible only under a degraded (`Failed`) presentation policy, as a Recovery shield over home for that
+    window. (2) FORMER-launcher direction, **fail-dangerous but bounded**: a demoted former launcher observed
+    within the TTL is still trusted as `Home` for up to the TTL (the indefinite past-TTL bypass is closed;
+    only this within-TTL window remains); a JVM test documents this residual (former launcher still home within the TTL,
+    not-home past it).
+
+    F revisits the adapter with three changes: a tri-state resolve result that distinguishes no-default from a
+    failure; for the differing-package direction, an immediate probe of a new candidate plus a per-candidate
+    negative cache; and, for the cache-MATCH direction (residual 2, which the immediate probe does not cover),
+    cache-match revalidation on a foreground transition, or another reliable invalidation. Together these close
+    the residual ≤TTL window.
   - **Overlay capability.** Move `SYSTEM_ALERT_WINDOW` out of the throwaway spike block (currently manifest
     line 18, otherwise deleted with the spike) into the permanent permissions. Add the
     `Settings.canDrawOverlays()` check and an `ACTION_MANAGE_OVERLAY_PERMISSION` grant path (onboarding + a
@@ -848,10 +888,40 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     attempt-keyed follow-up carrying the `NavigateSafely.attempt` token:
     `SafeDismissNavigationIssued(attempt)` once the destination launches, or
     `SafeDismissNavigationFailed(attempt)` if it could not (launch threw or nothing resolved). A transient
-    failure then reverts the escape for retry instead of stranding the surface.
-  - **Instrumentation.** Real-surface instrumentation per surface (Lock renders PIN + FLAG_SECURE; Checking
-    / Recovery shields block touch; `BiometricHostActivity` launch), device-run on the fleet. RTM:
-    **FR-044** Overlay Permission Verification (`not-started`->`partial`; verification WP6).
+    failure then reverts the escape for retry instead of stranding the surface. **Deferred to F, a MANDATORY
+    prerequisite for the production cutover:** `NavigationIssued` currently
+    fires when `startActivity` returns without throwing, but a silently aborted background launch
+    (`START_ABORTED` is non-fatal, confirmed in AOSP `Instrumentation.checkStartActivityResult`) also returns
+    without throwing, so the runtime could tear the overlay down before the safe destination is actually
+    foreground, briefly revealing the guarded app. F hardens this by: keeping the overlay and `LeavingFor(attempt)`
+    active after requesting navigation; completing the attempt only once an approved destination is OBSERVED
+    (`Home` / `Own` / the exact resolved Settings package); a monotonic, attempt-keyed timeout that reverts to
+    the guard on expiry; and rejecting late observations / callbacks by their `AttemptToken`. Tests: launch
+    aborted, wrong-package arrival, timeout, supersession, and successful arrival. E's `RealSafeNavigator` keeps
+    its total launch-return contract unchanged; the arrival gating is the runtime/interpreter's, added in F.
+  - **Instrumentation (`OverlayLockPresenterUiTest`, UiAutomator).** Per surface, it asserts the RENDERED
+    content (the PIN pad on Lock; text plus escape controls on the Checking / Recovery shields), blocks a
+    real underlying touch with a sentinel activity (a genuine injected tap, never a focus inference), and
+    exercises Back, the shield escape controls, and the biometric button THROUGH the surface UI. It drives
+    the presenter directly, so it is insulated from the Moto G accessibility flakiness (R-001a). FLAG_SECURE
+    is split: the flag policy is JVM-tested (`OverlayWindowFlagsTest`), the debuggable APK reads visible
+    behaviour (debug drops FLAG_SECURE by design), and a non-debug fleet screencap / window inspection proves
+    the deployed overlay is secure. A companion suite (`OverlayWindowHostFaultUiTest`) fault-injects the
+    internal `OverlayWindowHost` seam (a decorator around the real `WindowManager`, not a whole-surface fake;
+    the `LockPresenter` / runtime / DI contract is unchanged) to prove the failure-atomic reset: an
+    attached-removal failure retains the window (no orphan / duplicate add), an already-detached root cleans
+    up without a removal call, and a reset then a different presentation re-adds. It also proves the cold-add
+    fail-atomic reveal: a first `present()` whose reveal `updateViewLayout` throws leaves the window in the
+    dismissed, pass-through state (a sentinel confirms the underlying touch is not blocked), then recovers on
+    the next `present()` without a second add.
+  - **Gate-2 execution (fleet).** Primary target = the **Moto G 2025** (real hardware, API 35 / arm64) on
+    the `connected` lane, for the content / underlying-touch / escape / Back assertions. Two paths are not
+    covered there and complete the gate elsewhere: the API-36 predictive-back routing (targetSdk 36 stops
+    dispatching `KEYCODE_BACK`, an Android-16 device behaviour) runs on the **NucBox api36** emulator (`full`
+    matrix), and the deployed-secure proof is the non-debug FLAG_SECURE screencap above. Biometric-through-
+    the-UI runs only with an enrolled authenticator (otherwise the test asserts the no-enrollment host path).
+    Gate 2 is not closed until the Moto G run passes. RTM: **FR-044** Overlay Permission Verification
+    (`not-started`->`partial`; verification WP6).
 - **F — production cutover (fleet).** Swap DI (`AppModule`) to `LockEngineRuntime` built with the real
   adapters and the **application scope** (not a service scope — see D's lifetime contract). `AppDetectionService`
   injects the runtime (edge classification is internal, so it still forwards the raw package + `onScreenOff`),
@@ -862,6 +932,19 @@ extensions land here because Phase 2 is the first phase with a state-observing s
   stays package-keyed, never forced through a request-id overload. The watchdog and the MainActivity banner
   read the **derived health**, so "Protected" requires detector-enabled ∧ overlay-granted ∧ no present-failure;
   a `SurfaceApplyResult.Unavailable/Failed` is recorded, never swallowed.
+  F wires `retryPresentation()` for edge-triggered recovery ONLY (a restored overlay grant, and an
+  out-of-band host detach), never from a `present()` fault: change E removed the presenter's BadToken
+  self-trigger, because feeding it back into the failing present resets the re-drive budget and defeats the
+  bound (a busy retry loop), so a present()-internal fault relies on the runtime's bounded re-drive. The
+  out-of-band detach signal (the `ComposeView` / overlay host destroyed outside a runtime-driven present)
+  must be **de-duplicated** and **suppressed during teardown**, so one unexpected detach re-arms once while a
+  normal dismiss / shutdown does not. That handler MUST first invalidate the stale host
+  (`presenter.release()`, which clears the host after confirming it is detached) and only THEN call
+  `retryPresentation()`: `ensureAdded()`
+  early-returns on a non-null `overlayRoot`, so a retry alone would keep reconciling against the detached
+  root and never re-add. F must also treat a `LockCompletionBridge.bind()` that returns false as
+  **cutover-fatal**: an unbound (or mis-bound) bridge drops completions, so correct PINs never unlock and
+  failed PINs never reach lockout accounting.
   **Protection is gated on the overlay grant (Decision D-P2-2):** it cannot be reported or enabled active
   without `canDrawOverlays`, and the grant path is verified **before** the cutover flips. Otherwise
   ungranted users lose locking entirely, a regression against the Activity, which needs no overlay grant.

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      M7 WP2 (change E) Gate-2 test support, DEBUG builds only. SentinelActivity is a full-screen touch
+      recorder used to prove, with a real underlying touch (not an inference from window focus), that an
+      interactive overlay BLOCKS touches to the app beneath and a dismissed (pass-through) overlay lets them
+      through. It is declared in the TARGET (com.applock) debug manifest, not the androidTest APK, because
+      ActivityScenario.launch(Class) resolves the intent against the target-app context. It ships only in
+      debuggable builds and is exported=false.
+    -->
+    <application>
+        <activity
+            android:name="com.applock.e2e.SentinelActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+    </application>
+</manifest>

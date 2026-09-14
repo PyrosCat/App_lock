@@ -4,6 +4,72 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 Phase 2 (change E): real port adapters + overlay capability   (2026-09-13)
+---------------------------------------------------------------------------------
+Supplied the real adapters behind the D ports and the overlay-permission capability. No DI cutover (that is F):
+production still runs the legacy accessibility detector and LockScreenActivity, so FR-027/FR-028 are unchanged.
+
+Completion seam (service/engine)
+- Added LockCompletionSink, LockCompletionResult (ACCEPTED/UNAVAILABLE), and the app-scoped LockCompletionBridge:
+  the overlay surfaces report request-token completions without holding a runtime reference. The bind is one-time
+  and process-scoped, and drops completions while unbound. F binds a runtime-backed adapter.
+
+Adapters (platform/lock)
+- OverlayLockPresenter (LockPresenter): one warm, add-once TYPE_APPLICATION_OVERLAY window hosting the reusable
+  LockScreen in a ComposeView with its own lifecycle/viewmodel/savedstate owners. present and dismiss toggle the
+  window's flags and visibility, are idempotent and non-throwing, and apply fail-atomically so a fault leaves the
+  live window untouched. The window is added dismissed (GONE, pass-through); present returns Unavailable on a
+  missing grant and Failed on a window fault. FLAG_SECURE is set on non-debug builds. Back leaves without auth via
+  an OnBackInvokedCallback on API 33+, with a fail-closed key-event fallback below 33. Each shield exposes an
+  escape control (Recovery: grant or home; Checking: Open App Lock). The hosted LockScreen is keyed by the live
+  request token, and the runtime, never the surface, drives dismiss.
+- HandlerTimerScheduler (TimerScheduler): HandlerThread-backed, with a terminal shutdown that cancels armed
+  callbacks, rejects later schedules, is atomic with schedule, and releases the thread even if removal throws.
+- PackageManagerHomeResolver (HomeResolver): resolves MAIN/HOME, keeps a last-known-good launcher, never throws,
+  and re-resolves once the cached launcher is stale (past a short TTL), so a default-launcher change is picked up.
+- RealSafeNavigator (SafeNavigator): launches HOME, APP_LOCK, or OVERLAY_SETTINGS and reports whether it started,
+  with resolution and launch inside its never-throws boundary.
+- OverlayPermission: the canDrawOverlays check, the manage-overlay intent, and total resolution of the
+  overlay-settings package(s) for the C2 safe-dismiss exemption.
+- OverlayWindowFlags (the pure, JVM-tested flag policy including FLAG_SECURE) and OverlayWindowHost (the
+  WindowManager seam used for fault injection).
+
+Biometric single-flight (presentation)
+- BiometricLaunchGate + LeaseHandle: a process-scoped gate keyed by token and per-claim lease. The presenter
+  claims a lease before the launch and passes it to the host; the host acknowledges (token + lease) in onCreate,
+  and both release by (token + lease). acknowledge accepts only the gate's exact, unexpired lease and rejects a
+  free, expired, foreign, or reclaimed one. An unacknowledged lease expires and is reclaimable, so a silently
+  aborted launch (START_ABORTED, non-fatal) does not wedge the gate.
+- BiometricHostActivity: a transparent FragmentActivity launched from the overlay, carrying the token and lease in
+  its extras and savedInstanceState and reporting the token through the bridge. It never hides the overlay and
+  authenticates once: a configuration-change recreation rebinds the prompt without re-authenticating, while a
+  process-death recreation finds the gate empty and finishes silently. A LOCKED_OUT launch does not prompt, and a
+  lockout that later expires does not auto-prompt (matching the legacy Activity). The auto-prompt is consumed only
+  after the host acknowledges; if the lease expires unacknowledged the auto-launch makes one bounded retry, then
+  leaves the PIN pad and manual button.
+
+Overlay capability
+- Moved SYSTEM_ALERT_WINDOW into the permanent permissions and added BiometricHostActivity to the manifest.
+  Declared a MANAGE_OVERLAY_PERMISSION <queries> intent so the (possibly OEM) overlay-settings package resolves
+  under Android 11+ package visibility. Added the overlay grant-path UI (an onboarding card and a settings entry),
+  hidden behind OverlayEnforcement.uiEnabled until F.
+
+Validation
+- JVM tests cover the completion bridge, the home resolver, the timer scheduler, the pure window-flag policy
+  (including FLAG_SECURE), the appops-mode parser, the biometric gate, and the auto-launch loop. Full suite 297
+  green, detekt clean.
+- Authored the Gate-2 instrumentation (compiles here, runs on the fleet). OverlayLockPresenterUiTest asserts, per
+  surface, the rendered content (the PIN pad on Lock; text and escape controls on the Checking and Recovery
+  shields), blocks a real underlying touch with a sentinel activity, and exercises Back, the escape controls, and
+  the biometric button through the surface UI. OverlayWindowHostFaultUiTest fault-injects the OverlayWindowHost
+  seam to prove the failure-atomic reset and the fail-atomic cold-present reveal. FLAG_SECURE is verified in three
+  parts: the JVM flag policy, the debuggable androidTest APK (which drops the flag by design), and a non-debug
+  fleet screencap. The SentinelActivity touch recorder and the appops parser live in the debug source set, and
+  both fleet suites snapshot and restore the overlay app-op and biometric setting.
+- Fleet targets: the Moto G 2025 is primary (content, touch, escape, Back), NucBox api36 covers the API-36
+  predictive-Back routing, and the non-debug screencap proves FLAG_SECURE. Gate 2 is not closed until the Moto G
+  run passes.
+
 M7/WP2 Phase 2 (change D): LockPresenter port + LockEngineRuntime interpreter   (2026-09-12)
 -------------------------------------------------------------------------------------------
 Added the impure host around the pure reducer. LockEngineRuntime owns the EngineState, classifies raw inputs

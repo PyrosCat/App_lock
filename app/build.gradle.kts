@@ -23,18 +23,18 @@ android {
         versionName = "0.1.0"
 
         // WP8 (M1): the on-device smoke suite (app/src/androidTest) runs under the standard
-        // AndroidJUnitRunner — the real @HiltAndroidApp application backs it, so the tests
+        // AndroidJUnitRunner: the real @HiltAndroidApp application backs it, so the tests
         // exercise the production Hilt graph (no test-only component or custom runner needed).
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         // WP4 (M1, ADR-017 / FR-234): build provenance exposed to the app via BuildConfig.
-        // SCHEMA_VERSION mirrors the Room schema version in AppLockDatabase (currently 2) —
+        // SCHEMA_VERSION mirrors the Room schema version in AppLockDatabase (currently 2);
         // keep the two in lockstep when the DB is bumped.
         buildConfigField("int", "SCHEMA_VERSION", "2")
         // FR-227 secure-config injection *mechanism* (no secrets exist yet): a Gradle property
         // flows into BuildConfig, absent-safe. CI injects the real UTC build time
         // (-PbuildTime=…); local builds fall back to "unknown" so they stay reproducible. This
-        // same absent-safe property path is the sanctioned route for any FUTURE secret — never
+        // same absent-safe property path is the sanctioned route for any FUTURE secret; never
         // hard-code a secret into source or version control (they belong in Gradle properties /
         // CI secrets, injected here).
         buildConfigField(
@@ -51,7 +51,7 @@ android {
     //
     // prod keeps applicationId `com.applock` PERMANENTLY (isDefault, no suffix): it is the
     // upgrade / (future) Play-listing identity and the left half of the externally-persisted
-    // accessibility-service and device-admin component strings — see ADR-017 (this half) and
+    // accessibility-service and device-admin component strings; see ADR-017 (this half) and
     // ADR-018 (the FQCN half). Changing it strands every existing install on upgrade.
     flavorDimensions += "environment"
     productFlavors {
@@ -75,7 +75,7 @@ android {
         }
         create("prod") {
             dimension = "environment"
-            isDefault = true // default variant for anchor tasks (lint/run) — the shipping identity
+            isDefault = true // default variant for anchor tasks (lint/run); the shipping identity
             buildConfigField("String", "ENVIRONMENT", "\"prod\"")
         }
     }
@@ -108,7 +108,7 @@ android {
     lint {
         // WP1 (M1): pre-existing findings are frozen as accepted debt so only NEW
         // issues fail CI. Burn the baseline down opportunistically (tracked at the
-        // M2/M3 gate reviews) — never regenerate it to silence a new finding.
+        // M2/M3 gate reviews); never regenerate it to silence a new finding.
         baseline = file("lint-baseline.xml")
     }
 
@@ -116,7 +116,7 @@ android {
         resources {
             // WP5 (M1): Hilt/Dagger 2.56 pulls in org.jspecify:jspecify, whose multi-release-JAR
             // OSGi manifest collides with the same path in bcprov-jdk18on. It is build metadata,
-            // absent from the runtime APK either way — exclude it so mergeJavaResource does not
+            // absent from the runtime APK either way, so exclude it so mergeJavaResource does not
             // fail on the duplicate.
             excludes += "/META-INF/versions/9/OSGI-INF/MANIFEST.MF"
         }
@@ -124,12 +124,12 @@ android {
 
     // WP8 (M1, ADR-014 / M1_PLAN D4): Gradle-managed devices for the on-device smoke suite
     // (app/src/androidTest). Two device groups run the same variant's androidTest APK:
-    //   • `ci`   — API 30 + 35 + 36, run on the GitHub Actions runners (KVM); see .github/workflows/ci.yml.
-    //   • `full` — API 26/29/30/33/35 + 36, run locally on the NucBox G5 (the fleet device host).
+    //   • `ci`: API 30 + 35 + 36, run on the GitHub Actions runners (KVM); see .github/workflows/ci.yml.
+    //   • `full`: API 26/29/30/33/35 + 36, run locally on the NucBox G5 (the fleet device host).
     // The api36 lane is the M7 WP0 / D0 API-36 shipping target (M7_PLAN §10); a build change, not an ADR.
     // Run a group with e.g. `./gradlew ciGroupProdDebugAndroidTest` /
     // `fullGroupProdDebugAndroidTest`, or a single level with `api33ProdDebugAndroidTest`.
-    // Physical devices (the arm64 Moto G 2025) are NOT GMD-managed — GMD is emulator-only; run the
+    // Physical devices (the arm64 Moto G 2025) are NOT GMD-managed (GMD is emulator-only); run the
     // same suite there with `./gradlew connectedProdDebugAndroidTest` for real-hardware + native
     // SQLCipher coverage the all-x86_64 matrix cannot give.
     // Operator runbook (incl. the API-29 Argon2 heap workaround): docs/testing/WP8_GMD_MATRIX.md.
@@ -137,7 +137,7 @@ android {
     // Image source: every lane uses `aosp` (the SDK `default` image family). API 30/33 previously used
     // the lighter `aosp-atd` (Automated-Test-Device) images, but those "slim" builds (sdk_slim) ship NO
     // launchable target app (only the SIM Toolkit), so the OV-4 UIAutomator race test assume-skipped on
-    // them — a silent green asserting nothing (verified on the fleet host; see the 2026-08-28 M7 WP0
+    // them, a silent green asserting nothing (verified on the fleet host; see the 2026-08-28 M7 WP0
     // emulator campaign report). Switched 30/33 to `aosp`/default, which carries the AOSP clock that OV-4
     // targets and stays light (no GMS → no 2 GB heap ANR). API 36 (M7 WP0 / D0) also uses `aosp`; its
     // system-image availability is confirmed at the GMD run on the fleet host (this machine only defines
@@ -253,7 +253,7 @@ dependencies {
     implementation(libs.androidx.camera.lifecycle)
     implementation(libs.kotlinx.coroutines.android)
 
-    // WP5 (M1, ADR-015): Hilt DI — replaces the core/Graph service locator.
+    // WP5 (M1, ADR-015): Hilt DI replaces the core/Graph service locator.
     implementation(libs.hilt.android)
     implementation(libs.androidx.hilt.navigation.compose)
     ksp(libs.hilt.android.compiler)
@@ -266,6 +266,8 @@ dependencies {
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.core.ktx)
     androidTestImplementation(libs.androidx.test.runner)
+    // M7 WP2 (change E): cross-window content / touch / interaction assertions for the overlay Gate-2 test.
+    androidTestImplementation(libs.androidx.test.uiautomator)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     // Injects the empty test-host activity used by the Compose test rules into the debug manifest.

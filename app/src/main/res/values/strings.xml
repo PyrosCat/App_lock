@@ -11,6 +11,19 @@
     <string name="accessibility_needed_title">Protection is off</string>
     <string name="accessibility_needed_body">App Lock needs the Accessibility permission to detect when protected apps open. Enable "App Lock protection" in Settings.</string>
     <string name="open_settings">Open Settings</string>
+
+    <!-- Overlay lock presentation (M7 WP2 change E, FR-044). Grant-path UI is authored here but hidden
+         until F reveals it (OverlayEnforcement.uiEnabled). -->
+    <string name="overlay_needed_title">Allow display over other apps</string>
+    <string name="overlay_needed_body">App Lock shows the lock screen over protected apps. Turn on "Display over other apps" so it can appear.</string>
+    <string name="settings_overlay_title">Display over other apps</string>
+    <string name="settings_overlay_desc">Lets App Lock show the lock screen over protected apps</string>
+    <string name="overlay_recovery_title">Protection needs attention</string>
+    <string name="overlay_recovery_body">App Lock couldn\'t confirm it can protect this app. Grant the overlay permission, or go to the home screen.</string>
+    <string name="overlay_recovery_grant">Grant permission</string>
+    <string name="overlay_go_home">Go to home screen</string>
+    <string name="overlay_checking">Checking protection…</string>
+    <string name="overlay_open_app_lock">Open App Lock</string>
     <string name="settings_title">Settings</string>
     <string name="back">Back</string>
     <string name="relock_policy_title">Relock policy</string>

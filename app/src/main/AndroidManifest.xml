@@ -8,14 +8,25 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent>
+        <!-- M7 WP2 (change E): so resolveActivity can see the (possibly OEM) "display over other apps"
+             screen for the C2 safe-dismiss exemption under Android 11+ package visibility; otherwise a
+             filtered OEM Settings package would drop out of the exemption and the recovery shield could
+             cover the actual grant screen. -->
+        <intent>
+            <action android:name="android.settings.action.MANAGE_OVERLAY_PERMISSION" />
+            <data android:scheme="package" />
+        </intent>
     </queries>
 
-    <!-- ===== M7 WP0 SPIKE (throwaway) — remove with the com.applock.platform.spike package ===== -->
+    <!-- Baseline lock presentation: App Lock draws the lock over the protected app via a
+         TYPE_APPLICATION_OVERLAY window (M7 WP2 change E; ADR-013B / ADR-020). -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- ===== M7 WP0 SPIKE (throwaway): remove with the com.applock.platform.spike package ===== -->
     <!-- Usage Access is a special-access op granted via Settings/appops, not a runtime grant. -->
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"
         tools:ignore="ProtectedPermissions" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- ===== end SPIKE permissions ===== -->
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -55,6 +66,16 @@
             android:noHistory="true"
             android:showWhenLocked="false"
             android:taskAffinity="" />
+
+        <!-- Transparent biometric host for the overlay lock (M7 WP2 change E), launched from the
+             overlay as a BAL permitted by the visible overlay window (ADR-020 case (a)).
+             excludeFromRecents + taskAffinity="": its own task, never in the app switcher. -->
+        <activity
+            android:name=".presentation.authentication.BiometricHostActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- Foreground app detection -->
         <service
@@ -103,7 +124,7 @@
             </intent-filter>
         </receiver>
 
-        <!-- ===== M7 WP0 SPIKE (throwaway) — delete this block with the platform.spike package ===== -->
+        <!-- ===== M7 WP0 SPIKE (throwaway): delete this block with the platform.spike package ===== -->
         <!-- Manual driver + adb entry point; a second launcher icon is acceptable on the spike branch. -->
         <activity
             android:name=".platform.spike.SpikeLauncherActivity"

@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,6 +52,8 @@ import com.applock.R
 import com.applock.applocker.admin.UninstallProtectionReceiver
 import com.applock.domain.IntruderPolicy
 import com.applock.domain.RelockPolicy
+import com.applock.platform.lock.OverlayEnforcement
+import com.applock.platform.lock.OverlayPermission
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,11 +144,17 @@ fun SettingsScreen(
             var uninstallProtection by remember {
                 mutableStateOf(UninstallProtectionReceiver.isActive(context))
             }
+            // Overlay grant status (M7 WP2 change E, FR-044). Both this and uninstall protection are
+            // toggled in system UI, so re-read them on resume.
+            var overlayGranted by remember {
+                mutableStateOf(OverlayPermission.canDrawOverlays(context))
+            }
             val lifecycleOwner = LocalLifecycleOwner.current
             DisposableEffect(lifecycleOwner) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
                         uninstallProtection = UninstallProtectionReceiver.isActive(context)
+                        overlayGranted = OverlayPermission.canDrawOverlays(context)
                     }
                 }
                 lifecycleOwner.lifecycle.addObserver(observer)
@@ -164,6 +173,44 @@ fun SettingsScreen(
                     }
                 },
             )
+
+            // Overlay grant entry (M7 WP2 change E, FR-044). Authored now, hidden until F reveals it.
+            if (OverlayEnforcement.uiEnabled) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            context.startActivity(OverlayPermission.manageOverlayIntent(context))
+                        }
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            stringResource(R.string.settings_overlay_title),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            stringResource(R.string.settings_overlay_desc),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (overlayGranted) {
+                        Icon(
+                            Icons.Filled.Check,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                    } else {
+                        Icon(
+                            Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
 
             IntruderSettings(onOpenIntruderLog = onOpenIntruderLog)
         }
