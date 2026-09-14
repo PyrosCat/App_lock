@@ -904,9 +904,10 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     real underlying touch with a sentinel activity (a genuine injected tap, never a focus inference), and
     exercises Back, the shield escape controls, and the biometric button THROUGH the surface UI. It drives
     the presenter directly, so it is insulated from the Moto G accessibility flakiness (R-001a). FLAG_SECURE
-    is split: the flag policy is JVM-tested (`OverlayWindowFlagsTest`), the debuggable APK reads visible
-    behaviour (debug drops FLAG_SECURE by design), and a non-debug fleet screencap / window inspection proves
-    the deployed overlay is secure. A companion suite (`OverlayWindowHostFaultUiTest`) fault-injects the
+    is split: the flag policy is JVM-tested (`OverlayWindowFlagsTest`), and the debuggable APK reads visible
+    behaviour (debug drops FLAG_SECURE by design). The deployed-secure proof on a non-debug build is DEFERRED to
+    F (see the F section): before the cutover there is no non-debug entrypoint that shows the overlay, so there is
+    nothing to screencap; `OverlayWindowFlagsTest` covers the flag policy meanwhile. A companion suite (`OverlayWindowHostFaultUiTest`) fault-injects the
     internal `OverlayWindowHost` seam (a decorator around the real `WindowManager`, not a whole-surface fake;
     the `LockPresenter` / runtime / DI contract is unchanged) to prove the failure-atomic reset: an
     attached-removal failure retains the window (no orphan / duplicate add), an already-detached root cleans
@@ -918,8 +919,10 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     the `connected` lane, for the content / underlying-touch / escape / Back assertions. Two paths are not
     covered there and complete the gate elsewhere: the API-36 predictive-back routing (targetSdk 36 stops
     dispatching `KEYCODE_BACK`, an Android-16 device behaviour) runs on the **NucBox api36** emulator (`full`
-    matrix), and the deployed-secure proof is the non-debug FLAG_SECURE screencap above. Biometric-through-
-    the-UI runs only with an enrolled authenticator (otherwise the test asserts the no-enrollment host path).
+    matrix). The deployed-secure FLAG_SECURE proof is **deferred to F** (Decision 2026-09-14; F owns it, see the
+    F section). Biometric-through-the-UI runs only with an enrolled authenticator, which needs a `google_apis`
+    image (otherwise the test asserts the no-enrollment host path). The NucBox runbook is
+    `docs/testing/M7_WP2_GATE2_NUCBOX_PLAN.md`.
     Gate 2 is not closed until the Moto G run passes. RTM: **FR-044** Overlay Permission Verification
     (`not-started`->`partial`; verification WP6).
 - **F — production cutover (fleet).** Swap DI (`AppModule`) to `LockEngineRuntime` built with the real
@@ -948,6 +951,10 @@ extensions land here because Phase 2 is the first phase with a state-observing s
   **Protection is gated on the overlay grant (Decision D-P2-2):** it cannot be reported or enabled active
   without `canDrawOverlays`, and the grant path is verified **before** the cutover flips. Otherwise
   ungranted users lose locking entirely, a regression against the Activity, which needs no overlay grant.
+  **Deployed-secure FLAG_SECURE proof (deferred from change E's Gate 2, Decision 2026-09-14):** on a
+  `prodRelease` build the real overlay shows over a protected app, so the proof is direct here: `screencap`
+  returns black over the overlay region, and `dumpsys window` shows the `FLAG_SECURE` flag on the
+  `AppLockOverlay` window. `OverlayWindowFlagsTest` covers the flag policy until this lands.
   Replace `LockScreenLaunchTest` with a **replacement smoke** over the overlay / biometric-host surface,
   keep the GMD matrix green, and update the WP8 runbook reference. RTM (same commit): **FR-027**
   `partial`->`implemented`, **FR-028** `not-started`->`implemented`.

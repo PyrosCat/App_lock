@@ -4,6 +4,19 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change E): NucBox Gate-2 plan + defer FLAG_SECURE proof to F   (2026-09-14)
+---------------------------------------------------------------------------------
+Added the NucBox emulator plan for the remaining change-E Gate-2 legs, and recorded the deployed FLAG_SECURE
+proof as deferred to change F.
+- docs/testing/M7_WP2_GATE2_NUCBOX_PLAN.md: a standalone NucBox runbook. Leg A runs the change-E classes on GMD
+  api36 (predictive-Back, the three aborted or slow launch tests, the no-enrollment branch, surfaces, fault
+  atomicity). Leg B runs the biometric-success test on a google_apis AVD with emulator finger injection. Each leg
+  gives exact tasks and pass criteria.
+- The deployed-secure FLAG_SECURE proof moves to F, because there is no non-debug overlay entrypoint before the
+  cutover. It is recorded in M7_PLAN (the change-E instrumentation note, the change-E Gate-2 execution bullet, and
+  the F duties); OverlayWindowFlagsTest covers the flag policy until then.
+
+
 M7/WP2 Phase 2 (change E follow-up): fix overlay ViewTreeLifecycleOwner crash   (2026-09-14)
 -------------------------------------------------------------------------------------------
 Fixed an attach-time crash in the overlay lock surface, found by the Moto G 2025 Gate-2 run. The overlay set its
