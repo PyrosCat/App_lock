@@ -4,6 +4,25 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 Phase 2 (change E follow-up): fix overlay ViewTreeLifecycleOwner crash   (2026-09-14)
+-------------------------------------------------------------------------------------------
+Fixed an attach-time crash in the overlay lock surface, found by the Moto G 2025 Gate-2 run. The overlay set its
+lifecycle/viewmodel/savedstate owners on the child ComposeView, but Compose resolves the window recomposer from
+the window-root view and looks for the owners there, so composition creation threw (IllegalStateException:
+ViewTreeLifecycleOwner not found) when the window attached. Set the owners on the window-root OverlayRoot before
+addView; the child ComposeView finds them by walking up the view tree. The crash would have hit any real device;
+the JVM suite cannot attach a real window, so Gate-2 is what surfaced it. Production is unaffected until F wires
+the overlay in (no DI cutover yet).
+- Gate-2 Moto G 2025 (connected lane) then passed: 17 of 18, 1 skipped (the no-enrollment biometric case,
+  assumed out because the device has a fingerprint enrolled), 0 failed. JVM gate unchanged: 297 tests, detekt
+  clean. Evidence: docs/reports/campaigns/2026-09-14_m7wp2-gate2-e_moto-g-2025.md.
+- Added real-hardware biometric single-flight tests (aborted-launch reclaim, slow and past-timeout
+  acknowledgement, stale-host silent finish) and an opt-in emulator biometric-success test that asserts
+  unlockSucceeded carries the exact request token and the BIOMETRIC method.
+- OverlayRaceUiTest now snapshots and restores the get_usage_stats and system_alert_window app-ops, so a
+  connected run no longer leaves them granted.
+
+
 M7/WP2 Phase 2 (change E): real port adapters + overlay capability   (2026-09-13)
 ---------------------------------------------------------------------------------
 Supplied the real adapters behind the D ports and the overlay-permission capability. No DI cutover (that is F):

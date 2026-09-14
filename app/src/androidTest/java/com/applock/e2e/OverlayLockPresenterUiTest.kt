@@ -5,6 +5,7 @@ package com.applock.e2e
 import android.content.Context
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.util.Log
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
 import androidx.test.core.app.ActivityScenario
@@ -41,6 +42,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -273,9 +275,113 @@ class OverlayLockPresenterUiTest {
         assertEquals("the host must carry the full epoch+id token", token, cancelled)
     }
 
+    // ---- Biometric single-flight on real hardware: aborted or slow launch (API 35 and 36) ----------
+    // These tests confirm the gate timing against the device's real elapsed-realtime clock. setUp restores the
+    // production clock. M7_PLAN requires this fleet check before any change to the timeout. BiometricAutoLaunchTest
+    // covers the auto-launch loop logic in JVM (bounded retry, no premature consumption); these tests confirm the
+    // on-device primitives that the loop uses.
+
+    @Test
+    fun abortedBiometricLaunchReclaimsAfterTimeoutAndLeavesThePinPad() {
+        val request = request(11)
+        // This models an aborted background launch. The presenter claims a lease before startActivity, but the
+        // host does not start (START_ABORTED is not fatal), so the lease stays unacknowledged.
+        val abortedClaim = BiometricLaunchGate.claim(request) as BiometricLaunchGate.ClaimOutcome.Claimed
+        assertEquals("the aborted launch's token owns the gate", request, BiometricLaunchGate.claimedBy)
+        assertFalse("an unstarted host cannot acknowledge", abortedClaim.lease.isAcknowledged)
+
+        // The PIN pad stays available while the aborted lease is open. setUp disables biometrics, so nothing
+        // auto-launches over the pad.
+        assertEquals(SurfaceApplyResult.Success, present(LockPresentation.Lock(TARGET, request)))
+        assertVisible(text(R.string.enter_pin))
+        assertVisible("5")
+
+        // After the real timeout, the unacknowledged lease becomes reclaimable, so a later request is not blocked
+        // behind the dead lease.
+        SystemClock.sleep(BiometricLaunchGate.LEASE_TIMEOUT_MS + RECLAIM_MARGIN_MS)
+        val laterRequest = request(12)
+        assertTrue(
+            "an abandoned lease must be reclaimable, not blocked",
+            BiometricLaunchGate.claim(laterRequest) is BiometricLaunchGate.ClaimOutcome.Claimed,
+        )
+        assertEquals(laterRequest, BiometricLaunchGate.claimedBy)
+    }
+
+    @Test
+    fun slowBiometricAckWithinTimeoutIsHonouredAndPastTimeoutIsRejected() {
+        // A slow but valid launch acknowledges before the timeout. The gate keeps its lease, and a different
+        // request must wait instead of a second prompt.
+        val slowRequest = request(13)
+        val slowLease = (BiometricLaunchGate.claim(slowRequest) as BiometricLaunchGate.ClaimOutcome.Claimed).lease
+        SystemClock.sleep(BiometricLaunchGate.LEASE_TIMEOUT_MS / 2)
+        assertTrue("a within-timeout acknowledgement must be honoured", BiometricLaunchGate.acknowledge(slowRequest, slowLease.leaseId))
+        assertEquals(
+            "a foreign request must wait behind an acknowledged (live) prompt",
+            BiometricLaunchGate.ClaimOutcome.BusyOther,
+            BiometricLaunchGate.claim(request(14)),
+        )
+        BiometricLaunchGate.release(slowRequest, slowLease.leaseId)
+
+        // The gate rejects an acknowledgement that arrives after the timeout. The lease is abandoned, and another
+        // request can reclaim it, so a late host finishes and does not take a newer request.
+        val lateRequest = request(15)
+        val lateLease = (BiometricLaunchGate.claim(lateRequest) as BiometricLaunchGate.ClaimOutcome.Claimed).lease
+        SystemClock.sleep(BiometricLaunchGate.LEASE_TIMEOUT_MS + RECLAIM_MARGIN_MS)
+        assertFalse("a past-timeout acknowledgement must be rejected", BiometricLaunchGate.acknowledge(lateRequest, lateLease.leaseId))
+    }
+
+    @Test
+    fun staleBiometricHostWithoutAMatchingLeaseFinishesSilently() {
+        // ADR-020: a host must finish, and must not authenticate or report, if the gate does not hold its lease.
+        // This happens after a process death, or for an aborted launch's late host. setUp cleared the gate with
+        // resetForTest, so acknowledge() returns false before a prompt shows.
+        val token = RequestToken(epoch, RequestId(16))
+        context.startActivity(BiometricHostActivity.createIntent(context, token, leaseId = 9_999L, targetLabel = "Target"))
+        assertNull(
+            "a stale host without a matching lease must finish silently, not report a cancel",
+            sink.biometricCancelled.poll(SILENT_FINISH_MS, TimeUnit.MILLISECONDS),
+        )
+        assertNull(
+            "a stale host must not report an unlock",
+            sink.unlockSucceeded.poll(NO_REPORT_POLL_MS, TimeUnit.MILLISECONDS),
+        )
+    }
+
+    // ---- Biometric success from the overlay (opt-in emulator lane) ---------------------------------
+
+    @Test
+    fun biometricSuccessFromTheOverlayReportsUnlockSucceeded() {
+        // Instrumentation cannot inject a real fingerprint, because that needs the emulator console
+        // (adb emu finger touch <id>). This test runs only on the opt-in emulator lane. The fleet harness passes
+        // -e inject_biometric_success 1 and injects the finger when it finds BIOMETRIC_READY_TAG in logcat. The
+        // test is skipped on other lanes and when no authenticator is enrolled. It proves that a biometric unlock
+        // from the overlay reaches the sink with the exact request token and the BIOMETRIC method.
+        assumeTrue("opt-in emulator lane only (the harness injects the finger)", booleanArg("inject_biometric_success"))
+        assumeTrue(
+            "no usable biometric enrolled",
+            BiometricManager.from(context).canAuthenticate(BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS,
+        )
+        settings.biometricUnlockEnabled = true
+
+        val request = request(17)
+        assertEquals(SurfaceApplyResult.Success, present(LockPresentation.Lock(TARGET, request)))
+        // The FR-002/FR-007 auto-launched prompt is visible when its negative button is on screen. Signal the harness.
+        assertVisible(text(R.string.biometric_prompt_negative))
+        Log.i(BIOMETRIC_READY_TAG, "request=${request.id.n}: inject the fingerprint now")
+
+        val unlock = sink.unlockSucceeded.poll(BIOMETRIC_SUCCESS_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        assertNotNull("biometric success must report unlockSucceeded to the sink", unlock)
+        assertEquals("the exact request token", request, unlock!!.token)
+        assertEquals("the BIOMETRIC method", UnlockMethod.BIOMETRIC, unlock.method)
+    }
+
     // ---- helpers -----------------------------------------------------------------------------------
 
     private fun request(id: Long) = RequestToken(epoch, RequestId(id))
+
+    /** A boolean instrumentation argument from `-e <name> 1|true`; false when the argument is absent. */
+    private fun booleanArg(name: String): Boolean =
+        InstrumentationRegistry.getArguments().getString(name).let { it == "1" || it == "true" }
 
     private fun text(resId: Int): String = context.getString(resId)
 
@@ -328,10 +434,13 @@ class OverlayLockPresenterUiTest {
 
     /** Records every completion so a test can assert what a surface / the host delivered. */
     private class RecordingSink : LockCompletionSink {
-        val unlockSucceeded = LinkedBlockingQueue<RequestToken>()
+        val unlockSucceeded = LinkedBlockingQueue<Unlock>()
         val unlockFailed = LinkedBlockingQueue<RequestToken>()
         val biometricCancelled = LinkedBlockingQueue<RequestToken>()
         val safeDismiss = LinkedBlockingQueue<SafeDismiss>()
+
+        /** A recorded unlock success: the reporting token and the method, so a test can assert both. */
+        data class Unlock(val token: RequestToken, val method: UnlockMethod)
 
         data class SafeDismiss(
             val token: SurfaceToken,
@@ -340,7 +449,7 @@ class OverlayLockPresenterUiTest {
         )
 
         override fun unlockSucceeded(token: RequestToken, method: UnlockMethod): LockCompletionResult {
-            unlockSucceeded.offer(token)
+            unlockSucceeded.offer(Unlock(token, method))
             return LockCompletionResult.ACCEPTED
         }
 
@@ -376,5 +485,12 @@ class OverlayLockPresenterUiTest {
         val OVERLAY_TITLE = OverlayLockPresenter.OVERLAY_WINDOW_TITLE
         const val TIMEOUT_MS = 5_000L
         const val SAMPLE_MS = 100L
+
+        // Extra time after the gate's LEASE_TIMEOUT, so an unacknowledged lease is reclaimable.
+        const val RECLAIM_MARGIN_MS = 750L
+        const val SILENT_FINISH_MS = 2_000L // the stale host must report nothing in this time
+        const val NO_REPORT_POLL_MS = 250L // short poll to confirm that no unlock is reported
+        const val BIOMETRIC_SUCCESS_TIMEOUT_MS = 20_000L // long wait for the harness to inject the finger
+        const val BIOMETRIC_READY_TAG = "AppLockBiometricReady" // logcat marker: the prompt is visible, inject the finger
     }
 }

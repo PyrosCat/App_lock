@@ -204,16 +204,21 @@ class OverlayLockPresenter internal constructor(
         if (overlayRoot != null) return
         val owner = OverlayLifecycleOwner().apply { start() }
         val composeView = ComposeView(context).apply {
-            setViewTreeLifecycleOwner(owner)
-            setViewTreeViewModelStoreOwner(owner)
-            setViewTreeSavedStateRegistryOwner(owner)
             setContent { OverlayContent() }
         }
         // Added in the DISMISSED state: GONE and pass-through (FLAG_NOT_TOUCHABLE, via buildParams), so a
         // window that is added but not yet revealed blocks nothing. present() reveals it (interactive and
         // VISIBLE) only after the fallible reveal succeeds, so a failed cold add never strands a blank,
         // touch-modal overlay over the app underneath.
+        //
+        // Set the ViewTree owners on this root view, not on the child ComposeView. The WindowManager attaches
+        // this root view. Compose reads the window recomposer from the root view and calls
+        // findViewTreeLifecycleOwner() on it. If only the child holds the owners, Compose does not find them, and
+        // composition fails at attach. Set the owners before addView.
         val root = OverlayRoot(context).apply {
+            setViewTreeLifecycleOwner(owner)
+            setViewTreeViewModelStoreOwner(owner)
+            setViewTreeSavedStateRegistryOwner(owner)
             addView(composeView)
             visibility = View.GONE
         }

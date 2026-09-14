@@ -40,6 +40,11 @@ class OverlayRaceUiTest {
     private lateinit var targetPkg: String
     private lateinit var targetComponent: String
 
+    // App-op snapshots from before this suite sets them to allow. @After uses them to restore the device grant
+    // state. The default is Unknown, so if @Before stops before the snapshot, @After does nothing.
+    private var priorUsageOp: AppOpMode = AppOpMode.Unknown
+    private var priorOverlayOp: AppOpMode = AppOpMode.Unknown
+
     @Before
     fun grantAndStart() {
         // Resolve the target app per-device (§10 purpose = api × oem coverage, not one fixed app):
@@ -58,6 +63,11 @@ class OverlayRaceUiTest {
         targetPkg = resolved!!.first
         targetComponent = resolved.second
         Log.i("M7SpikeTest", "OV-4 target app: $targetPkg ($targetComponent)")
+        // Snapshot both app-ops before this suite sets them to allow. @After restores them (Known only), so the
+        // full connected run does not change the device grant state. @After keeps an Unknown snapshot as-is, so
+        // an unreadable read does not overwrite a real grant.
+        priorUsageOp = appOpMode("get_usage_stats")
+        priorOverlayOp = appOpMode("system_alert_window")
         sh("appops set $APP_PKG android:get_usage_stats allow")
         sh("appops set $APP_PKG android:system_alert_window allow")
         assumeTrue(
@@ -81,7 +91,15 @@ class OverlayRaceUiTest {
     fun stop() {
         sh("am start-foreground-service -n $POLL_SERVICE -a com.applock.spike.STOP")
         home()
+        // Restore both app-ops to their captured modes (Known only), so this suite does not leave get_usage_stats
+        // or system_alert_window set to allow after the run. Keep an Unknown snapshot unchanged.
+        (priorOverlayOp as? AppOpMode.Known)?.let { sh("appops set $APP_PKG android:system_alert_window ${it.mode}") }
+        (priorUsageOp as? AppOpMode.Known)?.let { sh("appops set $APP_PKG android:get_usage_stats ${it.mode}") }
     }
+
+    /** Reads an app-op mode with the shared parser; returns Unknown when the output is unreadable. */
+    private fun appOpMode(op: String): AppOpMode =
+        parseAppOpMode(op, runCatching { sh("appops get $APP_PKG android:$op") }.getOrDefault(""))
 
     @Test
     fun overlayNeverAbsentUnderRelaunchBurst() {
