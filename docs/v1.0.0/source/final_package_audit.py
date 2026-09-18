@@ -5,10 +5,8 @@ import re
 import shutil
 import zipfile
 from pathlib import Path
-from xml.etree import ElementTree as ET
 
 from docx import Document
-
 
 QA = Path(__file__).resolve().parent
 STAGING = QA / "staging"
@@ -19,9 +17,6 @@ OUTPUT = QA.parent
 PROJECT = OUTPUT.parents[1]
 SECTION_DOCX = OUTPUT / "sections"
 SECTION_MD = OUTPUT / "markdown" / "sections"
-
-NS = {"cp": "http://schemas.openxmlformats.org/package/2006/metadata/core-properties", "dc": "http://purl.org/dc/elements/1.1/"}
-
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -40,13 +35,16 @@ def inspect_docx(path: Path) -> list[str]:
         main = archive.read("word/document.xml")
         if re.search(br"<w:(?:ins|del)(?:\s|>)", main):
             errors.append(f"{path.name}: tracked changes present")
-        if "docProps/core.xml" in names:
-            root = ET.fromstring(archive.read("docProps/core.xml"))
-            for tag in ("dc:creator", "cp:lastModifiedBy"):
-                node = root.find(tag, NS)
-                if node is not None and (node.text or "").strip():
-                    errors.append(f"{path.name}: non-anonymous {tag}")
+        has_core_properties = "docProps/core.xml" in names
     document = Document(path)
+    if has_core_properties:
+        properties = document.core_properties
+        for tag, value in (
+            ("dc:creator", properties.author),
+            ("cp:lastModifiedBy", properties.last_modified_by),
+        ):
+            if (value or "").strip():
+                errors.append(f"{path.name}: non-anonymous {tag}")
     if not document.paragraphs or not document.paragraphs[0].text.strip():
         errors.append(f"{path.name}: title missing")
     if not any(p.style and p.style.name.startswith("Heading") for p in document.paragraphs):

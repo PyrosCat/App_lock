@@ -79,6 +79,9 @@ def convert(pandoc: str) -> None:
             base = os.path.splitext(name)[0]
             src_abs = os.path.abspath(os.path.join(area, name))
             # cwd=md_dir so image links inside the md are relative to the md file.
+            # External programs can run unintended commands when their executable or arguments
+            # come from untrusted input. Here Pandoc is resolved before conversion, files only
+            # come from fixed AREAS, and no shell interprets the separate arguments.
             subprocess.run(
                 [pandoc, "-f", "docx", "-t", "gfm", "--wrap=none",
                  "--extract-media", f"media/{base}", src_abs, "-o", f"{base}.md"],

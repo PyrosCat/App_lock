@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """Rebuild the entire Version 1.0.0 draft package from source/staging/.
 
 Usage:  python rebuild.py     (requires: pip install python-docx)
@@ -14,23 +13,25 @@ Pipeline (all script inputs live in this source/ directory):
   3. build_split_sections.py      -> 118 section DOCX -> source/split-docx/    (intermediate)
   4. final_package_audit.py       -> copies sections into ../sections and ../markdown/sections, then audits
 """
-import subprocess
-import sys
-from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
+import build_split_sections
+import build_v1_documents
+import final_package_audit
+import split_v1_sections
+
+# Run each stage in this process. Any exception stops the rebuild, and no shell command is built.
 STEPS = [
-    ("build_v1_documents.py", ["build"]),
-    ("split_v1_sections.py", []),
-    ("build_split_sections.py", []),
-    ("final_package_audit.py", []),
+    ("build_v1_documents.py build", build_v1_documents.build_all),
+    ("split_v1_sections.py", split_v1_sections.main),
+    ("build_split_sections.py", build_split_sections.main),
+    ("final_package_audit.py", final_package_audit.main),
 ]
 
 
 def main() -> None:
-    for script, args in STEPS:
-        print(f"\n=== {script} {' '.join(args)} ===")
-        subprocess.run([sys.executable, str(HERE / script), *args], check=True, cwd=HERE)
+    for label, run_step in STEPS:
+        print(f"\n=== {label} ===")
+        run_step()
     print("\nRebuild + audit complete.")
 
 
