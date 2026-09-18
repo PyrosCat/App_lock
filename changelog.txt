@@ -4,6 +4,30 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change E): NucBox Gate-2 both legs PASS on x86_64 emulator lanes   (2026-09-18)
+--------------------------------------------------------------------------------------
+Ran both change-E test legs on the NucBox x86_64 emulator lanes; both passed. Leg A ran on a hardware-GPU emulator
+(connected task) after the GMD software-GPU lane failed to render the surfaces; Leg B ran a real biometric unlock
+on a google_apis AVD. No production-code change; test/report work only.
+- Leg A (API-36 surfaces + fault atomicity): the GMD software-GPU api36 lane FAILED 11/17 (10 content-text
+  assertions + 1 touch-delivery); a 20s content-wait bump did not help and was reverted. A diagnostic showed
+  SystemUI unresponsive and the overlay window present but not compositing. The same classes pass on a hardware-GPU
+  emulator (`-gpu host`, Intel UHD) via connectedProdDebugAndroidTest and on the Moto G real hardware -- consistent
+  with a software-GPU rig/environment issue on this config rather than a code defect; GPU mode and SystemUI health
+  co-varied, so the cause is not isolated. Hardware-GPU run: 15 PASS + 2 expected SKIP (tests=17 skipped=2), incl.
+  the API-36 Back-callback route (verifies the emitted HOME safe-dismiss, not navigation), the aborted/slow
+  biometric-launch gate timing, the no-enrollment branch, and all six OverlayWindowHostFaultUiTest atomicity tests.
+- Leg B (biometric SUCCESS from the overlay): `biometricSuccessFromTheOverlayReportsUnlockSucceeded` on
+  google_apis api35 (headless `-gpu host`), fingerprint enrolled headlessly and injected via `adb emu finger
+  touch` on the AppLockBiometricReady marker -> PASS (tests=1 skipped=0): the overlay reports unlockSucceeded
+  with the exact request token and the BIOMETRIC method.
+- Fleet finding (this config only): on API 36 aosp/default with a software GPU, the GMD lane did not render the
+  change-E overlay surfaces; the hardware-GPU emulator did. Other software-GPU levels (api30/33/35) were not run.
+  The WP0 OV-4 spike (a simple drawn overlay) is unaffected.
+- Host note: an earlier WINDOWED `-gpu host` boot coincided with a host BSOD (bugcheck 0x139) during a concurrent
+  planned Windows OS upgrade; the cause was not established. All reported evidence was captured headless.
+
+
 M7/WP2 (change E): NucBox Gate-2 plan + defer FLAG_SECURE proof to F   (2026-09-14)
 ---------------------------------------------------------------------------------
 Added the NucBox emulator plan for the remaining change-E Gate-2 legs, and recorded the deployed FLAG_SECURE
