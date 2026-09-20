@@ -740,7 +740,7 @@ class LockEngineRuntimeTest {
         h.runtime.shutdown()
         // The scheduler is now terminal: a schedule() that races teardown (an in-flight scheduleTimer resuming
         // after the drain is cancelled) is rejected, so no armed timer can survive the stop.
-        val armed = h.timer.schedule(TimerToken(epoch, Generation(99)), 1_000L) { }
+        val armed = h.timer.schedule(TimerToken.ReadinessTimer(epoch, Generation(99)), 1_000L) { }
         assertFalse(armed)
         assertTrue(h.timer.active.isEmpty())
     }
@@ -756,7 +756,7 @@ class LockEngineRuntimeTest {
         timer.scheduleEntered = entered
         timer.scheduleProceed = proceed
 
-        val schedulerThread = thread { timer.schedule(TimerToken(epoch, Generation(1)), 1_000L) { } }
+        val schedulerThread = thread { timer.schedule(TimerToken.ReadinessTimer(epoch, Generation(1)), 1_000L) { } }
         try {
             assertTrue("schedule never entered", entered.await(2, TimeUnit.SECONDS))
             val shutdownThread = thread { timer.shutdown() }
@@ -993,7 +993,7 @@ class LockEngineRuntimeTest {
     // ---- Safe-dismiss ordering (end-to-end through the interpreter) ----------------------------
 
     @Test
-    fun `a safe dismiss issues the navigation before the surface comes down`() {
+    fun `a safe dismiss issues the navigation but keeps the surface up until the destination arrives`() {
         val h = buildRuntime()
         h.runtime.onAppForegrounded("com.a")
         h.idle()
@@ -1002,10 +1002,133 @@ class LockEngineRuntimeTest {
         h.runtime.safeDismissRequested(token, SafeDestination.HOME)
         h.idle()
 
-        // The guarded app never flashes: navigate(HOME) runs while the surface still stands, and the dismiss
-        // only follows the issued navigation.
+        // navigate(HOME) runs while the surface still stands. The issued echo does NOT dismiss (a silent
+        // START_ABORTED returns success too). So the guarded app never flashes, and the lock stays up until HOME
+        // actually arrives.
+        assertEquals(listOf("present:Lock:com.a", "navigate:HOME"), h.log)
+        assertEquals(Surface.Lock("com.a", RequestId(0)), h.runtime.state.value.surface)
+        assertTrue(h.runtime.state.value.pendingSafeDismiss!!.navigationIssued)
+
+        // HOME arrives (the launcher foregrounds): now the surface comes down.
+        h.runtime.onAppForegrounded("com.launcher")
+        h.idle()
         assertEquals(listOf("present:Lock:com.a", "navigate:HOME", "dismiss"), h.log)
         assertEquals(Surface.None, h.runtime.state.value.surface)
+    }
+
+    @Test
+    fun `a safe-dismiss escape reverts on the arrival timeout when the destination never arrives`() {
+        val h = buildRuntime()
+        h.runtime.onAppForegrounded("com.a")
+        h.idle()
+        val token = h.lockToken
+        h.runtime.safeDismissRequested(token, SafeDestination.HOME)
+        h.idle()
+        // The launch returned success, but nothing foregrounds. The armed arrival timeout fires and reverts the
+        // escape. The lock stays up (reconciled with Ready), and nothing was dismissed.
+        h.timer.fire(h.timer.latest)
+        h.idle()
+        assertNull(h.runtime.state.value.pendingSafeDismiss) // escape reverted
+        assertEquals(Surface.Lock("com.a", RequestId(0)), h.runtime.state.value.surface)
+        assertFalse(h.log.contains("dismiss"))
+    }
+
+    @Test
+    fun `the arrival timeout is cancelled when the destination arrives`() {
+        val h = buildRuntime()
+        h.runtime.onAppForegrounded("com.a")
+        h.idle()
+        val token = h.lockToken
+        h.runtime.safeDismissRequested(token, SafeDestination.HOME)
+        h.idle()
+        val arrivalTimer = h.timer.latest
+        h.runtime.onAppForegrounded("com.launcher") // HOME arrives and completes the escape
+        h.idle()
+        assertTrue(arrivalTimer in h.timer.cancelled) // the now-moot timeout was cancelled
+        assertEquals(Surface.None, h.runtime.state.value.surface)
+    }
+
+    @Test
+    fun `the arrival timeout is cancelled on screen off`() {
+        val h = buildRuntime()
+        h.runtime.onAppForegrounded("com.a")
+        h.idle()
+        val token = h.lockToken
+        h.runtime.safeDismissRequested(token, SafeDestination.HOME)
+        h.idle()
+        val arrivalTimer = h.timer.latest
+        h.runtime.onScreenOff()
+        h.idle()
+        assertTrue(arrivalTimer in h.timer.cancelled)
+    }
+
+    @Test
+    fun `a failed arrival-timeout arm reverts the escape fail-secure`() {
+        val h = buildRuntime()
+        h.runtime.onAppForegrounded("com.a")
+        h.idle()
+        val token = h.lockToken
+        h.timer.armed = false // the arrival timeout cannot be armed (a dying looper)
+        h.runtime.safeDismissRequested(token, SafeDestination.HOME)
+        h.idle()
+        // The launch succeeded, but the escape cannot be bounded, so it reverts now (fail-secure). The lock stays
+        // up, nothing was dismissed, and the rejection is reported.
+        assertNull(h.runtime.state.value.pendingSafeDismiss)
+        assertEquals(Surface.Lock("com.a", RequestId(0)), h.runtime.state.value.surface)
+        assertFalse(h.log.contains("dismiss"))
+        assertTrue(h.diagnostics.reports.contains("arrival_timeout" to "rejected"))
+    }
+
+    @Test
+    fun `an app-lock escape completes on the app-lock foreground signal`() {
+        val h = buildRuntime(policy = PolicyState.Failed("boom"))
+        h.runtime.onAppForegrounded("com.a") // Failed -> a Recovery shield over com.a
+        h.idle()
+        val token = ReadinessToken(epoch, h.runtime.state.value.generation)
+        h.runtime.safeDismissRequested(token, SafeDestination.APP_LOCK)
+        h.idle()
+        assertTrue(h.runtime.state.value.pendingSafeDismiss!!.navigationIssued) // navigation issued, surface up
+        val attempt = (h.runtime.state.value.guardState as GuardState.LeavingFor).attempt
+        h.runtime.appLockForegrounded(attempt) // App Lock reports it is on screen (stamped with the attempt)
+        h.idle()
+        assertEquals(Surface.None, h.runtime.state.value.surface)
+        assertNull(h.runtime.state.value.pendingSafeDismiss)
+    }
+
+    @Test
+    fun `a stale app-lock foreground signal does not complete a later escape`() {
+        val h = buildRuntime(policy = PolicyState.Failed("boom"))
+        h.runtime.onAppForegrounded("com.a") // Recovery(com.a)
+        h.idle()
+        val token = ReadinessToken(epoch, h.runtime.state.value.generation)
+        h.runtime.safeDismissRequested(token, SafeDestination.APP_LOCK)
+        h.idle()
+        val staleAttempt = (h.runtime.state.value.guardState as GuardState.LeavingFor).attempt
+        // The launch aborted silently: the arrival timeout reverts attempt 0, then a retry starts attempt 1.
+        h.timer.fire(h.timer.latest)
+        h.idle()
+        h.runtime.safeDismissRequested(token, SafeDestination.APP_LOCK)
+        h.idle()
+        assertTrue(h.runtime.state.value.pendingSafeDismiss != null) // attempt 1 is in flight
+        // A delayed signal stamped with attempt 0 must not complete attempt 1's escape.
+        h.runtime.appLockForegrounded(staleAttempt)
+        h.idle()
+        assertTrue(h.runtime.state.value.pendingSafeDismiss != null) // still in flight, not torn down
+        assertEquals(HoldPhase.RECOVERY, h.runtime.state.value.readinessHold?.phase)
+    }
+
+    @Test
+    fun `shutdown cancels an armed arrival timeout so no callback survives teardown`() {
+        val h = buildRuntime()
+        h.runtime.onAppForegrounded("com.a")
+        h.idle()
+        val token = h.lockToken
+        h.runtime.safeDismissRequested(token, SafeDestination.HOME)
+        h.idle()
+        assertTrue(h.timer.active.isNotEmpty()) // the arrival timeout is armed
+        h.runtime.shutdown()
+        assertEquals(1, h.timer.shutdownCount)
+        assertTrue(h.timer.active.isEmpty()) // terminal shutdown cancelled it
     }
 
     @Test

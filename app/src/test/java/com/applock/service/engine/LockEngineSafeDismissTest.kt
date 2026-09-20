@@ -8,10 +8,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * M7 WP2 Phase 2 (change C2): the pure reducer's token-keyed safe-dismiss handshake
- * ([EngineEvent.SafeDismissRequested] -> [Effect.NavigateSafely] -> exactly one attempt-keyed follow-up,
- * [EngineEvent.SafeDismissNavigationIssued] on success or [EngineEvent.SafeDismissNavigationFailed] on a
- * launch failure). Split out from [LockEngineReducerTest] so each suite stays focused. "com.a" / "com.b"
+ * M7 WP2 Phase 2 (change C2, extended in F1): the pure reducer's token-keyed safe-dismiss handshake
+ * ([EngineEvent.SafeDismissRequested] -> [Effect.NavigateSafely] -> an attempt-keyed
+ * [EngineEvent.SafeDismissNavigationIssued] that merely RECORDS the launch, or
+ * [EngineEvent.SafeDismissNavigationFailed] on a launch failure). F1 makes the issued echo stop tearing the
+ * surface down: only a real ARRIVAL ([Foreground.Home], the destination package's foreground, or the
+ * [EngineEvent.AppLockForeground] signal) ends the escape, and the interpreter's attempt-keyed
+ * [EngineEvent.SafeDismissTimedOut] reverts a silently aborted launch. APP_LOCK and OVERLAY_SETTINGS are
+ * shield-only escapes. Split out from [LockEngineReducerTest] so each suite stays focused. "com.a" / "com.b"
  * are protected; "com.android.settings" stands for the overlay grant screen the OVERLAY_SETTINGS escape
  * navigates to.
  */
@@ -51,6 +55,14 @@ class LockEngineSafeDismissTest {
     private fun EngineState.navFailed(attempt: AttemptToken) =
         LockEngineReducer.reduce(this, EngineEvent.SafeDismissNavigationFailed(attempt))
 
+    /** Runs the arrival-timeout follow-up over this state for the given attempt (the destination never arrived). */
+    private fun EngineState.navTimedOut(attempt: AttemptToken) =
+        LockEngineReducer.reduce(this, EngineEvent.SafeDismissTimedOut(attempt))
+
+    /** App Lock's own foreground UI reports it is on screen (the APP_LOCK arrival confirmation for [attempt]). */
+    private fun EngineState.appLockArrived(attempt: AttemptToken) =
+        LockEngineReducer.reduce(this, EngineEvent.AppLockForeground(attempt))
+
     // ---- Step 1: request records the pending dismiss, preserves the surface, and only navigates -----
 
     @Test
@@ -82,43 +94,40 @@ class LockEngineSafeDismissTest {
         assertEquals(listOf(Effect.NavigateSafely(SafeDestination.OVERLAY_SETTINGS, attempt)), reduction.effects)
     }
 
-    // ---- Step 2: navigation-issued tears the still-live surface down, but only after a real step 1 ---
+    // ---- Step 2a: navigation-issued only RECORDS the issue; it never tears the surface down ---------
 
     @Test
-    fun `the navigation-issued follow-up tears down the lock and advances the generation`() {
+    fun `the navigation-issued follow-up records the issue and keeps the surface up (no teardown)`() {
         val locked = initial().observe(other("com.a")).state
         assertEquals(Generation(0), locked.generation)
         val token = RequestToken(epoch, locked.activeRequest!!.id)
         val requested = locked.requestSafeDismiss(token, SafeDestination.HOME)
         val reduction = requested.navIssued(requested.attempt)
-        assertNull(reduction.state.activeRequest)
-        assertEquals(Generation(1), reduction.state.generation) // an invalidating teardown
-        assertNull(reduction.state.pendingSafeDismiss) // HOME needs no arrival exemption
-        // The app being left is relocked before its foreground is erased.
-        assertEquals(listOf(Effect.NoteAppLeft("com.a"), Effect.DismissSurface), reduction.effects)
+        // The launch only started (a silent START_ABORTED returns success too), so the lock stays up. Only a
+        // real HOME arrival tears it down. The follow-up flips the projection flag and emits nothing.
+        assertEquals(locked.activeRequest, reduction.state.activeRequest) // still locked
+        assertEquals(Generation(0), reduction.state.generation) // no invalidating teardown
+        assertTrue(reduction.state.pendingSafeDismiss!!.navigationIssued)
+        assertTrue(reduction.effects.isEmpty())
     }
 
     @Test
-    fun `the follow-up over a checking shield cancels its timer, dismisses, and advances the generation`() {
-        val checking = loading().observe(other("com.a")).state
-        val checkingTimer = checking.readinessHold!!.timer!!
-        assertEquals(Generation(1), checking.generation)
-        val token = ReadinessToken(epoch, checking.generation)
-        val requested = checking.requestSafeDismiss(token, SafeDestination.HOME)
-        val reduction = requested.navIssued(requested.attempt)
-        assertNull(reduction.state.readinessHold)
-        assertEquals(Generation(2), reduction.state.generation)
-        assertEquals(
-            listOf(Effect.CancelTimer(checkingTimer), Effect.NoteAppLeft("com.a"), Effect.DismissSurface),
-            reduction.effects,
-        )
+    fun `a second navigation-issued follow-up for an already-issued escape is an idempotent no-op`() {
+        val locked = initial().observe(other("com.a")).state
+        val token = RequestToken(epoch, locked.activeRequest!!.id)
+        val issued = locked.requestSafeDismiss(token, SafeDestination.HOME).let {
+            it.navIssued(it.attempt).state
+        }
+        val again = issued.navIssued((issued.guardState as GuardState.LeavingFor).attempt)
+        assertEquals(issued, again.state)
+        assertTrue(again.effects.isEmpty())
     }
 
     @Test
     fun `a navigation-issued follow-up with no prior request cannot tear the guard down`() {
         val locked = initial().observe(other("com.a")).state // no SafeDismissRequested was ever issued
         val reduction = locked.navIssued(AttemptToken(epoch, AttemptId(0)))
-        assertEquals(locked, reduction.state) // guard intact; a bare follow-up cannot dismiss it
+        assertEquals(locked, reduction.state) // guard intact; a bare follow-up cannot change it
         assertTrue(reduction.effects.isEmpty())
     }
 
@@ -131,6 +140,52 @@ class LockEngineSafeDismissTest {
         val reduction = requested.navIssued(wrong)
         assertEquals(requested, reduction.state) // still guarded, request still recorded
         assertTrue(reduction.effects.isEmpty())
+    }
+
+    // ---- Step 2b: only a real ARRIVAL tears the surface down --------------------------------------
+
+    @Test
+    fun `a HOME arrival after the navigation issued tears the lock down and advances the generation`() {
+        val locked = initial().observe(other("com.a")).state
+        assertEquals(Generation(0), locked.generation)
+        val token = RequestToken(epoch, locked.activeRequest!!.id)
+        val issued = locked.requestSafeDismiss(token, SafeDestination.HOME).let { it.navIssued(it.attempt).state }
+        assertEquals("com.a", issued.activeRequest!!.target) // still locked until HOME actually arrives
+        val reduction = issued.observe(Foreground.Home) // the launcher foregrounds: the HOME arrival
+        assertNull(reduction.state.activeRequest)
+        assertEquals(Generation(1), reduction.state.generation) // an invalidating teardown
+        assertNull(reduction.state.pendingSafeDismiss) // HOME needs no arrival exemption
+        // The app being left is relocked as its foreground is replaced by Home.
+        assertEquals(listOf(Effect.NoteAppLeft("com.a"), Effect.DismissSurface), reduction.effects)
+    }
+
+    @Test
+    fun `a HOME arrival before the navigation issued also tears the lock down (stale queued observation)`() {
+        // The drain can process the destination foreground before the issued echo (navigate suspends on Main).
+        val locked = initial().observe(other("com.a")).state
+        val token = RequestToken(epoch, locked.activeRequest!!.id)
+        val requested = locked.requestSafeDismiss(token, SafeDestination.HOME) // navigationIssued still false
+        val reduction = requested.observe(Foreground.Home)
+        assertNull(reduction.state.activeRequest) // HOME arrival completes the escape even before the echo
+        // The now-stale issued echo matches no live escape and is dropped.
+        val late = reduction.state.navIssued(requested.attempt)
+        assertEquals(reduction.state, late.state)
+        assertTrue(late.effects.isEmpty())
+    }
+
+    @Test
+    fun `a HOME arrival over a checking shield cancels its timer, dismisses, and advances the generation`() {
+        val checking = loading().observe(other("com.a")).state
+        val checkingTimer = checking.readinessHold!!.timer!!
+        assertEquals(Generation(1), checking.generation)
+        val token = ReadinessToken(epoch, checking.generation)
+        val issued = checking.requestSafeDismiss(token, SafeDestination.HOME).let { it.navIssued(it.attempt).state }
+        val reduction = issued.observe(Foreground.Home)
+        assertNull(reduction.state.readinessHold)
+        assertEquals(Generation(2), reduction.state.generation)
+        assertTrue(reduction.effects.contains(Effect.CancelTimer(checkingTimer)))
+        assertTrue(reduction.effects.contains(Effect.NoteAppLeft("com.a")))
+        assertTrue(reduction.effects.contains(Effect.DismissSurface))
     }
 
     // ---- Stale tokens are dropped; the newer surface always stands ------------------------------
@@ -229,14 +284,15 @@ class LockEngineSafeDismissTest {
     @Test
     fun `settings arriving after the navigation-issued follow-up is allowed, not re-shielded`() {
         val requested = escapeRequested()
-        // Step 2 tears the shield down but keeps the record so the arrival can still be exempted.
+        // The issued echo only records the issue. The shield stays up until settings actually arrives.
         val issued = requested.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold)
-        assertEquals(SafeDestination.OVERLAY_SETTINGS, issued.pendingSafeDismiss!!.destination)
-        val arrival = issued.observe(other(settings))
+        assertEquals(HoldPhase.RECOVERY, issued.readinessHold!!.phase) // shield still up
+        assertTrue(issued.pendingSafeDismiss!!.navigationIssued)
+        val arrival = issued.observe(other(settings)) // the destination arrives: now the shield comes down
         assertNull(arrival.state.readinessHold) // allowed through, no new shield
         assertNull(arrival.state.activeRequest)
         assertEquals(settings, arrival.state.pendingSafeDismiss!!.arrived)
+        assertTrue(arrival.effects.contains(Effect.DismissSurface))
         assertTrue(arrival.effects.none { it is Effect.Present })
     }
 
@@ -275,29 +331,27 @@ class LockEngineSafeDismissTest {
     @Test
     fun `a same-target re-emission before the follow-up does not cancel a settings escape`() {
         val requested = escapeRequested() // Recovery(com.a), OVERLAY_SETTINGS armed, not issued
-        // com.a re-emits its own accessibility event before step 2: not a supersession, so the escape stays.
+        // com.a re-emits its own accessibility event before the arrival: not a supersession, so the escape stays.
         val reappear = requested.observe(other("com.a")).state
         assertEquals(requested.pendingSafeDismiss, reappear.pendingSafeDismiss) // escape preserved
         assertEquals(HoldPhase.RECOVERY, reappear.readinessHold!!.phase) // com.a still shielded
         assertEquals(requested.lastForegroundSeq + 1, reappear.lastForegroundSeq) // processed, emits a new state
-        // The follow-up therefore still works: the shield comes down and settings then arrives exempt.
-        val issued = reappear.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold)
-        val arrival = issued.observe(other(settings))
+        // The arrival therefore still works: settings arrives, the shield comes down, and it is exempt.
+        val arrival = reappear.observe(other(settings))
         assertNull(arrival.state.readinessHold)
         assertEquals(settings, arrival.state.pendingSafeDismiss!!.arrived)
     }
 
     @Test
-    fun `a same-target re-emission before the follow-up does not cancel an app-lock escape`() {
+    fun `a same-target re-emission before the arrival does not cancel an app-lock escape`() {
         val shielded = failed().observe(other("com.a")).state
         val token = ReadinessToken(epoch, shielded.generation)
         val requested = shielded.requestSafeDismiss(token, SafeDestination.APP_LOCK)
-        val reappear = requested.observe(other("com.a")).state // com.a re-emits before step 2
+        val reappear = requested.observe(other("com.a")).state // com.a re-emits before the arrival
         assertEquals(requested.pendingSafeDismiss, reappear.pendingSafeDismiss) // escape not cancelled
         assertEquals(requested.lastForegroundSeq + 1, reappear.lastForegroundSeq) // processed, emits a new state
-        // The follow-up still tears the shield down (without the fix it would be rejected, leaving it stuck).
-        val issued = reappear.navIssued(requested.attempt).state
+        // The App Lock arrival signal still tears the shield down (without the fix it would be stuck).
+        val issued = reappear.appLockArrived(requested.attempt).state
         assertNull(issued.readinessHold)
         assertNull(issued.pendingSafeDismiss)
     }
@@ -318,8 +372,8 @@ class LockEngineSafeDismissTest {
         assertEquals(HoldPhase.RECOVERY, reappear.readinessHold!!.phase)
         assertEquals(recovery.generation, reappear.generation) // no new generation opened
         assertEquals(requested.lastForegroundSeq + 1, reappear.lastForegroundSeq) // processed, emits a new state
-        val issued = reappear.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold)
+        val arrival = reappear.observe(other(settings))
+        assertNull(arrival.state.readinessHold)
     }
 
     @Test
@@ -327,26 +381,26 @@ class LockEngineSafeDismissTest {
         val locked = initial().observe(other("com.a")).state // Lock(com.a) under Ready
         val token = RequestToken(epoch, locked.activeRequest!!.id)
         val requested = locked.requestSafeDismiss(token, SafeDestination.HOME)
-        // com.a re-emits now reporting a valid session (a fresh eval would ALLOW and dismiss the lock):
-        // during the handshake it is an idempotent re-presentation, so the lock and escape are preserved.
+        // com.a re-emits now with a valid session (a fresh eval would ALLOW and dismiss the lock). During the
+        // escape it is an idempotent re-presentation, so the lock and escape are preserved.
         val reappear = requested.observe(other("com.a", session = true)).state
         assertEquals(requested.activeRequest, reappear.activeRequest) // lock preserved
         assertEquals(requested.pendingSafeDismiss, reappear.pendingSafeDismiss) // escape preserved
         assertEquals(requested.lastForegroundSeq + 1, reappear.lastForegroundSeq) // processed, emits a new state
-        val issued = reappear.navIssued(requested.attempt)
-        assertNull(issued.state.activeRequest)
-        assertTrue(issued.effects.contains(Effect.DismissSurface))
+        val arrival = reappear.observe(Foreground.Home) // HOME actually arrives: now the lock comes down
+        assertNull(arrival.state.activeRequest)
+        assertTrue(arrival.effects.contains(Effect.DismissSurface))
     }
 
     @Test
-    fun `the follow-up relocks the app being left before clearing the foreground`() {
+    fun `the HOME arrival relocks the app being left as the foreground moves to Home`() {
         val shielded = failed().observe(other("com.a")).state
         val token = ReadinessToken(epoch, shielded.generation)
-        val requested = shielded.requestSafeDismiss(token, SafeDestination.HOME)
-        val reduction = requested.navIssued(requested.attempt)
+        val issued = shielded.requestSafeDismiss(token, SafeDestination.HOME).let { it.navIssued(it.attempt).state }
+        val reduction = issued.observe(Foreground.Home)
         assertTrue(reduction.effects.contains(Effect.NoteAppLeft("com.a"))) // session ended for the app left
-        assertNull(reduction.state.lastForeground)
-        // The later Home observation must not emit a duplicate (the foreground was already cleared).
+        assertEquals(RealForeground.Home, reduction.state.lastForeground) // foreground is now Home
+        // A later Home observation must not emit a duplicate.
         val afterHome = reduction.state.observe(Foreground.Home)
         assertTrue(afterHome.effects.none { it is Effect.NoteAppLeft })
     }
@@ -374,13 +428,13 @@ class LockEngineSafeDismissTest {
     @Test
     fun `the original target re-emitting before settings stays shielded, and the escape survives`() {
         val requested = escapeRequested()
-        val issued = requested.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold)
-        // The original protected target re-emits before Settings appears: it is NOT the approved
-        // destination, so it must be re-shielded, never allowed through.
+        val issued = requested.navIssued(requested.attempt).state // shield still up (issued != arrived)
+        // The original protected target re-emits before Settings appears. It is the origin, so it is an
+        // idempotent re-presentation of its own shield, and is never allowed through.
         val reappear = issued.observe(other("com.a"))
         assertEquals(HoldPhase.RECOVERY, reappear.state.readinessHold!!.phase)
         assertEquals("com.a", reappear.state.readinessHold!!.target)
+        assertTrue(reappear.effects.none { it is Effect.DismissSurface })
         // The escape stays armed, so Settings is still allowed through when it does arrive.
         val arrival = reappear.state.observe(other(settings))
         assertNull(arrival.state.readinessHold)
@@ -418,43 +472,61 @@ class LockEngineSafeDismissTest {
     }
 
     @Test
-    fun `a failed policy re-emission mid-escape does not re-raise a shield over the abandoned target`() {
+    fun `a failed policy re-emission while the issued escape still stands keeps its shield without a flash`() {
         val requested = escapeRequested()
-        val issued = requested.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold) // the shield is already down for the escape
-        // Policy re-emits Failed before settings arrives; the abandoned target must not be re-shielded.
+        val issued = requested.navIssued(requested.attempt).state // shield still up (issued != arrived)
+        assertEquals(HoldPhase.RECOVERY, issued.readinessHold!!.phase)
+        // Policy re-emits Failed before settings arrives. The still-guarding shield stays, without re-presenting.
         val reduction = LockEngineReducer.reduce(issued, EngineEvent.PolicyStateChanged(PolicyState.Failed("again")))
+        assertEquals(HoldPhase.RECOVERY, reduction.state.readinessHold!!.phase) // shield preserved
+        assertEquals(requested.pendingSafeDismiss?.destination, reduction.state.pendingSafeDismiss?.destination)
+        assertTrue(reduction.effects.none { it is Effect.Present }) // zero flash
+    }
+
+    @Test
+    fun `a failed policy re-emission after settings arrives does not re-raise a shield over the abandoned target`() {
+        val requested = escapeRequested()
+        val onSettings = requested.observe(other(settings)).state // settings arrived: surface gone, exemption armed
+        assertNull(onSettings.readinessHold)
+        // Policy re-emits Failed while the arrived exemption stands. The abandoned target must not be re-shielded.
+        val reduction =
+            LockEngineReducer.reduce(onSettings, EngineEvent.PolicyStateChanged(PolicyState.Failed("again")))
         assertNull(reduction.state.readinessHold)
         assertNull(reduction.state.activeRequest)
         assertTrue(reduction.effects.none { it is Effect.Present }) // zero flash
-        assertEquals(SafeDestination.OVERLAY_SETTINGS, reduction.state.pendingSafeDismiss!!.destination)
+        assertEquals(settings, reduction.state.pendingSafeDismiss!!.arrived)
     }
 
     @Test
-    fun `app-lock escape then Own then a failed re-emission raises no shield over the abandoned target`() {
+    fun `app-lock arrival then a failed re-emission raises no shield over the abandoned target`() {
         val shielded = failed().observe(other("com.a")).state // Recovery(com.a)
         val token = ReadinessToken(epoch, shielded.generation)
-        val requested = shielded.requestSafeDismiss(token, SafeDestination.APP_LOCK)
-        val issued = requested.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold)
-        assertNull(issued.pendingSafeDismiss) // APP_LOCK keeps no arrival exemption
-        val afterOwn = issued.observe(Foreground.Own).state // App Lock's own UI foregrounds; Own is a no-op
-        val reduction = LockEngineReducer.reduce(afterOwn, EngineEvent.PolicyStateChanged(PolicyState.Failed("again")))
-        assertNull(reduction.state.readinessHold) // no shield rebuilt over com.a while App Lock is foreground
+        val issued = shielded.requestSafeDismiss(token, SafeDestination.APP_LOCK).let {
+            it.navIssued(it.attempt).state
+        }
+        val attempt = (issued.guardState as GuardState.LeavingFor).attempt
+        val arrived = issued.appLockArrived(attempt).state // App Lock foregrounds: the escape completes
+        assertNull(arrived.readinessHold)
+        assertNull(arrived.pendingSafeDismiss) // APP_LOCK keeps no arrival exemption
+        assertNull(arrived.lastForeground) // the abandoned target's foreground was cleared
+        val reduction = LockEngineReducer.reduce(arrived, EngineEvent.PolicyStateChanged(PolicyState.Failed("again")))
+        assertNull(reduction.state.readinessHold) // no shield rebuilt over com.a
         assertTrue(reduction.effects.none { it is Effect.Present })
     }
 
     @Test
-    fun `home escape then a failed re-emission before the home observation raises no shield`() {
+    fun `a failed re-emission during a home escape keeps the shield until home is observed`() {
         val shielded = failed().observe(other("com.a")).state
         val token = ReadinessToken(epoch, shielded.generation)
-        val requested = shielded.requestSafeDismiss(token, SafeDestination.HOME)
-        val issued = requested.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold)
-        // Failed arrives before Home is observed; the cleared lastForeground must not resurrect com.a.
+        val issued = shielded.requestSafeDismiss(token, SafeDestination.HOME).let { it.navIssued(it.attempt).state }
+        // Failed re-emits before Home is observed. The escape's shield stays, without a flash.
         val reduction = LockEngineReducer.reduce(issued, EngineEvent.PolicyStateChanged(PolicyState.Failed("again")))
-        assertNull(reduction.state.readinessHold)
+        assertEquals(HoldPhase.RECOVERY, reduction.state.readinessHold!!.phase)
         assertTrue(reduction.effects.none { it is Effect.Present })
+        // Home then arrives and completes the escape cleanly.
+        val home = reduction.state.observe(Foreground.Home)
+        assertNull(home.state.readinessHold)
+        assertTrue(home.effects.contains(Effect.DismissSurface))
     }
 
     @Test
@@ -513,46 +585,45 @@ class LockEngineSafeDismissTest {
     }
 
     @Test
-    fun `a ready re-emission during a lock's app-lock escape preserves the handshake`() {
+    fun `a ready re-emission during a lock's home escape preserves the escape`() {
         val locked = initial().observe(other("com.a")).state // Lock(com.a) under Ready
         val token = RequestToken(epoch, locked.activeRequest!!.id)
-        val requested = locked.requestSafeDismiss(token, SafeDestination.APP_LOCK)
-        // A harmless Ready re-emission must not drop the in-flight handshake over the still-live lock.
+        val requested = locked.requestSafeDismiss(token, SafeDestination.HOME)
+        // A harmless Ready re-emission must not drop the in-flight escape over the still-live lock.
         val afterReady = LockEngineReducer.reduce(
             requested,
             EngineEvent.PolicyStateChanged(PolicyState.Ready(protectedPackages)),
         ).state
         assertEquals(requested.activeRequest, afterReady.activeRequest) // lock preserved
-        assertEquals(requested.pendingSafeDismiss, afterReady.pendingSafeDismiss) // handshake preserved
-        // The navigation-issued follow-up then dismisses the surface as intended (not stranded).
-        val issued = afterReady.navIssued(requested.attempt)
-        assertNull(issued.state.activeRequest)
-        assertTrue(issued.effects.contains(Effect.DismissSurface))
+        assertEquals(requested.pendingSafeDismiss, afterReady.pendingSafeDismiss) // escape preserved
+        // The HOME arrival then dismisses the surface as intended (not stranded).
+        val home = afterReady.observe(Foreground.Home)
+        assertNull(home.state.activeRequest)
+        assertTrue(home.effects.contains(Effect.DismissSurface))
     }
 
     // ---- Round-9 review fixes -----------------------------------------------------------------
 
     @Test
-    fun `when the guarded origin is itself the approved destination, a same-origin event re-presents not arrives`() {
-        // The guarded app IS Settings and the OVERLAY_SETTINGS escape targets the grant screen in that same
-        // package, so origin == the sole approved package. A same-origin event before step 2 must re-present
-        // the shield, never be mistaken for the destination arriving and tear it down early.
+    fun `when the guarded origin is itself the sole approved destination, a same-package event never arrives`() {
+        // The guarded app IS Settings, and the OVERLAY_SETTINGS escape targets the grant screen in that same
+        // package. So the origin equals the sole approved package. A same-package observation is a conservative
+        // origin re-present, never an arrival, because the reducer cannot prove it is the destination. The escape
+        // can only end on the timeout backstop. It never tears the shield down early on this ambiguous event.
         val shielded = failed().observe(other(settings)).state // Recovery(settings)
         val token = ReadinessToken(epoch, shielded.generation)
         val requested = shielded.requestSafeDismiss(token, SafeDestination.OVERLAY_SETTINGS, setOf(settings))
-        val reappearR = requested.observe(other(settings))
-        assertTrue(reappearR.effects.none { it is Effect.DismissSurface }) // shield not torn down
-        val reappear = reappearR.state
-        assertEquals(HoldPhase.RECOVERY, reappear.readinessHold!!.phase) // shield preserved
-        assertEquals(settings, reappear.readinessHold!!.target)
-        assertEquals(requested.pendingSafeDismiss, reappear.pendingSafeDismiss) // still the in-flight escape
-        assertEquals(requested.lastForegroundSeq + 1, reappear.lastForegroundSeq) // processed
-        // Only step 2 confirms the navigation; a settings observation after it counts as the arrival.
-        val issued = reappear.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold)
-        val arrival = issued.observe(other(settings))
-        assertNull(arrival.state.readinessHold) // now allowed through as the arrival
-        assertEquals(settings, arrival.state.pendingSafeDismiss!!.arrived)
+        val issued = requested.navIssued(requested.attempt).state // issued, but same-package cannot confirm arrival
+        val reappear = issued.observe(other(settings)) // re-presents the shield, never counted as an arrival
+        assertTrue(reappear.effects.none { it is Effect.DismissSurface }) // shield not torn down
+        assertEquals(HoldPhase.RECOVERY, reappear.state.readinessHold!!.phase) // shield preserved
+        assertEquals(settings, reappear.state.readinessHold!!.target)
+        assertEquals(SafeDestination.OVERLAY_SETTINGS, reappear.state.pendingSafeDismiss!!.destination) // still armed
+        assertTrue(reappear.state.pendingSafeDismiss!!.navigationIssued)
+        // The timeout is the only way out. It reverts the escape to its shield.
+        val timedOut = reappear.state.navTimedOut(requested.attempt)
+        assertNull(timedOut.state.pendingSafeDismiss)
+        assertEquals(HoldPhase.RECOVERY, timedOut.state.readinessHold!!.phase)
     }
 
     @Test
@@ -585,10 +656,10 @@ class LockEngineSafeDismissTest {
         assertEquals(requested.pendingSafeDismiss, afterReady.pendingSafeDismiss) // escape preserved
         assertEquals(requested.generation, afterReady.generation) // token not invalidated
         assertNull(afterReady.activeRequest) // no new lock raised over com.a
-        // The follow-up then completes the escape instead of being dropped as stale.
-        val issued = afterReady.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold)
-        assertNull(issued.pendingSafeDismiss)
+        // The App Lock arrival then completes the escape instead of being stranded.
+        val arrived = afterReady.appLockArrived(requested.attempt).state
+        assertNull(arrived.readinessHold)
+        assertNull(arrived.pendingSafeDismiss)
     }
 
     @Test
@@ -601,8 +672,8 @@ class LockEngineSafeDismissTest {
             EngineEvent.PolicyStateChanged(PolicyState.Ready(protectedPackages)),
         ).state
         assertEquals(requested.pendingSafeDismiss, afterReady.pendingSafeDismiss) // escape preserved
-        val issued = afterReady.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold)
+        val home = afterReady.observe(Foreground.Home)
+        assertNull(home.state.readinessHold)
     }
 
     @Test
@@ -631,9 +702,9 @@ class LockEngineSafeDismissTest {
         assertEquals(requested.pendingSafeDismiss, reduction.state.pendingSafeDismiss) // escape preserved
         assertTrue(reduction.effects.contains(Effect.CancelTimer(timer))) // its T_ready timer is cancelled
         assertTrue(reduction.effects.contains(Effect.Present(Surface.Recovery("com.a"))))
-        // The escape token is still valid, so the follow-up still tears the surface down.
-        val issued = reduction.state.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold)
+        // The escape token is still valid, so the settings arrival still tears the surface down.
+        val arrival = reduction.state.observe(other(settings))
+        assertNull(arrival.state.readinessHold)
     }
 
     // ---- Round-10 review fixes ----------------------------------------------------------------
@@ -689,10 +760,10 @@ class LockEngineSafeDismissTest {
         val fired = LockEngineReducer.reduce(afterReady, EngineEvent.TimerFired(timer))
         assertEquals(afterReady, fired.state) // no state change
         assertTrue(fired.effects.none { it is Effect.Present }) // no Recovery surface presented
-        // The navigation follow-up still succeeds afterwards.
-        val issued = fired.state.navIssued(requested.attempt).state
-        assertNull(issued.readinessHold)
-        assertNull(issued.pendingSafeDismiss)
+        // The App Lock arrival still completes the escape afterwards.
+        val arrived = fired.state.appLockArrived(requested.attempt).state
+        assertNull(arrived.readinessHold)
+        assertNull(arrived.pendingSafeDismiss)
     }
 
     // ---- Round-11 review fixes ----------------------------------------------------------------
@@ -757,6 +828,177 @@ class LockEngineSafeDismissTest {
         // Attempt 2's own follow-up still completes it (hands off to the arrival exemption).
         val issued = second.navIssued(attempt2).state
         assertEquals(SafeDestination.OVERLAY_SETTINGS, issued.pendingSafeDismiss!!.destination)
+    }
+
+    // ---- F1: arrival confirmation, shield-only escapes, and the arrival timeout ----------------
+
+    /** A recovery shield over "com.a" with an in-flight APP_LOCK escape (a ReadinessToken; shield-only). */
+    private fun appLockEscape(): EngineState {
+        val shielded = failed().observe(other("com.a")).state // Recovery(com.a)
+        val token = ReadinessToken(epoch, shielded.generation)
+        return shielded.requestSafeDismiss(token, SafeDestination.APP_LOCK)
+    }
+
+    @Test
+    fun `an app-lock escape completes on the app-lock foreground signal after the issue`() {
+        val issued = appLockEscape().let { it.navIssued(it.attempt).state }
+        assertEquals(HoldPhase.RECOVERY, issued.readinessHold!!.phase) // still up until App Lock actually arrives
+        val arrived = issued.appLockArrived((issued.guardState as GuardState.LeavingFor).attempt)
+        assertNull(arrived.state.readinessHold)
+        assertNull(arrived.state.pendingSafeDismiss) // APP_LOCK keeps no arrival exemption
+        assertNull(arrived.state.lastForeground)
+        assertTrue(arrived.effects.contains(Effect.NoteAppLeft("com.a")))
+        assertTrue(arrived.effects.contains(Effect.DismissSurface))
+    }
+
+    @Test
+    fun `an app-lock escape completes on the app-lock foreground signal before the issue (stale queued)`() {
+        val requested = appLockEscape() // navigationIssued still false
+        val arrived = requested.appLockArrived(requested.attempt) // arrival delivered before the issued echo
+        assertNull(arrived.state.readinessHold) // completes in either navigationIssued state
+        // The now-stale issued echo matches no live escape and is dropped.
+        val late = arrived.state.navIssued(requested.attempt)
+        assertEquals(arrived.state, late.state)
+        assertTrue(late.effects.isEmpty())
+    }
+
+    @Test
+    fun `Foreground Own never completes an app-lock escape`() {
+        val requested = appLockEscape()
+        val afterOwn = requested.observe(Foreground.Own)
+        assertEquals(requested, afterOwn.state) // Own is a pure no-op; it cannot be arrival evidence
+        assertTrue(afterOwn.effects.isEmpty())
+    }
+
+    @Test
+    fun `a delayed biometric-host Own across a surface change does not complete a later app-lock escape`() {
+        val escape1 = appLockEscape() // shield 1's APP_LOCK escape over Recovery(com.a)
+        val shield2 = escape1.observe(other("com.b")).state // com.b supersedes: escape 1 gone, Recovery(com.b)
+        assertNull(shield2.pendingSafeDismiss)
+        val token2 = ReadinessToken(epoch, shield2.generation)
+        val escape2 = shield2.requestSafeDismiss(token2, SafeDestination.APP_LOCK) // shield 2's escape
+        // A delayed Foreground.Own drains (App Lock's biometric host from escape 1's era). It must not count as
+        // escape 2's arrival. Own never completes an escape, so escape 2 stays in flight.
+        val afterOwn = escape2.observe(Foreground.Own)
+        assertEquals(escape2.pendingSafeDismiss, afterOwn.state.pendingSafeDismiss) // escape 2 intact
+        assertEquals("com.b", afterOwn.state.readinessHold!!.target)
+    }
+
+    @Test
+    fun `a delayed app-lock foreground signal from a timed-out attempt does not complete a retry`() {
+        // attempt 0 -> timeout -> attempt 1. A delayed arrival stamped with attempt 0 must not dismiss attempt 1's
+        // shield. Without the attempt key it would, because both are live APP_LOCK escapes over the same shield.
+        val shielded = failed().observe(other("com.a")).state // Recovery(com.a)
+        val token = ReadinessToken(epoch, shielded.generation)
+        val first = shielded.requestSafeDismiss(token, SafeDestination.APP_LOCK) // attempt 0
+        val staleAttempt = first.attempt
+        val reverted = first.navTimedOut(staleAttempt).state // attempt 0 times out; the shield is restored
+        val second = reverted.requestSafeDismiss(token, SafeDestination.APP_LOCK) // attempt 1, a fresh attempt
+        assertNotEquals(staleAttempt, second.attempt)
+        // The delayed signal from attempt 0 drains now. It carries attempt 0, not attempt 1, so it is dropped.
+        val late = second.appLockArrived(staleAttempt)
+        assertEquals(second, late.state) // attempt 1's shield stands, not torn down
+        assertTrue(late.effects.isEmpty())
+        // Attempt 1's own signal still completes it.
+        val arrived = second.appLockArrived(second.attempt)
+        assertNull(arrived.state.readinessHold)
+    }
+
+    @Test
+    fun `a delayed app-lock foreground signal across a supersession does not complete a later escape`() {
+        val escape1 = appLockEscape() // shield 1 (com.a), attempt 0
+        val staleAttempt = escape1.attempt
+        val shield2 = escape1.observe(other("com.b")).state // com.b supersedes: escape 1 gone, Recovery(com.b)
+        val token2 = ReadinessToken(epoch, shield2.generation)
+        val escape2 = shield2.requestSafeDismiss(token2, SafeDestination.APP_LOCK) // shield 2's escape, attempt 1
+        // A delayed signal stamped with escape 1's attempt drains: escape 2's attempt differs, so it is dropped.
+        val late = escape2.appLockArrived(staleAttempt)
+        assertEquals(escape2, late.state) // escape 2 intact
+        assertEquals("com.b", late.state.readinessHold!!.target)
+    }
+
+    @Test
+    fun `an app-lock request from a lock surface is rejected (shield-only)`() {
+        val locked = initial().observe(other("com.a")).state // a Lock (RequestToken) under Ready
+        val token = RequestToken(epoch, locked.activeRequest!!.id)
+        val reduction =
+            LockEngineReducer.reduce(locked, EngineEvent.SafeDismissRequested(token, SafeDestination.APP_LOCK))
+        assertEquals(locked, reduction.state) // the lock stands; APP_LOCK cannot arm from a lock
+        assertTrue(reduction.effects.isEmpty())
+    }
+
+    @Test
+    fun `an app-lock foreground signal with no escape in flight is dropped`() {
+        val recovery = failed().observe(other("com.a")).state // a plain Recovery shield, no escape
+        val reduction = recovery.appLockArrived(AttemptToken(epoch, AttemptId(0)))
+        assertEquals(recovery, reduction.state) // no live escape: the signal tears nothing down
+        assertTrue(reduction.effects.isEmpty())
+    }
+
+    @Test
+    fun `settings arrival on a different approved package completes the escape`() {
+        // This is the normal path. The guarded origin (com.a) is not an approved package, so a different approved
+        // package (the resolved settings screen) is an unambiguous arrival.
+        val requested = escapeRequested() // approved = {settings}, origin = com.a
+        val issued = requested.navIssued(requested.attempt).state
+        val arrival = issued.observe(other(settings))
+        assertNull(arrival.state.readinessHold)
+        assertEquals(settings, arrival.state.pendingSafeDismiss!!.arrived)
+        assertTrue(arrival.effects.contains(Effect.DismissSurface))
+    }
+
+    @Test
+    fun `an aborted overlay-settings launch with origin re-emission after the issue does not complete`() {
+        // The launch returned success but silently aborted (a background START_ABORTED never foregrounds). The
+        // origin re-emits (com.a, a protected app that is not the approved destination). It re-presents its own
+        // shield, and is never counted as the arrival, so the escape stays until the timeout backstops it.
+        val requested = escapeRequested() // approved = {settings}, origin = com.a
+        val issued = requested.navIssued(requested.attempt).state
+        val reappear = issued.observe(other("com.a"))
+        assertTrue(reappear.effects.none { it is Effect.DismissSurface }) // origin re-present, not an arrival
+        assertEquals(HoldPhase.RECOVERY, reappear.state.readinessHold!!.phase)
+        assertEquals("com.a", reappear.state.readinessHold!!.target)
+        assertTrue(reappear.state.pendingSafeDismiss!!.navigationIssued) // still in flight
+        // The timeout is the backstop. It reverts the escape to its shield.
+        val timedOut = reappear.state.navTimedOut(requested.attempt)
+        assertNull(timedOut.state.pendingSafeDismiss)
+        assertEquals(HoldPhase.RECOVERY, timedOut.state.readinessHold!!.phase)
+    }
+
+    @Test
+    fun `the arrival timeout reverts an issued escape to its guard, never tearing the surface down`() {
+        val issued = escapeRequested().let { it.navIssued(it.attempt).state } // Recovery(com.a), issued
+        val timedOut = issued.navTimedOut((issued.guardState as GuardState.LeavingFor).attempt)
+        assertNull(timedOut.state.pendingSafeDismiss) // no longer in flight
+        assertEquals(HoldPhase.RECOVERY, timedOut.state.readinessHold!!.phase) // back to a plain guard
+        assertEquals("com.a", timedOut.state.readinessHold!!.target)
+        assertTrue(timedOut.effects.none { it is Effect.DismissSurface }) // the surface never came down
+    }
+
+    @Test
+    fun `a late arrival timeout for an already-completed escape is dropped`() {
+        val requested = escapeRequested()
+        val settingsArrived = requested.observe(other(settings)).state // escape completed (exemption armed)
+        val late = settingsArrived.navTimedOut(requested.attempt) // a late timeout for the old attempt
+        assertEquals(settingsArrived, late.state) // dropped by the attempt token: nothing changes
+        assertTrue(late.effects.isEmpty())
+    }
+
+    @Test
+    fun `a retry to the same destination after an arrival timeout mints a fresh attempt`() {
+        val shielded = failed().observe(other("com.a")).state // Recovery(com.a)
+        val token = ReadinessToken(epoch, shielded.generation)
+        val first = shielded.requestSafeDismiss(token, SafeDestination.OVERLAY_SETTINGS, setOf(settings)) // attempt 0
+        val reverted = first.navTimedOut(first.attempt).state // the arrival timeout reverts it to the shield
+        assertNull(reverted.pendingSafeDismiss)
+        // A retry over the same, still-live surface succeeds and mints a distinct attempt id.
+        val retry = reverted.requestSafeDismiss(token, SafeDestination.OVERLAY_SETTINGS, setOf(settings))
+        val retryAttempt = (retry.guardState as GuardState.LeavingFor).attempt
+        assertEquals(AttemptId(1), retryAttempt.id) // distinct from attempt 0
+        // A late timeout from the first attempt cannot revert the second.
+        val lateTimeout = retry.navTimedOut(first.attempt)
+        assertEquals(retry, lateTimeout.state)
+        assertTrue(lateTimeout.effects.isEmpty())
     }
 
     // ---- Model invariants: the type cannot encode a state the reducer never produces ----------

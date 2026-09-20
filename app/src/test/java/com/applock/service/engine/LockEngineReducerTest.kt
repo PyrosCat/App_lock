@@ -56,7 +56,7 @@ class LockEngineReducerTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun `a recovery hold with a timer is rejected`() {
-        ReadinessHold("com.a", HoldPhase.RECOVERY, TimerToken(epoch, Generation(1)))
+        ReadinessHold("com.a", HoldPhase.RECOVERY, TimerToken.ReadinessTimer(epoch, Generation(1)))
     }
 
     @Test(expected = IllegalArgumentException::class)
@@ -64,7 +64,9 @@ class LockEngineReducerTest {
         EngineState(
             epoch = epoch,
             generation = Generation(2),
-            guardState = GuardState.Guarding(BlockingGuard.Checking("com.a", TimerToken(epoch, Generation(1)))),
+            guardState = GuardState.Guarding(
+                BlockingGuard.Checking("com.a", TimerToken.ReadinessTimer(epoch, Generation(1))),
+            ),
         )
     }
 
@@ -467,7 +469,7 @@ class LockEngineReducerTest {
         assertEquals("com.a", hold.target)
         assertEquals(HoldPhase.CHECKING, hold.phase)
         assertNull(reduction.state.activeRequest)
-        val token = TimerToken(epoch, Generation(1))
+        val token = TimerToken.ReadinessTimer(epoch, Generation(1))
         assertEquals(token, hold.timer)
         assertEquals(
             listOf(
@@ -607,7 +609,7 @@ class LockEngineReducerTest {
         val holdA = loading().observe(other("com.a")).state
         val timerA = holdA.readinessHold!!.timer!!
         val reduction = holdA.observe(other("com.b"))
-        val expectedTimerB = TimerToken(epoch, Generation(2))
+        val expectedTimerB = TimerToken.ReadinessTimer(epoch, Generation(2))
         assertEquals("com.b", reduction.state.readinessHold!!.target)
         assertEquals(Generation(2), reduction.state.generation)
         assertEquals(1L, reduction.state.supersedeCount)

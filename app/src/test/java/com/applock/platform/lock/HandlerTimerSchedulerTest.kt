@@ -23,7 +23,7 @@ class HandlerTimerSchedulerTest {
     private val epoch = Epoch(1)
     private val delay = 100L
 
-    private fun token(generation: Long) = TimerToken(epoch, Generation(generation))
+    private fun token(generation: Long) = TimerToken.ReadinessTimer(epoch, Generation(generation))
 
     /**
      * A fake [HandlerTimerScheduler.TimerOps]. `posted` models the callbacks live in a Handler queue.

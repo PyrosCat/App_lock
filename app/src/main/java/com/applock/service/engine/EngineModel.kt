@@ -46,8 +46,23 @@ data class AttemptToken(val epoch: Epoch, val id: AttemptId)
 @JvmInline
 value class Generation(val n: Long)
 
-/** Keys a scheduled `T_ready` timer to the shield that owns it. A fired timer must match it exactly. */
-data class TimerToken(val epoch: Epoch, val generation: Generation)
+/**
+ * Keys a scheduled timer to the concern that owns it. A fired timer must match its token exactly. There are two
+ * kinds. A [ReadinessTimer] is the `T_ready` timer of a checking shield. It is keyed to the [Generation] that
+ * armed it, so a fired timer from a superseded shield does not match the live surface. An [ArrivalTimer] is a
+ * safe-dismiss arrival timeout. It is keyed to the escape [AttemptId] that armed it, so a fired timer from a
+ * superseded or reverted attempt does not match the live escape. The interpreter arms it only after a launched
+ * navigation issues. The two kinds do not collide, because they use different identities and different events.
+ */
+sealed interface TimerToken {
+    val epoch: Epoch
+
+    /** The `T_ready` readiness timer of the checking shield at [generation]. Fires an [EngineEvent.TimerFired]. */
+    data class ReadinessTimer(override val epoch: Epoch, val generation: Generation) : TimerToken
+
+    /** The arrival timeout of the safe-dismiss escape [attemptId]. Fires an [EngineEvent.SafeDismissTimedOut]. */
+    data class ArrivalTimer(override val epoch: Epoch, val attemptId: AttemptId) : TimerToken
+}
 
 /**
  * Identifies the surface that is live now. It lets the reducer key a leave-without-auth navigation to the
@@ -117,15 +132,15 @@ sealed interface RealForeground {
 sealed interface BlockingGuard {
     val target: String
     data class Lock(override val target: String, val id: RequestId) : BlockingGuard
-    data class Checking(override val target: String, val timer: TimerToken) : BlockingGuard
+    data class Checking(override val target: String, val timer: TimerToken.ReadinessTimer) : BlockingGuard
     data class Recovery(override val target: String) : BlockingGuard
 }
 
 /**
  * The single on-screen surface slot. [None] shows nothing. [Guarding] shows a [BlockingGuard]. [LeavingFor]
- * is step 1 of a safe-dismiss: the reducer has emitted the navigation, but the [guarding] surface still
- * stands (and the presenter renders it) while the reducer waits for step 2. Because these are one sum type,
- * a lock, a shield, and an in-flight escape cannot occur together, with no runtime invariant.
+ * is a safe-dismiss in flight: the reducer has emitted the navigation, but the [guarding] surface still
+ * stands (and the presenter renders it) until the destination is confirmed to have ARRIVED. Because these are
+ * one sum type, a lock, a shield, and an in-flight escape cannot occur together, with no runtime invariant.
  */
 sealed interface GuardState {
     data object None : GuardState
@@ -140,8 +155,9 @@ sealed interface GuardState {
      * from a previous, reverted attempt over the same surface cannot complete or cancel this one.
      * [destination] and [approved] give the target, and (for OVERLAY_SETTINGS) which resolved package(s) its
      * arrival can show. A foreground for a different target supersedes [guarding] and ends the escape by the
-     * normal surface-replacement path. The origin re-emitting is an idempotent re-presentation. Step 2 tears
-     * [guarding] down and, for OVERLAY_SETTINGS, hands off to [EngineState.exemption].
+     * normal surface-replacement path. The origin re-emitting is an idempotent re-presentation. A confirmed
+     * arrival tears [guarding] down. For OVERLAY_SETTINGS it hands off to [EngineState.exemption]. If nothing
+     * arrives, the interpreter's arrival timeout reverts the escape.
      */
     data class LeavingFor(
         val guarding: BlockingGuard,
@@ -149,6 +165,15 @@ sealed interface GuardState {
         val attempt: AttemptToken,
         val destination: SafeDestination,
         val approved: Set<String>,
+        /**
+         * True after the [Effect.NavigateSafely] launch call returns success
+         * ([EngineEvent.SafeDismissNavigationIssued]). It records that the navigation *issued*, not that the
+         * destination *arrived*. A background `START_ABORTED` also returns success, so only a real arrival ends
+         * the escape. The reducer accepts an arrival in either [navigationIssued] state, because the drain can
+         * process the destination's foreground before the issued echo. The flag carries no security weight. It is
+         * a projection fact, and it makes a repeated issued echo an idempotent no-op.
+         */
+        val navigationIssued: Boolean = false,
     ) : GuardState {
         init {
             require((destination == SafeDestination.OVERLAY_SETTINGS) == approved.isNotEmpty()) {
@@ -202,7 +227,7 @@ data class ArrivalExemption(
 enum class HoldPhase { CHECKING, RECOVERY }
 
 /** Read-model projection of a live readiness shield. [timer] is non-null only for [HoldPhase.CHECKING]. */
-data class ReadinessHold(val target: String, val phase: HoldPhase, val timer: TimerToken?) {
+data class ReadinessHold(val target: String, val phase: HoldPhase, val timer: TimerToken.ReadinessTimer?) {
     init {
         require((phase == HoldPhase.CHECKING) == (timer != null)) {
             "a CHECKING hold must carry a T_ready timer and a RECOVERY hold must not"
@@ -336,7 +361,7 @@ data class EngineState(
                 origin = g.guarding.target,
                 approved = g.approved,
                 arrived = null,
-                navigationIssued = false,
+                navigationIssued = g.navigationIssued,
             )
             else -> exemption?.let {
                 PendingSafeDismiss(
@@ -363,7 +388,7 @@ data class EngineState(
 sealed interface EngineEvent {
     data class ForegroundObserved(val foreground: Foreground, val elapsedRealtimeMs: Long) : EngineEvent
     data class PolicyStateChanged(val policy: PolicyState) : EngineEvent
-    data class TimerFired(val token: TimerToken) : EngineEvent
+    data class TimerFired(val token: TimerToken.ReadinessTimer) : EngineEvent
     data class UnlockSucceeded(val token: RequestToken, val method: UnlockMethod) : EngineEvent
     data class UnlockFailed(val token: RequestToken, val method: UnlockMethod) : EngineEvent
 
@@ -385,6 +410,21 @@ sealed interface EngineEvent {
     data class BiometricCancelled(val token: RequestToken) : EngineEvent
 
     /**
+     * App Lock's own foreground UI reports that it is on screen. It is the ARRIVAL confirmation for an in-flight
+     * [SafeDestination.APP_LOCK] escape (the interpreter's `appLockForegrounded`, wired to `MainActivity.onResume`
+     * in F). [Foreground.Home] and the OVERLAY_SETTINGS package arrival are level-triggered: they observe the
+     * CURRENT foreground. This signal is an edge-triggered lifecycle event, so a stale one from a timed-out or
+     * superseded launch could otherwise complete a *different* live APP_LOCK escape. It therefore carries the
+     * [token] of the attempt that launched App Lock. F stamps the launch intent with the attempt, and
+     * `MainActivity.onResume` echoes it back. The reducer completes the escape only when a live
+     * [GuardState.LeavingFor] targets APP_LOCK and its [GuardState.LeavingFor.attempt] equals [token]. It drops a
+     * signal that has no escape in flight, that comes from a superseded or timed-out attempt, or that carries a
+     * foreign epoch (a dead process). [Foreground.Own] cannot serve as this evidence: it cannot tell App Lock's
+     * destination Activity from the biometric host of a superseded lock.
+     */
+    data class AppLockForeground(val token: AttemptToken) : EngineEvent
+
+    /**
      * A leave-without-auth request from the live surface (a Lock's Back/Home, or a shield's escape), keyed
      * by that surface's [SurfaceToken] and a closed [destination]. The reducer validates it against the live
      * surface, and **preserves** the surface: the reducer emits only [Effect.NavigateSafely], so the
@@ -402,12 +442,14 @@ sealed interface EngineEvent {
     ) : EngineEvent
 
     /**
-     * The success follow-up to [Effect.NavigateSafely], after the destination has launched. It is keyed by
-     * the escape's [AttemptToken], not the surface token (a retry over the same surface reuses the surface
-     * token). It matches only the exact attempt that emitted the NavigateSafely, and only while that escape
-     * is still in flight; then it tears the surface down. A supersession, or a follow-up from an
-     * already-reverted earlier attempt, no longer matches and is dropped. The newer surface stands, and the
-     * issued navigation is benign.
+     * The success follow-up to [Effect.NavigateSafely]: the launch call returned success. It sets
+     * [GuardState.LeavingFor.navigationIssued] to true on the in-flight escape. It does **not** tear the surface
+     * down. A background `START_ABORTED` also returns success, so only a real ARRIVAL ends the escape: a
+     * [Foreground.Home] observation for HOME, the destination package's foreground for OVERLAY_SETTINGS, or the
+     * explicit [AppLockForeground] signal for APP_LOCK. It is keyed by the escape's [AttemptToken], not the
+     * surface token. (A retry over the same surface reuses the surface token.) It matches only the attempt that
+     * emitted the NavigateSafely, and only while that escape is still in flight. The reducer drops a supersession,
+     * a follow-up from an already-reverted attempt, or an echo for an escape that arrival already completed.
      */
     data class SafeDismissNavigationIssued(val token: AttemptToken) : EngineEvent
 
@@ -421,6 +463,17 @@ sealed interface EngineEvent {
      * and is dropped.
      */
     data class SafeDismissNavigationFailed(val token: AttemptToken) : EngineEvent
+
+    /**
+     * The arrival timeout fired for an in-flight escape. The interpreter arms an attempt-keyed
+     * [TimerToken.ArrivalTimer] after it issues a launched navigation. If the destination does not arrive within
+     * the bound (a silent `START_ABORTED` never foregrounds), the timer feeds this event back. The reducer treats
+     * it like [SafeDismissNavigationFailed]: it reverts the escape [GuardState.LeavingFor] to its plain guard,
+     * reconciled with the current policy, so the control can retry. The surface never comes down for a navigation
+     * that did not arrive. It is keyed by the escape's [AttemptToken]. The reducer drops a late timeout for a
+     * superseded or already-reverted attempt.
+     */
+    data class SafeDismissTimedOut(val token: AttemptToken) : EngineEvent
     data object ScreenOff : EngineEvent
 }
 
@@ -429,16 +482,18 @@ sealed interface Effect {
     data object DismissSurface : Effect
 
     /**
-     * Launch [destination] over the standing surface, then feed back exactly one follow-up with this
-     * [attempt] token: [EngineEvent.SafeDismissNavigationIssued] after navigation starts (so the reducer
-     * tears the surface down, and only if that attempt is still the live escape), or
-     * [EngineEvent.SafeDismissNavigationFailed] if the launch could not start (so the reducer reverts the
-     * escape and the control can retry). The attempt token is unique for each request, so a follow-up cannot
-     * be attributed to a different attempt over the same surface.
+     * Launch [destination] over the standing surface, then feed back exactly one follow-up with this [attempt]
+     * token. When the launch call returns success, feed [EngineEvent.SafeDismissNavigationIssued] (the reducer
+     * records the navigation as issued, only if that attempt is still the live escape). The surface stays up until
+     * the destination is confirmed to have ARRIVED. When the launch cannot start, feed
+     * [EngineEvent.SafeDismissNavigationFailed] (the reducer reverts the escape so the control can retry). When the
+     * launch succeeds, the interpreter also arms an attempt-keyed [TimerToken.ArrivalTimer]. If the destination
+     * does not arrive, the timer feeds [EngineEvent.SafeDismissTimedOut] to revert the escape. The attempt token is
+     * unique for each request, so a follow-up cannot attach to a different attempt over the same surface.
      */
     data class NavigateSafely(val destination: SafeDestination, val attempt: AttemptToken) : Effect
-    data class ScheduleTimer(val token: TimerToken, val delayMs: Long) : Effect
-    data class CancelTimer(val token: TimerToken) : Effect
+    data class ScheduleTimer(val token: TimerToken.ReadinessTimer, val delayMs: Long) : Effect
+    data class CancelTimer(val token: TimerToken.ReadinessTimer) : Effect
     data class Log(val event: AuditEvent, val packageName: String?) : Effect
     data class NoteAppLeft(val packageName: String) : Effect
     data class MarkUnlocked(val packageName: String) : Effect

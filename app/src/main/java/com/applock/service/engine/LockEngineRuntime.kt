@@ -41,7 +41,8 @@ import kotlinx.coroutines.withContext
  * runtime ENQUEUES an effect follow-up onto the same channel and never does a reentrant reduce. Each
  * safety-critical presenter or navigation effect completes on [mainDispatcher] before the drain receives event
  * N+1. Thus N+1 never overtakes N's surface change. The runtime publishes the state BEFORE it interprets the
- * effects. This is C2-safe: a leave-without-auth keeps the surface in [GuardState.LeavingFor] until step 2.
+ * effects. This is C2-safe: a leave-without-auth keeps the surface in [GuardState.LeavingFor] until the
+ * destination is confirmed to have arrived.
  *
  * ## Resilience
  * The runtime calls every Android-bound port through an explicit failure policy. Thus no adapter fault can stop
@@ -164,6 +165,16 @@ class LockEngineRuntime(
     /** The user cancelled the biometric prompt for [token]. It never changes the lockout counter. */
     fun biometricCancelled(token: RequestToken) = submit(EngineEvent.BiometricCancelled(token))
 
+    /**
+     * App Lock's own foreground UI reports it is on screen (F wires `MainActivity.onResume` here). It is the
+     * ARRIVAL confirmation for an in-flight APP_LOCK safe-dismiss escape. [token] is the attempt that launched App
+     * Lock. F stamps the launch intent with the attempt's epoch and id, and `MainActivity.onResume` echoes it back.
+     * So a stale resume (a slow launch that lands after a timeout, or a background return) carries the old attempt,
+     * and the reducer drops it instead of completing a later escape. It rides the channel like every other input,
+     * so it stays ordered with the foreground stream and the handshake follow-ups.
+     */
+    fun appLockForegrounded(token: AttemptToken) = submit(EngineEvent.AppLockForeground(token))
+
     /** A leave-without-auth request from the live surface [token] to [destination]. */
     fun safeDismissRequested(
         token: SurfaceToken,
@@ -283,9 +294,29 @@ class LockEngineRuntime(
     }
 
     private suspend fun process(event: EngineEvent) {
-        val reduction = LockEngineReducer.reduce(_state.value, event)
+        val before = _state.value
+        val reduction = LockEngineReducer.reduce(before, event)
         _state.value = reduction.state // single-writer publish, before interpretation (C2-safe)
         for (effect in reduction.effects) interpret(effect, reduction.state)
+        reconcileArrivalTimeout(before, reduction.state)
+    }
+
+    /**
+     * Cancels the arrival timeout of a safe-dismiss escape that this event ended. [navigate] arms the timeout on
+     * the interpreter side, so its cancel is on the interpreter side too. When the in-flight escape's
+     * [AttemptToken] changed between [before] and [after] (the escape completed on arrival, reverted, was
+     * superseded, or screen-off cleared it), it cancels that attempt's [TimerToken.ArrivalTimer]. The cancel is an
+     * optimization, not the correctness boundary: a late fire that races it feeds a [EngineEvent.SafeDismissTimedOut]
+     * that the reducer's [AttemptToken] check drops. A cancel of a token that was never armed (a launch that failed
+     * before the arm) is a no-op. [shutdown] cancels every armed timer terminally.
+     */
+    private fun reconcileArrivalTimeout(before: EngineState, after: EngineState) {
+        val endedAttempt = (before.guardState as? GuardState.LeavingFor)?.attempt ?: return
+        val liveAttempt = (after.guardState as? GuardState.LeavingFor)?.attempt
+        if (liveAttempt != endedAttempt) {
+            val arrivalTimer = TimerToken.ArrivalTimer(endedAttempt.epoch, endedAttempt.id)
+            guard("timer_cancel") { timerScheduler.cancel(arrivalTimer) }
+        }
     }
 
     /**
@@ -396,20 +427,48 @@ class LockEngineRuntime(
     // ---- Navigation ----------------------------------------------------------------------------
 
     /**
-     * Launches [destination], then enqueues exactly one attempt-keyed follow-up. It enqueues "issued" when the
-     * launch started, and "failed" when it could not (a `false` return or a throw, both through [onMain]). A
+     * Launches [destination], then enqueues exactly one attempt-keyed follow-up. When the launch cannot start (a
+     * `false` return or a throw, both through [onMain]), it enqueues "failed" and the reducer reverts the escape.
+     * When the launch starts, it arms an attempt-keyed arrival timeout FIRST, then enqueues "issued". The surface
+     * stays up until the destination is confirmed to have arrived. So a background `START_ABORTED`, which also
+     * returns success and never foregrounds, reverts on the timeout instead of stranding the surface. If the
+     * timeout cannot be armed, it fails secure and reverts now, rather than leave the escape unbounded. A
      * supersession that arrived first makes the follow-up stale, and the reducer drops it. Thus the newer surface
-     * never comes down for an old navigation.
+     * never comes down for an old navigation, and no navigation is left without a bound.
      */
     private suspend fun navigate(destination: SafeDestination, attempt: AttemptToken) {
         val launched = onMain({ navigator.navigate(destination) }, { false })
-        submit(
-            if (launched) {
-                EngineEvent.SafeDismissNavigationIssued(attempt)
-            } else {
-                EngineEvent.SafeDismissNavigationFailed(attempt)
-            },
-        )
+        if (!launched) {
+            submit(EngineEvent.SafeDismissNavigationFailed(attempt))
+            return
+        }
+        if (!armArrivalTimeout(attempt)) {
+            submit(EngineEvent.SafeDismissNavigationFailed(attempt))
+            return
+        }
+        submit(EngineEvent.SafeDismissNavigationIssued(attempt))
+    }
+
+    /**
+     * Arms the attempt-keyed arrival timeout through the [timerScheduler] seam, so it inherits the scheduler's
+     * shutdown atomicity and scheduling-failure semantics. It returns whether the timer was armed. A `false` return
+     * (a dying looper) or a throw both report to diagnostics and count as not-armed, so [navigate] reverts the
+     * escape fail-secure. A real arrival cancels the timer ([reconcileArrivalTimeout]). On expiry the scheduler
+     * feeds [EngineEvent.SafeDismissTimedOut] through [onTimerFire].
+     */
+    @Suppress("TooGenericExceptionCaught") // scheduling failure (false or throw) -> fail-secure revert
+    private fun armArrivalTimeout(attempt: AttemptToken): Boolean {
+        val token = TimerToken.ArrivalTimer(attempt.epoch, attempt.id)
+        return try {
+            val scheduled = timerScheduler.schedule(token, ARRIVAL_TIMEOUT_MS, ::onTimerFire)
+            if (!scheduled) safeReport("arrival_timeout", "rejected")
+            scheduled
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            safeReport("arrival_timeout", e.javaClass.simpleName)
+            false
+        }
     }
 
     // ---- Boundaries & helpers ------------------------------------------------------------------
@@ -472,7 +531,7 @@ class LockEngineRuntime(
      * reports both rejection modes to diagnostics.
      */
     @Suppress("TooGenericExceptionCaught") // scheduling failure (false or throw) -> escalate to Recovery
-    private fun scheduleTimer(token: TimerToken, delayMs: Long) {
+    private fun scheduleTimer(token: TimerToken.ReadinessTimer, delayMs: Long) {
         val armed = try {
             val scheduled = timerScheduler.schedule(token, delayMs, ::onTimerFire)
             if (!scheduled) safeReport("timer_schedule", "rejected") // a non-throwing rejection (dying looper)
@@ -497,7 +556,17 @@ class LockEngineRuntime(
         submit(EngineEvent.LockoutRecorded(effect.token, outcome.state, outcome.count))
     }
 
-    private fun onTimerFire(token: TimerToken) = submit(EngineEvent.TimerFired(token))
+    /**
+     * The scheduler's fired callback, for both timer kinds. A [TimerToken.ReadinessTimer] feeds the readiness
+     * [EngineEvent.TimerFired]. A [TimerToken.ArrivalTimer] feeds the attempt-keyed
+     * [EngineEvent.SafeDismissTimedOut]. It only enqueues. The reducer rejects a stale or superseded timer, so an
+     * extra fire is benign.
+     */
+    private fun onTimerFire(token: TimerToken) = when (token) {
+        is TimerToken.ReadinessTimer -> submit(EngineEvent.TimerFired(token))
+        is TimerToken.ArrivalTimer ->
+            submit(EngineEvent.SafeDismissTimedOut(AttemptToken(token.epoch, token.attemptId)))
+    }
 
     // ---- Total lockout boundary (production storage is Android-backed and can throw) ------------
 
@@ -616,5 +685,13 @@ class LockEngineRuntime(
 
         /** Delay before a re-drive, so a transient adapter failure has time to clear. */
         const val REDRIVE_DELAY_MS = 250L
+
+        /**
+         * Provisional bound for a safe-dismiss escape to reach its destination before it reverts. A launch that
+         * silently aborts (a background `START_ABORTED`) returns success and never foregrounds, so the escape would
+         * otherwise stay in [GuardState.LeavingFor] forever. The surface stays up the whole time (fail secure), so
+         * this bound only sets how long the "leaving" state lasts before it reconciles with policy.
+         */
+        const val ARRIVAL_TIMEOUT_MS = 5_000L
     }
 }

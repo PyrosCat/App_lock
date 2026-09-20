@@ -4,6 +4,40 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F1): safe-dismiss arrival confirmation + arrival timeout   (2026-09-20)
+-------------------------------------------------------------------------------------
+Reworked the leave-without-auth handshake so the guarding surface comes down only when the destination is
+confirmed to have ARRIVED, not the instant the launch call returns. A background START_ABORTED returns success
+too, so the old "issued tears the surface down" step could reveal the guarded app when nothing actually launched.
+Reducer and interpreter support plus its JVM tests only; no DI wiring (the MainActivity.onResume signal lands with
+the cutover), so production is unchanged and still runs the legacy path.
+- SafeDismissNavigationIssued now only RECORDS the issue (LeavingFor.navigationIssued = true); it no longer
+  dismisses. A real arrival ends the escape: Foreground.Home for HOME, the destination package's foreground for
+  OVERLAY_SETTINGS, and a new explicit AppLockForeground signal for APP_LOCK. Arrival completes in either
+  navigationIssued state (the drain can deliver the destination foreground before the issued echo); a late echo for
+  an already-completed escape matches no live escape and is dropped.
+- The AppLockForeground signal carries the AttemptToken of the escape that launched App Lock (F stamps the launch
+  intent, MainActivity.onResume echoes it), and the reducer completes the escape only when the live escape's
+  attempt matches. Foreground.Home and the settings foreground are level-triggered observations of the current
+  foreground, but onResume is an edge-triggered lifecycle event, so a stale one (a slow launch landing after a
+  timeout, or a background return) would otherwise complete a different later escape; the attempt key drops it.
+- APP_LOCK and OVERLAY_SETTINGS are now shield-only escapes (a ReadinessToken): the reducer rejects an APP_LOCK
+  request from a lock, matching the presenter, which offers "Open App Lock" only from the readiness shields. This
+  also lets App Lock's own foreground confirm the arrival without mistaking a lock's biometric-host Foreground.Own
+  for the destination; Own is never arrival evidence.
+- OVERLAY_SETTINGS completes only on an approved package different from the guarded origin. When the origin is
+  itself the approved package (settings over settings), a same-package observation stays an origin re-present and
+  the timeout is the backstop, which removes the origin-re-emission-becomes-arrival and the
+  false-arrival-on-aborted-launch cases.
+- Added an attempt-keyed arrival timeout: the interpreter arms a TimerToken.ArrivalTimer through the existing
+  TimerScheduler seam when a launched navigation issues, so a silently aborted escape reverts (SafeDismissTimedOut,
+  treated like a launch failure) instead of stranding the surface. A scheduling failure reverts immediately (fail
+  secure). The timeout is cancelled on completion, supersession, and screen-off, and shutdown() cancels all; a late
+  fire is dropped by the attempt token. TimerToken is now a sealed set (ReadinessTimer + ArrivalTimer).
+- Gate green on this box: testProdDebugUnitTest (LockEngineReducerTest 52, LockEngineSafeDismissTest 68,
+  LockEngineRuntimeTest 54; 0 failures), detekt clean, assembleProdDebug, compileProdDebugAndroidTestKotlin.
+
+
 M7/WP2 (change E): NucBox Gate-2 both legs PASS on x86_64 emulator lanes   (2026-09-18)
 --------------------------------------------------------------------------------------
 Ran both change-E test legs on the NucBox x86_64 emulator lanes; both passed. Leg A ran on a hardware-GPU emulator

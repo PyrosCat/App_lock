@@ -30,9 +30,11 @@ object LockEngineReducer {
         is EngineEvent.UnlockFailed -> onUnlockFailed(state, event)
         is EngineEvent.LockoutRecorded -> onLockoutRecorded(state, event)
         is EngineEvent.BiometricCancelled -> onBiometricCancelled(state, event)
+        is EngineEvent.AppLockForeground -> onAppLockForeground(state, event)
         is EngineEvent.SafeDismissRequested -> onSafeDismissRequested(state, event)
         is EngineEvent.SafeDismissNavigationIssued -> onSafeDismissNavigationIssued(state, event)
         is EngineEvent.SafeDismissNavigationFailed -> onSafeDismissNavigationFailed(state, event)
+        is EngineEvent.SafeDismissTimedOut -> onSafeDismissTimedOut(state, event)
         EngineEvent.ScreenOff -> onScreenOff(state)
     }
 
@@ -351,7 +353,7 @@ object LockEngineReducer {
         val guard: BlockingGuard
         if (phase == HoldPhase.CHECKING) {
             newGeneration = Generation(state.generation.n + 1)
-            val timer = TimerToken(state.epoch, newGeneration)
+            val timer = TimerToken.ReadinessTimer(state.epoch, newGeneration)
             effects += Effect.ScheduleTimer(timer, T_READY_MS)
             guard = BlockingGuard.Checking(target, timer)
         } else {
@@ -478,8 +480,8 @@ object LockEngineReducer {
      * **preserves** the surface: the guard becomes a [GuardState.LeavingFor] over the same [BlockingGuard],
      * and the reducer emits only [Effect.NavigateSafely]. So the destination launches over the standing
      * surface, and the guarded app never flashes. The reducer drops a token that does not match the live
-     * surface (a stale request from a superseded surface, or a foreign-process epoch), and an invalid
-     * OVERLAY_SETTINGS escape.
+     * surface (a stale request from a superseded surface, or a foreign-process epoch), and an invalid APP_LOCK
+     * or OVERLAY_SETTINGS escape (both are shield-only; see below).
      *
      * At most one escape is ever in flight, so the reducer **drops** a request that arrives while a
      * [GuardState.LeavingFor] already stands; it never lets the request replace the escape. This keeps
@@ -492,9 +494,16 @@ object LockEngineReducer {
     private fun onSafeDismissRequested(state: EngineState, event: EngineEvent.SafeDismissRequested): Reduction {
         val guard = state.liveGuard ?: return Reduction(state, emptyList()) // no surface to leave
         val alreadyLeaving = state.guardState is GuardState.LeavingFor // one escape is already in flight
-        // An OVERLAY_SETTINGS escape is valid only from a readiness shield with a resolved package.
-        val validForDestination =
-            event.destination != SafeDestination.OVERLAY_SETTINGS || isValidSettingsEscape(event)
+        // APP_LOCK and OVERLAY_SETTINGS are shield-only escapes (a ReadinessToken). The presenter offers
+        // "Open App Lock" and "Grant overlay" only from the Checking or Recovery shields, never from a lock. A
+        // shield-only APP_LOCK also lets App Lock's own foreground signal confirm the arrival, so the reducer does
+        // not mistake a lock's biometric-host Foreground.Own for the destination. OVERLAY_SETTINGS also needs a
+        // resolved package to exempt. HOME may leave any live surface (a lock's Back or Home, or a shield's).
+        val validForDestination = when (event.destination) {
+            SafeDestination.HOME -> true
+            SafeDestination.APP_LOCK -> event.token is ReadinessToken
+            SafeDestination.OVERLAY_SETTINGS -> isValidSettingsEscape(event)
+        }
         if (alreadyLeaving || !isLiveSurface(state, event.token) || !validForDestination) {
             return Reduction(state, emptyList())
         }
@@ -525,41 +534,51 @@ object LockEngineReducer {
         event.token is ReadinessToken && event.exemptPackages.isNotEmpty()
 
     /**
-     * Step 2: the destination has launched, so now, and only now, tear the surface down. The reducer needs
-     * the in-flight escape recorded at step 1 whose [GuardState.LeavingFor.attempt] matches this exact token.
-     * (A stray or miswired follow-up with no navigation ever issued cannot clear the guard. A supersession
-     * that replaced the escape makes this stale, and the reducer drops it: the newer surface must never come
-     * down for the old navigation, which is itself benign.) The escape then hands off to an OVERLAY_SETTINGS
-     * arrival exemption; every other destination needs none.
+     * Step 2a: the launch call returned success, so record the navigation as ISSUED on the in-flight escape. It
+     * does **not** tear the surface down. A background `START_ABORTED` also returns success, so a teardown here
+     * would reveal the guarded app when nothing arrived. Only a real ARRIVAL ends the escape ([onForeground] for
+     * HOME and OVERLAY_SETTINGS, [onAppLockForeground] for APP_LOCK), and the interpreter's arrival timeout is the
+     * backstop for a silent abort. The reducer needs the in-flight escape whose [GuardState.LeavingFor.attempt]
+     * matches this token. It drops a stray follow-up with no escape in flight, a stale one from a superseded or
+     * already-reverted attempt, and an echo for an escape that arrival already completed. A re-flip of an
+     * already-issued escape is an idempotent no-op.
      */
     private fun onSafeDismissNavigationIssued(
         state: EngineState,
         event: EngineEvent.SafeDismissNavigationIssued,
     ): Reduction {
         val leaving = state.guardState as? GuardState.LeavingFor
-        if (leaving == null || leaving.attempt != event.token) {
+        if (leaving == null || leaving.attempt != event.token || leaving.navigationIssued) {
+            return Reduction(state, emptyList())
+        }
+        return Reduction(state.copy(guardState = leaving.copy(navigationIssued = true)), emptyList())
+    }
+
+    /**
+     * App Lock's own foreground UI is on screen ([EngineEvent.AppLockForeground]): the ARRIVAL confirmation for an
+     * in-flight APP_LOCK escape. The reducer completes it only when a live [GuardState.LeavingFor] targets APP_LOCK
+     * and its [GuardState.LeavingFor.attempt] matches the signal's [EngineEvent.AppLockForeground.token]. The
+     * attempt match is essential. This is an edge-triggered lifecycle signal, so a stale one from a timed-out or
+     * superseded launch must not complete a *different* later escape. A retry mints a fresh attempt, so its token
+     * no longer matches the stale signal. The reducer drops a signal with no escape in flight, one whose escape a
+     * supersession replaced, and one for an already-reverted attempt. On a match it tears the guarding surface
+     * down (APP_LOCK keeps no arrival exemption), re-locks the app being left, and clears
+     * [EngineState.lastForeground] so a later Failed does not rebuild a shield over the abandoned target. It
+     * completes in either [GuardState.LeavingFor.navigationIssued] state, because the drain can deliver this before
+     * the issued echo.
+     */
+    private fun onAppLockForeground(state: EngineState, event: EngineEvent.AppLockForeground): Reduction {
+        val leaving = state.guardState as? GuardState.LeavingFor
+        if (leaving == null || leaving.destination != SafeDestination.APP_LOCK || leaving.attempt != event.token) {
             return Reduction(state, emptyList())
         }
         val effects = mutableListOf<Effect>()
         cancelCheckingTimer(state, effects)
-        // The user leaves the current foreground for a safe destination, so re-lock it (end its session under
-        // the relock policy) before the reducer erases the foreground: the destination observation can no
-        // longer emit this after lastForeground is cleared. An arrival-before-follow-up already emits it
-        // through onRealForeground, and the reducer then drops this follow-up, so there is no duplicate.
         (state.lastForeground as? RealForeground.Other)?.let { effects += Effect.NoteAppLeft(it.packageName) }
         effects += Effect.DismissSurface
-        // Hand off to an arrival exemption for OVERLAY_SETTINGS; other destinations need none. The reducer
-        // clears lastForeground: the user has left the old target for a safe destination, so a later Failed
-        // must not rebuild a shield over it (Home resets it on observation; APP_LOCK's Own never would).
-        val exemption = if (leaving.approved.isNotEmpty()) {
-            ArrivalExemption(leaving.surfaceToken, leaving.guarding.target, leaving.approved)
-        } else {
-            null
-        }
         return Reduction(
             state.copy(
                 guardState = GuardState.None,
-                exemption = exemption,
                 lastForeground = null,
                 generation = Generation(state.generation.n + 1),
             ),
@@ -569,24 +588,39 @@ object LockEngineReducer {
 
     /**
      * The failure sibling of [onSafeDismissNavigationIssued]: the destination could not launch, so revert the
-     * in-flight escape to its plain guard, and allow a retry. The reducer needs the recorded escape whose
-     * [GuardState.LeavingFor.attempt] matches this exact attempt token, so it drops a stale failure from a
-     * since-superseded or already-reverted attempt, and never reverts a newer surface.
-     *
-     * The policy may have moved on while the (now-failed) navigation was in flight: Ready or Failed can arrive
-     * over a preserved HOME/APP_LOCK escape without an end to it. So the reducer reconciles the reverted guard
-     * with the current policy, exactly as a fresh [EngineEvent.PolicyStateChanged] would. Under Loading the
-     * restored guard stands. Under Failed a shield escalates to Recovery (a lock is preserved). Under Ready a
-     * shield is re-evaluated (a protected target locks fail-secure, an unprotected target dismisses) and a lock
-     * is preserved. Without this, a Checking or Recovery shield restored under Ready would stand frozen forever
-     * (its `T_ready` timer is inert after policy leaves Loading).
+     * in-flight escape to its plain guard, and allow a retry. See [revertEscape].
      */
     private fun onSafeDismissNavigationFailed(
         state: EngineState,
         event: EngineEvent.SafeDismissNavigationFailed,
-    ): Reduction {
+    ): Reduction = revertEscape(state, event.token)
+
+    /**
+     * The timeout sibling of [onSafeDismissNavigationFailed]: the interpreter's attempt-keyed arrival timeout
+     * fired because the destination never came to the foreground (a silent `START_ABORTED`), so revert the
+     * escape exactly as a launch failure would. See [revertEscape].
+     */
+    private fun onSafeDismissTimedOut(
+        state: EngineState,
+        event: EngineEvent.SafeDismissTimedOut,
+    ): Reduction = revertEscape(state, event.token)
+
+    /**
+     * Reverts the in-flight escape whose [GuardState.LeavingFor.attempt] matches [token] to its plain guard, so
+     * the escape control can retry. It drops a stale [token] from a superseded or already-reverted attempt, so it
+     * never reverts a newer surface.
+     *
+     * The policy can change while the navigation is in flight. Ready or Failed can arrive over a preserved HOME or
+     * APP_LOCK escape, and the escape does not end. So the reducer reconciles the reverted guard with the current
+     * policy, as a fresh [EngineEvent.PolicyStateChanged] does. Under Loading the restored guard stands. Under
+     * Failed a shield escalates to Recovery, and a lock stays. Under Ready the reducer re-evaluates a shield (a
+     * protected target locks fail-secure, an unprotected target dismisses), and a lock stays. Without this, a
+     * Checking or Recovery shield restored under Ready would stand frozen: its `T_ready` timer is inert after the
+     * policy leaves Loading.
+     */
+    private fun revertEscape(state: EngineState, token: AttemptToken): Reduction {
         val leaving = state.guardState as? GuardState.LeavingFor
-        if (leaving == null || leaving.attempt != event.token) {
+        if (leaving == null || leaving.attempt != token) {
             return Reduction(state, emptyList())
         }
         val reverted = state.copy(guardState = GuardState.Guarding(leaving.guarding))
