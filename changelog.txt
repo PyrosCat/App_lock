@@ -4,6 +4,13 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F2): retain FR-174 JVM re-verification report   (2026-09-20)
+--------------------------------------------------------------------------
+Added the local JVM validation report for commit b9e7c53 covering f2 lockout; the RTM cites it as
+FR-174's green-run evidence.
+- Gate: 348 unit tests, 0 failures; detekt, assembleProdDebug, and compileProdDebugAndroidTestKotlin all pass.
+
+
 M7/WP2 (change F2): record R-007 degraded-storage residuals   (2026-09-20)
 --------------------------------------------------------------------------
 Recorded four proposed R-007 residuals in docs/process/RISK_REGISTER.md, deferred to F6 (the runtime cutover) for
