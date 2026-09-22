@@ -450,7 +450,10 @@ object LockEngineReducer {
         // the legacy engine, and the capture fires on every failure (the capture manager owns the threshold
         // policy).
         val effects = mutableListOf<Effect>()
-        if (event.lockout is LockoutState.LockedOut) {
+        // Only a recorded (durable) lockout audits as LOCKOUT_TRIGGERED. A degraded, in-memory-only lockout (a
+        // storage write that failed) still blocks and still projects LockedOut, but it is never audited as recorded
+        // (R-007). The capture below fires on every failure regardless.
+        if (event.lockout is LockoutState.LockedOut && !event.lockout.degraded) {
             effects += Effect.Log(AuditEvent.LOCKOUT_TRIGGERED, pendingFailure.target)
         }
         effects += Effect.CaptureIntruder(pendingFailure.target, pendingFailure.method, event.failureCount)

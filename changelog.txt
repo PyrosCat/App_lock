@@ -4,6 +4,30 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F2): R-007 degraded-storage lockout enforcement   (2026-09-20)
+----------------------------------------------------------------------------
+Fixed R-007: a lockout storage-write failure now blocks further authentication attempts in memory, even below
+the normal failure threshold. Previously, write failures could silently lose the failure count. This change
+strengthens brute-force protection (FR-174); the remaining storage and restart risks are documented separately.
+
+- Reworked LockoutManager to enforce the lockout from memory immediately and queue storage writes in order off the
+  caller thread, and to report each failure's own count and write result for audit and intruder capture.
+- Changed EncryptedPrefsLockoutStorage to commit directly and return the result, so a failed write surfaces instead
+  of being swallowed.
+- Updated ApplicationLockEngine (the live PIN path) to return the immediate lockout, move the audit into the
+  completion callback, and log a reset-write failure instead of dropping it; a failed reset clears in memory
+  without re-locking the user.
+- Injected a sleep-aware Android enforcement clock into LockoutManager via AppModule.
+- Updated LockEngineRuntime to admit lockout changes immediately and resolve persistence off its event loop, so it
+  dismisses the overlay and processes queued events without waiting for a write; it remains unwired until F6.
+- Added a LockEngineReducer gate that logs LOCKOUT_TRIGGERED only for a durable (committed) lockout.
+- Adapted the overlay UI tests (OverlayLockPresenterUiTest, OverlayWindowHostFaultUiTest) to the new storage
+  interface (compile-only on this host) and expanded the LockoutManager and LockEngineRuntime unit tests (degraded
+  enforcement, overlapping writes, resets, shutdown, stalled writes).
+- Ran the gate green (348 unit tests, 0 failures; detekt, assembleProdDebug, compileProdDebugAndroidTestKotlin);
+  FR-174 stays implemented-verified (per-push CI), device re-verification at WP6.
+
+
 M7/WP2 (change F1): safe-dismiss arrival confirmation + arrival timeout   (2026-09-20)
 -------------------------------------------------------------------------------------
 Reworked the leave-without-auth handshake so the guarding surface comes down only when the destination is

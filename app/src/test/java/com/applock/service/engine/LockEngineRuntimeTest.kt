@@ -4,13 +4,17 @@ import com.applock.domain.LockSessionManager
 import com.applock.domain.PolicyState
 import com.applock.domain.RelockPolicy
 import com.applock.security.LockoutManager
+import com.applock.security.LockoutSnapshot
 import com.applock.security.LockoutState
 import com.applock.security.LockoutStorage
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
 import org.junit.After
@@ -20,6 +24,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
@@ -48,38 +53,43 @@ class LockEngineRuntimeTest {
     private val protectedPackages = setOf("com.a", "com.b")
     private var nowMs = 0L
     private var runtimeScope: CoroutineScope? = null
+    private var lockoutManagerRef: LockoutManager? = null
 
     @After
     fun tearDown() {
+        lockoutManagerRef?.shutdown() // stop the lockout persistence coroutines
         runtimeScope?.cancel() // stop the drain and the policy collector coroutines
     }
 
     // ---- Fakes ---------------------------------------------------------------------------------
 
     /** In-memory lockout store, so the real LockoutManager runs on the JVM. When [error] is set, EVERY access
-     *  (a read or a write, on either property) throws. This models a persistent storage fault, like a broken
-     *  EncryptedPrefs. */
-    private class FakeLockoutStorage(var error: Exception? = null) : LockoutStorage {
-        private var count: Int = 0
-        private var until: Long = 0L
-        override var failureCount: Int
-            get() {
-                error?.let { throw it }
-                return count
-            }
-            set(value) {
-                error?.let { throw it }
-                count = value
-            }
-        override var lockoutUntil: Long
-            get() {
-                error?.let { throw it }
-                return until
-            }
-            set(value) {
-                error?.let { throw it }
-                until = value
-            }
+     *  (a read or a write) throws. This models a persistent storage fault, like a broken EncryptedPrefs: the seed
+     *  read fails, and a write throws (which the manager contains as a degraded fallback). */
+    private class FakeLockoutStorage(
+        @Volatile var error: Exception? = null,
+        seed: LockoutSnapshot = LockoutSnapshot(0, 0L),
+    ) : LockoutStorage {
+        @Volatile private var stored: LockoutSnapshot = seed
+
+        // Optional latches so a test can park a write in flight (to prove a shutdown barrier).
+        @Volatile
+        var writeEntered: CountDownLatch? = null
+
+        @Volatile
+        var writeProceed: CountDownLatch? = null
+
+        override fun read(): LockoutSnapshot {
+            error?.let { throw it }
+            return stored
+        }
+        override fun write(snapshot: LockoutSnapshot): Boolean {
+            writeEntered?.countDown()
+            writeProceed?.await()
+            error?.let { throw it }
+            stored = snapshot
+            return true
+        }
     }
 
     private class FakePresenter(
@@ -251,6 +261,7 @@ class LockEngineRuntimeTest {
         val home: FakeHomeResolver,
         val diagnostics: FakeDiagnostics,
         val scheduler: TestCoroutineScheduler,
+        val scope: CoroutineScope,
         val log: MutableList<String>,
     ) {
         /** The live lock's request token, or fails the test if nothing is locked. */
@@ -258,6 +269,23 @@ class LockEngineRuntimeTest {
 
         /** Drains every queued input and effect follow-up to a fixed point. */
         fun idle() = scheduler.advanceUntilIdle()
+
+        /**
+         * Runs the suspend self-gate success on the test scope and drains. The admission runs under the lifecycle
+         * barrier; the durable clear is awaited on the same scheduler, so [idle] resolves it.
+         */
+        fun selfGateSuccess(packageName: String, method: UnlockMethod = UnlockMethod.PIN) {
+            scope.launch { runtime.onUnlockSuccess(packageName, method) }
+            idle()
+        }
+
+        /** Runs the suspend self-gate failure on the test scope, drains, and returns its resolved lockout state. */
+        fun selfGateFailure(packageName: String, method: UnlockMethod = UnlockMethod.PIN): LockoutState {
+            var result: LockoutState? = null
+            scope.launch { result = runtime.onUnlockFailure(packageName, method) }
+            idle()
+            return result ?: error("self-gate failure did not resolve")
+        }
     }
 
     @Suppress("LongParameterList") // optional per-test knobs, each defaulted
@@ -268,6 +296,7 @@ class LockEngineRuntimeTest {
         homePackages: Set<String> = setOf("com.launcher"),
         storage: FakeLockoutStorage = FakeLockoutStorage(),
         main: CoroutineDispatcher? = null,
+        realLockoutIo: Boolean = false,
     ): Harness {
         val log = mutableListOf<String>()
         val policyFlow = MutableStateFlow(policy)
@@ -279,8 +308,6 @@ class LockEngineRuntimeTest {
         val home = FakeHomeResolver(homePackages)
         val diagnostics = FakeDiagnostics()
         val health = EnforcementHealth()
-        val lockoutManager = LockoutManager(storage) { nowMs }
-        val sessionManager = LockSessionManager(policyProvider = { RelockPolicy.IMMEDIATE }, clock = { nowMs })
         // The drain runs on a StandardTestDispatcher whose scheduler the test advances explicitly, so inputs
         // queued without an intervening idle() sit in the channel together. mainDispatcher defaults to the same
         // scheduler; a test can pass a distinct (pausable) Main to hold an effect mid-flight.
@@ -288,6 +315,22 @@ class LockEngineRuntimeTest {
         val dispatcher = StandardTestDispatcher(scheduler)
         val scope = CoroutineScope(dispatcher)
         runtimeScope = scope
+        // By default the manager persists on the SAME test dispatcher, so idle() drives its writes deterministically.
+        // The lifecycle barrier test needs real thread blocking, so it opts into a real single-thread dispatcher.
+        val lockoutManager =
+            if (realLockoutIo) {
+                LockoutManager(
+                    storage,
+                    clock = { nowMs },
+                    elapsedRealtime = { nowMs },
+                    ioDispatcher = Executors.newSingleThreadExecutor { r -> Thread(r).apply { isDaemon = true } }
+                        .asCoroutineDispatcher(),
+                )
+            } else {
+                LockoutManager(storage, clock = { nowMs }, elapsedRealtime = { nowMs }, ioDispatcher = dispatcher)
+            }
+        lockoutManagerRef = lockoutManager
+        val sessionManager = LockSessionManager(policyProvider = { RelockPolicy.IMMEDIATE }, clock = { nowMs })
         val runtime = LockEngineRuntime(
             epoch = epoch,
             scope = scope,
@@ -310,7 +353,7 @@ class LockEngineRuntimeTest {
         log.clear() // drop any startup present so per-test logs start clean
         return Harness(
             runtime, policyFlow, presenter, navigator, timer, audit, intruder, health, lockoutManager,
-            sessionManager, home, diagnostics, scheduler, log,
+            sessionManager, home, diagnostics, scheduler, scope, log,
         )
     }
 
@@ -775,19 +818,22 @@ class LockEngineRuntimeTest {
     }
 
     @Test
-    fun `shutdown blocks until an in-flight self-gate call completes`() {
-        val h = buildRuntime()
+    fun `shutdown blocks until an in-flight self-gate admission completes`() {
+        // The lockout persistence runs on a real dispatcher here, so the parked audit blocks a real thread that
+        // holds the lifecycle monitor while a second thread's shutdown() must wait on it.
+        val h = buildRuntime(realLockoutIo = true)
         val entered = CountDownLatch(1)
         val proceed = CountDownLatch(1)
         h.audit.entered = entered
         h.audit.proceed = proceed
         val shutdownReturned = AtomicBoolean(false)
 
-        // Thread A: a self-gate failure that parks inside its (first) audit write, holding the lifecycle monitor.
-        val selfGateThread = thread { h.runtime.onUnlockFailure("com.a") }
+        // Thread A: a self-gate failure that parks inside its (first) audit write, holding the lifecycle monitor
+        // through the whole admission (the audit and the lockout admission are one unit under the barrier).
+        val selfGateThread = thread { runBlocking { h.runtime.onUnlockFailure("com.a") } }
         try {
             assertTrue("self-gate never entered", entered.await(2, TimeUnit.SECONDS))
-            // Thread B: shutdown() must block on the lifecycle monitor A holds; it cannot return mid self-gate.
+            // Thread B: shutdown() must block on the lifecycle monitor A holds; it cannot return mid admission.
             val shutdownThread = thread {
                 h.runtime.shutdown()
                 shutdownReturned.set(true)
@@ -795,16 +841,16 @@ class LockEngineRuntimeTest {
             val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2)
             while (shutdownThread.state != Thread.State.BLOCKED && System.nanoTime() < deadline) Thread.onSpinWait()
             assertEquals(Thread.State.BLOCKED, shutdownThread.state)
-            assertFalse("shutdown returned mid self-gate call", shutdownReturned.get())
+            assertFalse("shutdown returned mid self-gate admission", shutdownReturned.get())
 
-            proceed.countDown() // let A finish; only then can shutdown acquire the monitor and complete
+            proceed.countDown() // let A finish its admission; only then can shutdown acquire the monitor
             shutdownThread.join(3_000)
             assertTrue(shutdownReturned.get())
         } finally {
             proceed.countDown()
             selfGateThread.join(3_000)
         }
-        // A's self-gate mutation ran to completion before shutdown returned (the barrier held).
+        // A's self-gate admission ran to completion before shutdown returned (the barrier held).
         assertEquals(1, h.lockoutManager.failureCount())
     }
 
@@ -815,15 +861,44 @@ class LockEngineRuntimeTest {
         h.idle()
         // The self-gate bypasses the channel, so it needs its own stopped guard. onUnlockFailure is a
         // fail-secure deny (LockedOut) with no lockout / audit / capture mutation.
-        val state = h.runtime.onUnlockFailure("com.a")
+        val state = runBlocking { h.runtime.onUnlockFailure("com.a") }
         assertTrue(state is LockoutState.LockedOut)
         assertEquals(0, h.lockoutManager.failureCount())
         assertTrue(h.audit.events.isEmpty())
         assertTrue(h.intruder.calls.isEmpty())
         // onUnlockSuccess is a reported no-op: no session is marked unlocked.
-        h.runtime.onUnlockSuccess("com.a")
+        runBlocking { h.runtime.onUnlockSuccess("com.a") }
         assertFalse(h.sessionManager.hasValidSession("com.a"))
         // Both were reported to diagnostics, not silently dropped.
+        assertTrue(h.diagnostics.reports.any { it.first == "runtime" && it.second == "self_gate_after_shutdown" })
+    }
+
+    @Test
+    fun `a self-gate whose write is in flight starts no audit or capture once shutdown returns`() {
+        // The post-await audit and capture re-enter the lifecycle barrier and recheck stopped, so a shutdown
+        // that returned while persistence was in flight prevents any new effect. The lockout persistence runs on a
+        // real dispatcher so the parked write blocks a real thread.
+        val storage = FakeLockoutStorage()
+        val h = buildRuntime(storage = storage, realLockoutIo = true)
+        val entered = CountDownLatch(1)
+        val proceed = CountDownLatch(1)
+        storage.writeEntered = entered
+        storage.writeProceed = proceed
+        val done = CountDownLatch(1)
+
+        // The self-gate admits (auditing UNLOCK_FAILURE), then parks inside its durable write.
+        thread {
+            runBlocking { h.runtime.onUnlockFailure("com.a") }
+            done.countDown()
+        }
+        assertTrue("write never entered", entered.await(2, TimeUnit.SECONDS))
+
+        h.runtime.shutdown() // returns while the write is still in flight
+        proceed.countDown() // the write completes; the post-await recheck must now skip audit and capture
+        assertTrue("self-gate never completed", done.await(3, TimeUnit.SECONDS))
+
+        assertTrue("capture must not start after shutdown", h.intruder.calls.isEmpty())
+        assertTrue(h.audit.events.none { it.first == AuditEvent.LOCKOUT_TRIGGERED })
         assertTrue(h.diagnostics.reports.any { it.first == "runtime" && it.second == "self_gate_after_shutdown" })
     }
 
@@ -888,7 +963,7 @@ class LockEngineRuntimeTest {
     @Test
     fun `self-gate success marks the session, resets lockout, and audits`() {
         val h = buildRuntime()
-        h.runtime.onUnlockSuccess("com.a")
+        h.selfGateSuccess("com.a")
         assertTrue(h.sessionManager.hasValidSession("com.a")) // authoritative session mutation
         assertEquals(0, h.lockoutManager.failureCount()) // lockout reset
         assertTrue(h.audit.events.contains(AuditEvent.UNLOCK_SUCCESS to "com.a"))
@@ -897,7 +972,7 @@ class LockEngineRuntimeTest {
     @Test
     fun `self-gate biometric success audits the biometric event`() {
         val h = buildRuntime()
-        h.runtime.onUnlockSuccess("com.a", UnlockMethod.BIOMETRIC)
+        h.selfGateSuccess("com.a", UnlockMethod.BIOMETRIC)
         assertTrue(h.audit.events.contains(AuditEvent.BIOMETRIC_UNLOCK_SUCCESS to "com.a"))
     }
 
@@ -905,27 +980,41 @@ class LockEngineRuntimeTest {
     fun `self-gate failure records the lockout and returns the real state`() {
         val h = buildRuntime()
         var state: LockoutState = LockoutState.Available
-        repeat(LockoutManager.FAILURE_THRESHOLD) { state = h.runtime.onUnlockFailure("com.a") }
+        repeat(LockoutManager.FAILURE_THRESHOLD) { state = h.selfGateFailure("com.a") }
         // The authoritative mutation ran (real count + state), and the observational audit / capture fired.
         assertTrue(state is LockoutState.LockedOut)
+        assertFalse("a persisted threshold lockout is recorded", (state as LockoutState.LockedOut).degraded)
         assertEquals(LockoutManager.FAILURE_THRESHOLD, h.lockoutManager.failureCount())
         assertTrue(h.audit.events.contains(AuditEvent.LOCKOUT_TRIGGERED to "com.a"))
         assertEquals(LockoutManager.FAILURE_THRESHOLD, h.intruder.calls.last().third)
     }
 
     @Test
-    fun `self-gate failure returns a contained synthetic lockout when the authoritative mutation throws`() {
+    fun `self-gate failure resolves a degraded lockout when the durable write fails`() {
         val h = buildRuntime(storage = FakeLockoutStorage(error = RuntimeException("storage boom")))
-        // The authoritative recordFailureAndCount throws, so the fallback returns a contained synthetic lockout:
-        // this decision denies (never a spurious Available), the fault is reported, and the drain survives. It is
-        // not persisted, so it does not enforce the NEXT attempt (that is R-007, change F). This test does not
-        // assert that.
-        val state = h.runtime.onUnlockFailure("com.a")
+        // The durable write fails, so the manager contains it as a degraded in-memory lockout: it denies (never a
+        // spurious Available), the fault is reported, and the drain survives. A degraded lockout is not audited as
+        // a recorded LOCKOUT_TRIGGERED, but the capture still fires with the actual count (R-007).
+        val state = h.selfGateFailure("com.a")
         assertTrue(state is LockoutState.LockedOut)
+        assertTrue("an unpersistable failure enforces in memory", (state as LockoutState.LockedOut).degraded)
         assertTrue(h.diagnostics.reports.any { it.first == "lockout_record" })
-        // The degraded attempt still keeps its ordinary failure audit and capture (legacy order preserved).
         assertTrue(h.audit.events.contains(AuditEvent.UNLOCK_FAILURE to "com.a"))
-        assertTrue(h.intruder.calls.isNotEmpty())
+        assertFalse(h.audit.events.any { it.first == AuditEvent.LOCKOUT_TRIGGERED }) // degraded is never recorded
+        assertEquals(1, h.intruder.calls.last().third) // the actual count, never a fabricated threshold
+    }
+
+    @Test
+    fun `self-gate success reports a diagnostic when the reset write fails but still unlocks`() {
+        val storage = FakeLockoutStorage()
+        val h = buildRuntime(storage = storage)
+        storage.error = RuntimeException("storage boom") // the reset write throws (contained by the manager)
+        h.selfGateSuccess("com.a")
+        // The authoritative session mutation and the in-memory reset both stand (no re-lock), and the failed
+        // durable clear is surfaced through the background observer, not swallowed.
+        assertTrue(h.sessionManager.hasValidSession("com.a"))
+        assertEquals(0, h.lockoutManager.failureCount())
+        assertTrue(h.diagnostics.reports.any { it.first == "lockout_reset" })
     }
 
     @Test
@@ -934,8 +1023,8 @@ class LockEngineRuntimeTest {
         h.audit.error = RuntimeException("audit boom")
         h.intruder.error = RuntimeException("capture boom")
         // Audit and capture are observational and contained, so the authoritative lockout state still returns.
-        val state = h.runtime.onUnlockFailure("com.a")
-        assertEquals(LockoutState.Available, state) // one failure, below threshold
+        val state = h.selfGateFailure("com.a")
+        assertEquals(LockoutState.Available, state) // one failure, below threshold, write succeeds
         assertEquals(1, h.lockoutManager.failureCount()) // authoritative mutation still happened
         assertTrue(h.diagnostics.reports.any { it.first == "audit" })
         assertTrue(h.diagnostics.reports.any { it.first == "intruder_capture" })
@@ -955,16 +1044,18 @@ class LockEngineRuntimeTest {
     }
 
     @Test
-    fun `a request-token unlock success survives a throwing lockout reset`() {
+    fun `a request-token unlock success survives a failing lockout reset write`() {
         val storage = FakeLockoutStorage()
         val h = buildRuntime(storage = storage)
         h.runtime.onAppForegrounded("com.a")
         h.idle()
         val token = h.lockToken
-        storage.error = RuntimeException("storage boom") // recordSuccess will throw
+        storage.error = RuntimeException("storage boom") // the reset write throws (contained by the manager)
         h.runtime.unlockSucceeded(token, UnlockMethod.PIN)
         h.idle()
-        // The reset is contained (reported); the surface still comes down and the drain survives.
+        // The reset write failure is contained in memory (a documented residual: storage keeps the old deadline);
+        // the surface still comes down and the drain survives. The failed durable clear is now observable through
+        // the background observer, not swallowed.
         assertEquals(Surface.None, h.runtime.state.value.surface)
         assertTrue(h.diagnostics.reports.any { it.first == "lockout_reset" })
         storage.error = null
@@ -974,20 +1065,105 @@ class LockEngineRuntimeTest {
     }
 
     @Test
-    fun `a request-token unlock failure returns a contained synthetic lockout when storage throws`() {
+    fun `the overlay dismisses on success even while the reset write is stalled`() {
+        // The drain must not await the reset commit before dismissing. The lockout persistence runs on a real
+        // dispatcher so the reset write can stall on a gate while the drain (on the test scheduler) continues.
+        val storage = FakeLockoutStorage()
+        val h = buildRuntime(storage = storage, realLockoutIo = true)
+        h.runtime.onAppForegrounded("com.a")
+        h.idle()
+        val token = h.lockToken
+        assertTrue("the overlay should be up before the unlock", h.presenter.visible)
+
+        // Gate the reset write so its commit() stalls indefinitely.
+        val entered = CountDownLatch(1)
+        val proceed = CountDownLatch(1)
+        storage.writeEntered = entered
+        storage.writeProceed = proceed
+
+        h.runtime.unlockSucceeded(token, UnlockMethod.PIN)
+        h.idle() // the drain admits the reset (its write stalls), then continues to DismissSurface
+
+        assertTrue("the reset write never stalled", entered.await(2, TimeUnit.SECONDS))
+        assertEquals(Surface.None, h.runtime.state.value.surface) // dismissed despite the stalled reset write
+        assertFalse(h.presenter.visible)
+
+        // The drain is not frozen by the stalled reset write: a queued screen-off is still processed. The unlock
+        // marked com.a's session; screen-off must clear it while the reset commit is still parked.
+        assertTrue(h.sessionManager.hasValidSession("com.a"))
+        h.runtime.onScreenOff()
+        h.idle()
+        assertFalse("screen-off processed despite the stalled reset write", h.sessionManager.hasValidSession("com.a"))
+
+        proceed.countDown() // release the stalled write for cleanup
+        h.idle()
+    }
+
+    @Test
+    fun `the drain keeps processing while a failure write is stalled and each completion keeps its count`() {
+        // The event loop does not wait for persistence on the failure path: the single drain admits each failure
+        // synchronously (the count and the lockout publish at once) and awaits persistence off the drain, so a
+        // stalled commit() cannot freeze queued events. The lockout persistence runs on a real dispatcher so the
+        // first failure write stalls on a gate while the drain (on the test scheduler) keeps going. A regression
+        // would re-freeze the drain.
+        val storage = FakeLockoutStorage()
+        val h = buildRuntime(storage = storage, realLockoutIo = true)
+        h.runtime.onAppForegrounded("com.a")
+        h.idle()
+        val token = h.lockToken
+
+        // Gate the writes: the single-thread persistence dispatcher parks in the first write, holding every later
+        // write behind it (FIFO), so all five failure writes are in flight or queued and none resolves.
+        val entered = CountDownLatch(1)
+        val proceed = CountDownLatch(1)
+        storage.writeEntered = entered
+        storage.writeProceed = proceed
+
+        repeat(LockoutManager.FAILURE_THRESHOLD) { h.runtime.unlockFailed(token, UnlockMethod.PIN) }
+        h.idle() // all five admissions run on the drain; the writes stall on the gate
+
+        assertTrue("the first failure write never stalled", entered.await(2, TimeUnit.SECONDS))
+        // Enforcement is immediate from the admitted snapshot, even though no durable write has resolved.
+        assertEquals(LockoutManager.FAILURE_THRESHOLD, h.lockoutManager.failureCount())
+        assertTrue(h.lockoutManager.currentState() is LockoutState.LockedOut)
+        assertTrue("captures ride the off-drain completions, still pending", h.intruder.calls.isEmpty())
+
+        // The drain is not frozen by the stalled writes: a queued screen-off is processed.
+        h.runtime.onScreenOff()
+        h.idle()
+        assertEquals(Surface.None, h.runtime.state.value.surface)
+
+        // Release persistence; the queued writes drain FIFO, and each off-drain completion fires its capture with
+        // its own count and target, in admission order. Pump the test scheduler until the completions land (they
+        // resume from the real dispatcher).
+        proceed.countDown()
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (h.intruder.calls.size < LockoutManager.FAILURE_THRESHOLD && System.nanoTime() < deadline) h.idle()
+
+        assertEquals(listOf(1, 2, 3, 4, 5), h.intruder.calls.map { it.third })
+        assertTrue("every completion kept its target", h.intruder.calls.all { it.first == "com.a" })
+        // The threshold completion audited a recorded lockout; the below-threshold ones did not.
+        assertTrue(h.audit.events.contains(AuditEvent.LOCKOUT_TRIGGERED to "com.a"))
+    }
+
+    @Test
+    fun `a request-token unlock failure resolves a degraded lockout when the durable write fails`() {
         val storage = FakeLockoutStorage()
         val h = buildRuntime(storage = storage)
         h.runtime.onAppForegrounded("com.a")
         h.idle()
         val token = h.lockToken
-        storage.error = RuntimeException("storage boom") // recordFailureAndCount will throw
+        storage.error = RuntimeException("storage boom") // the failure write throws (contained as degraded)
         h.runtime.unlockFailed(token, UnlockMethod.PIN)
         h.idle()
-        // The app stays locked, the EngineState projection is a contained synthetic LockedOut, the fault is
-        // reported, and the drain survives. The synthetic lockout is not persisted (durable enforcement = R-007).
+        // The app stays locked, the EngineState projection is a degraded LockedOut (in-memory enforcement), the
+        // fault is reported, and the drain survives. A degraded lockout is never audited as recorded (R-007).
         assertEquals("com.a", h.runtime.state.value.activeRequest?.target)
-        assertTrue(h.runtime.state.value.lockout is LockoutState.LockedOut)
+        val projected = h.runtime.state.value.lockout
+        assertTrue(projected is LockoutState.LockedOut)
+        assertTrue((projected as LockoutState.LockedOut).degraded)
         assertTrue(h.diagnostics.reports.any { it.first == "lockout_record" })
+        assertFalse(h.audit.events.any { it.first == AuditEvent.LOCKOUT_TRIGGERED })
     }
 
     // ---- Safe-dismiss ordering (end-to-end through the interpreter) ----------------------------
@@ -1172,7 +1348,7 @@ class LockEngineRuntimeTest {
 
     @Test
     fun `the lockout projection is seeded from the manager at construction`() {
-        val storage = FakeLockoutStorage().apply { lockoutUntil = 60_000L }
+        val storage = FakeLockoutStorage(seed = LockoutSnapshot(0, 60_000L))
         val h = buildRuntime(storage = storage)
         assertTrue(h.runtime.state.value.lockout is LockoutState.LockedOut)
     }

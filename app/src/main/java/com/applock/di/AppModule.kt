@@ -1,6 +1,7 @@
 package com.applock.di
 
 import android.content.Context
+import android.os.SystemClock
 import com.applock.data.AppLockDatabase
 import com.applock.data.IntruderEventDao
 import com.applock.data.ProtectedAppDao
@@ -82,7 +83,13 @@ object AppModule {
     @Provides
     @Singleton
     fun provideLockoutManager(@ApplicationContext context: Context): LockoutManager =
-        LockoutManager(EncryptedPrefsLockoutStorage(context))
+        // Inject Android's boot-time clock for the monotonic deadline. SystemClock.elapsedRealtime() advances during
+        // deep sleep; the manager's JVM default (System.nanoTime) does not, which would let a lockout outlive its
+        // wall deadline after the device wakes (the longer-remaining rule keeps a frozen mono alive).
+        LockoutManager(
+            EncryptedPrefsLockoutStorage(context),
+            elapsedRealtime = SystemClock::elapsedRealtime,
+        )
 
     @Provides
     @Singleton

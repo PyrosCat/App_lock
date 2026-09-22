@@ -22,6 +22,7 @@ import com.applock.platform.lock.OverlayWindowHost
 import com.applock.platform.lock.WindowManagerOverlayHost
 import com.applock.security.CredentialRepository
 import com.applock.security.LockoutManager
+import com.applock.security.LockoutSnapshot
 import com.applock.security.LockoutStorage
 import com.applock.service.engine.Epoch
 import com.applock.service.engine.Generation
@@ -315,8 +316,12 @@ class OverlayWindowHostFaultUiTest {
 
     /** In-memory [LockoutStorage] so the test never mutates the app's real encrypted lockout preferences. */
     private class InMemoryLockoutStorage : LockoutStorage {
-        override var failureCount: Int = 0
-        override var lockoutUntil: Long = 0L
+        private var snapshot = LockoutSnapshot(0, 0L)
+        override fun read(): LockoutSnapshot = snapshot
+        override fun write(snapshot: LockoutSnapshot): Boolean {
+            this.snapshot = snapshot
+            return true
+        }
     }
 
     private companion object {

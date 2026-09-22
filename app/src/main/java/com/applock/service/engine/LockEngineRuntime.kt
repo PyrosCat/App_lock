@@ -226,52 +226,65 @@ class LockEngineRuntime(
     // ---- Package-keyed self-gate (App Lock's own PIN gate; runs on the caller / UI thread) -------
 
     /**
-     * App Lock's own gate accepted [packageName]. This is not a reducer surface. The AUTHORITATIVE session
-     * mutation ([LockSessionManager.markUnlocked], in-memory and reliable) always runs. The lockout reset and the
-     * success audit are OBSERVATIONAL and each contained, so a broken storage or audit adapter cannot crash the
-     * gate. It runs under [lifecycleLock], so it completes as one unit against [shutdown]. After [shutdown] it is
-     * a reported no-op and mutates nothing. The self-gate bypasses the channel, so it carries its own guard.
+     * App Lock's own gate accepted [packageName]. This is not a reducer surface. The authoritative session mutation
+     * ([LockSessionManager.markUnlocked], in-memory and reliable) and the lockout reset admission both run under
+     * [lifecycleLock], so they complete as one unit against [shutdown]. The durable clear is awaited outside the
+     * lock, so a stalled disk cannot hold the barrier. The success audit is observational and contained. After
+     * [shutdown] it is a reported no-op and mutates nothing. The self-gate bypasses the channel, so it carries its
+     * own guard. It is suspend; F6 wires it to a coroutine on the caller.
      */
-    fun onUnlockSuccess(packageName: String, method: UnlockMethod = UnlockMethod.PIN) {
-        synchronized(lifecycleLock) {
+    suspend fun onUnlockSuccess(packageName: String, method: UnlockMethod = UnlockMethod.PIN) {
+        val pending = synchronized(lifecycleLock) {
             if (stopped) {
                 safeReport("runtime", "self_gate_after_shutdown")
                 return
             }
             sessionManager.markUnlocked(packageName)
-            resetLockoutSafely()
             guard("audit") { auditLog.record(successAudit(method), packageName) }
+            lockoutManager.submitSuccess() // admission only: publishes the reset, enqueues the durable clear
         }
+        awaitReset(pending) // await the durable clear outside the barrier
     }
 
     /**
-     * App Lock's own gate rejected [packageName]. It returns the resulting lockout. It attempts the
-     * `UNLOCK_FAILURE` audit FIRST, which matches the legacy engine order, so even a degraded attempt is
-     * recorded. Then it does the AUTHORITATIVE lockout mutation through [recordFailureSafely]. Then it does the
-     * conditional `LOCKOUT_TRIGGERED` audit and the intruder capture, which are OBSERVATIONAL and each contained.
-     * If the authoritative mutation throws, [recordFailureSafely] returns and projects a CONTAINED SYNTHETIC
-     * `LockedOut` observation, and never a spurious `Available`. The capture still fires, and the drain and gate
-     * survive. That observation is not persisted and does not increment the durable counter, so it enforces
-     * nothing on its own. No brute-force attempt is blocked by it until F supplies the authoritative countdown
-     * (the real gate reads `LockoutManager.currentState()`). To converge that is R-007, change F. It runs under
-     * [lifecycleLock], so it completes as one unit against [shutdown]. After [shutdown] it reports, and returns a
-     * fail-closed-shaped lockout WITHOUT any mutation. The self-gate bypasses the channel, so it carries its own
-     * guard.
+     * App Lock's own gate rejected [packageName]. Enforcement is immediate: the admission publishes the counted
+     * lockout to the manager's snapshot at once, which the live lock-screen path reads. This suspend method itself,
+     * however, does not return immediately — it awaits the durable outcome and returns the resolved state, so the
+     * caller learns durability (recorded vs degraded) before acting. It attempts the `UNLOCK_FAILURE` audit first and
+     * admits the lockout mutation, both under [lifecycleLock], so they complete as one unit against [shutdown]. The
+     * durable write is awaited outside the lock. On resolution it does the conditional `LOCKOUT_TRIGGERED` audit and
+     * the intruder capture, which are observational and each contained. The manager itself contains a storage
+     * failure: a failed write resolves as a degraded lockout (in-memory, still blocking) rather than a throw, so
+     * `LOCKOUT_TRIGGERED` is emitted only for a recorded lockout, while capture fires on every failure with the
+     * actual count (R-007). After [shutdown] it reports and returns a blocked lockout state without any mutation. The
+     * post-await audit and capture re-enter [lifecycleLock] and recheck [stopped], so a [shutdown] that returned
+     * while the write was in flight is a hard barrier: no new audit or capture starts afterwards. The self-gate
+     * bypasses the channel, so it carries its own guard.
      */
-    fun onUnlockFailure(packageName: String, method: UnlockMethod = UnlockMethod.PIN): LockoutState {
-        synchronized(lifecycleLock) {
+    suspend fun onUnlockFailure(packageName: String, method: UnlockMethod = UnlockMethod.PIN): LockoutState {
+        val pending = synchronized(lifecycleLock) {
             if (stopped) {
                 safeReport("runtime", "self_gate_after_shutdown")
-                return LockoutState.LockedOut(LockoutManager.BASE_LOCKOUT_MS) // a deny-shaped value, no mutation
+                // A blocked state, with no mutation.
+                return LockoutState.LockedOut(LockoutManager.BASE_LOCKOUT_MS, degraded = true)
             }
             guard("audit") { auditLog.record(AuditEvent.UNLOCK_FAILURE, packageName) }
-            val outcome = recordFailureSafely()
-            if (outcome.state is LockoutState.LockedOut) {
+            lockoutManager.submitFailure() // admission only: publishes the count and deadline, enqueues the write
+        }
+        val outcome = awaitFailure(pending)
+        synchronized(lifecycleLock) {
+            if (stopped) {
+                // [shutdown] returned while the write was in flight: do not start audit or capture.
+                safeReport("runtime", "self_gate_after_shutdown")
+                return outcome.state
+            }
+            val state = outcome.state
+            if (state is LockoutState.LockedOut && !state.degraded) {
                 guard("audit") { auditLog.record(AuditEvent.LOCKOUT_TRIGGERED, packageName) }
             }
             guard("intruder_capture") { intruderCapture.onAuthFailure(packageName, method, outcome.count) }
-            return outcome.state
         }
+        return outcome.state
     }
 
     private fun successAudit(method: UnlockMethod): AuditEvent =
@@ -546,14 +559,20 @@ class LockEngineRuntime(
     }
 
     /**
-     * Records the failure on the drain loop, then enqueues the [EngineEvent.LockoutRecorded] follow-up with the
-     * same [FailureToken]. Thus the lockout audit and the intruder capture stay in the pure reducer. The outcome
-     * comes from [recordFailureSafely]. So a storage failure produces a fail-closed [LockoutRecorded] (the
-     * reducer still resolves the pending failure and fires the audit and capture) and does not kill the drain.
+     * Admits the failure on the drain loop (its count and deadline publish synchronously, so enforcement updates at
+     * once), then awaits the durable outcome and enqueues the [EngineEvent.LockoutRecorded] follow-up off the drain,
+     * on [workScope]. Persistence is never awaited on the single drain, so a stalled `commit()` cannot freeze queued
+     * runtime events. The follow-up carries the same [FailureToken], so the lockout audit and the intruder capture
+     * stay in the pure reducer, which keys the follow-up by that token and tolerates its off-drain ordering. A
+     * storage failure resolves as a degraded [LockoutState.LockedOut] (the reducer resolves the pending failure and
+     * fires the capture, but never a recorded `LOCKOUT_TRIGGERED`).
      */
     private fun recordFailure(effect: Effect.RecordUnlockFailure) {
-        val outcome = recordFailureSafely()
-        submit(EngineEvent.LockoutRecorded(effect.token, outcome.state, outcome.count))
+        val pending = lockoutManager.submitFailure() // admission is synchronous; enforcement is published now
+        workScope.launch {
+            val outcome = awaitFailure(pending) // await the durable outcome off the drain
+            submit(EngineEvent.LockoutRecorded(effect.token, outcome.state, outcome.count))
+        }
     }
 
     /**
@@ -572,8 +591,8 @@ class LockEngineRuntime(
 
     /** Reads the persisted lockout for the seed projection. A storage failure degrades to Available and is reported. */
     @Suppress("TooGenericExceptionCaught") // storage read failure: degrade the projection, never crash construction
-    private fun readLockoutSafely(): LockoutState =
-        try {
+    private fun readLockoutSafely(): LockoutState {
+        val state = try {
             lockoutManager.currentState()
         } catch (e: CancellationException) {
             throw e
@@ -581,31 +600,68 @@ class LockEngineRuntime(
             safeReport("lockout_read", e.javaClass.simpleName)
             LockoutState.Available
         }
-
-    /** Resets the lockout on unlock success. A storage failure is reported and does not kill the caller. */
-    private fun resetLockoutSafely() = guard("lockout_reset") { lockoutManager.recordSuccess() }
+        // The manager contains a seed read failure itself (currentState does not throw), so surface the degraded
+        // cold start here, once, for diagnostics. The manager retries the read off-main (its re-seed).
+        if (lockoutManager.seedReadFailed()) safeReport("lockout_read", "seed_degraded")
+        return state
+    }
 
     /**
-     * Records a failure and reads its outcome atomically. If the storage write throws, this returns a CONTAINED
-     * SYNTHETIC outcome: a base-window lockout at the failure threshold, and never a spurious `Available`. The
-     * capture is not skipped, and the drain and gate survive the throw. The synthetic outcome is NOT persisted
-     * and does NOT increment the durable counter, so it enforces nothing on its own. No attempt is blocked by it
-     * until F supplies the authoritative countdown (the real gate reads `LockoutManager.currentState()`). Durable
-     * degraded-storage enforcement, and no over-report of `LOCKOUT_TRIGGERED` for it, is R-007, change F.
+     * Resets the lockout on unlock success (the drain path). The reset clears the counters in memory at once; the
+     * durable write is awaited separately, off the drain on [workScope], so a stalled `commit()` cannot delay the
+     * overlay dismissal or the queued events. The reducer emits `RecordUnlockSuccess` before `DismissSurface`, so
+     * awaiting the clear on the drain would strand an authenticated user behind the overlay.
      */
-    @Suppress("TooGenericExceptionCaught") // storage write failure: contained synthetic deny, never a spurious open
-    private fun recordFailureSafely(): LockoutManager.FailureOutcome =
-        try {
-            lockoutManager.recordFailureAndCount()
+    private fun resetLockoutSafely() {
+        val pending = lockoutManager.submitSuccess()
+        workScope.launch { awaitReset(pending) }
+    }
+
+    /**
+     * Awaits a failure admission's durable outcome. It rethrows cancellation, and maps any other unexpected throw to
+     * a reported degraded outcome (a blocked state) carrying the actual in-memory count. A resolved degraded outcome
+     * (the durable write failed and the manager fell back to in-memory enforcement) is reported too, so a storage
+     * fault stays observable even though the manager contains it.
+     */
+    @Suppress("TooGenericExceptionCaught") // await failure: rethrow cancellation, otherwise a contained degraded block
+    private suspend fun awaitFailure(
+        pending: LockoutManager.Pending<LockoutManager.FailureOutcome>,
+    ): LockoutManager.FailureOutcome {
+        val outcome = try {
+            pending.resolved.await()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             safeReport("lockout_record", e.javaClass.simpleName)
-            LockoutManager.FailureOutcome(
-                LockoutState.LockedOut(LockoutManager.BASE_LOCKOUT_MS),
-                LockoutManager.FAILURE_THRESHOLD,
+            return LockoutManager.FailureOutcome(
+                LockoutState.LockedOut(LockoutManager.BASE_LOCKOUT_MS, degraded = true),
+                lockoutManager.failureCount(),
             )
         }
+        val state = outcome.state
+        if (state is LockoutState.LockedOut && state.degraded) safeReport("lockout_record", "storage_degraded")
+        return outcome
+    }
+
+    /**
+     * Awaits a reset admission's durable clear and reports a failed clear. A resolved not-committed result (the
+     * manager contained a `commit() == false` or a write throw as a false outcome) is reported to diagnostics, so a
+     * failed reset stays observable. The in-memory reset is never undone here, so the user is not re-locked; storage
+     * can keep the pre-reset deadline until the next successful unlock (R-007 residual d). It rethrows cancellation
+     * and reports any other unexpected throw.
+     */
+    @Suppress("TooGenericExceptionCaught") // await reset: rethrow cancellation, otherwise report and continue
+    private suspend fun awaitReset(pending: LockoutManager.Pending<Boolean>) {
+        val committed = try {
+            pending.resolved.await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            safeReport("lockout_reset", e.javaClass.simpleName)
+            return
+        }
+        if (!committed) safeReport("lockout_reset", "storage_degraded")
+    }
 
     // ---- Edge helpers --------------------------------------------------------------------------
 

@@ -75,7 +75,15 @@ class ApplicationLockEngine(
 
     fun onUnlockSuccess(packageName: String, method: UnlockMethod = UnlockMethod.PIN) {
         sessionManager.markUnlocked(packageName)
-        lockoutManager.recordSuccess()
+        // Admission clears the counters in memory immediately; the durable write resolves off the caller thread. A
+        // failed durable clear does not delay anything here or undo the in-memory reset (the user stays unlocked); it
+        // is logged so it is not silently discarded on this live legacy path. The durable diagnostic sink
+        // (RuntimeDiagnostics "lockout_reset") arrives with LockEngineRuntime at F6, which replaces this engine.
+        lockoutManager.submitSuccess { committed ->
+            if (!committed) {
+                Log.w(TAG, "lockout reset write failed for $packageName; storage keeps the pre-reset deadline")
+            }
+        }
         lockScreenTarget = null
         logEvent(
             when (method) {
@@ -86,20 +94,27 @@ class ApplicationLockEngine(
         )
     }
 
-    /** Returns the lockout state after counting this failure (FR-174). */
+    /**
+     * Returns the immediate lockout state after counting this failure (FR-174), so the caller enforces at once. This
+     * engine is synchronous and returns before persistence finishes, so the conditional `LOCKOUT_TRIGGERED` audit and
+     * the intruder capture run when persistence completes (a completion callback that carries the actual count and
+     * durability). `LOCKOUT_TRIGGERED` fires only for a recorded (durable) lockout, never a degraded one; the capture
+     * fires on every failure with the real count, even when the durable write later fails (R-007).
+     */
     fun onUnlockFailure(
         packageName: String,
         method: UnlockMethod = UnlockMethod.PIN,
     ): LockoutState {
         logEvent(SecurityEventType.UNLOCK_FAILURE, packageName)
-        val state = lockoutManager.recordFailure()
-        if (state is LockoutState.LockedOut) {
-            logEvent(SecurityEventType.LOCKOUT_TRIGGERED, packageName)
-        }
-        // FR-081: the capture manager decides (policy + settings) whether this
-        // particular failure crosses the intruder threshold.
-        intruderCapture.onAuthFailure(packageName, method.name, lockoutManager.failureCount())
-        return state
+        return lockoutManager.submitFailure { outcome ->
+            val state = outcome.state
+            if (state is LockoutState.LockedOut && !state.degraded) {
+                logEvent(SecurityEventType.LOCKOUT_TRIGGERED, packageName)
+            }
+            // FR-081: the capture manager decides (policy + settings) whether this
+            // particular failure crosses the intruder threshold.
+            intruderCapture.onAuthFailure(packageName, method.name, outcome.count)
+        }.immediate
     }
 
     /** User backed out of the lock screen without authenticating. */

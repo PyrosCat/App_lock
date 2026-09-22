@@ -2,13 +2,19 @@ package com.applock.security
 
 import android.content.Context
 import android.content.SharedPreferences
-import androidx.core.content.edit
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
 /**
- * Lockout counters in EncryptedSharedPreferences so they persist across
- * process death and can't be trivially edited (FR-174).
+ * Lockout counters in EncryptedSharedPreferences so they persist across process death and can't be trivially
+ * edited (FR-174).
+ *
+ * [write] calls [SharedPreferences.Editor.commit] directly and returns its Boolean, so a failed durable write
+ * surfaces to [LockoutManager] instead of being swallowed. The KTX `edit(commit = true)` extension discards the
+ * result, so it is not used here (R-007). Both counters commit as one operation, so a reader never sees a
+ * half-updated pair. Atomic file replacement prevents a partially-updated snapshot, but it does not guarantee the
+ * newest snapshot survived a death mid-commit, so durability is confirmed only by the commit return (a residual).
+ * [read] surfaces a decryption or IO fault by throwing, which the manager degrades around.
  */
 class EncryptedPrefsLockoutStorage(context: Context) : LockoutStorage {
 
@@ -25,13 +31,17 @@ class EncryptedPrefsLockoutStorage(context: Context) : LockoutStorage {
         )
     }
 
-    override var failureCount: Int
-        get() = prefs.getInt(KEY_FAILURE_COUNT, 0)
-        set(value) = prefs.edit { putInt(KEY_FAILURE_COUNT, value) }
+    override fun read(): LockoutSnapshot =
+        LockoutSnapshot(
+            failureCount = prefs.getInt(KEY_FAILURE_COUNT, 0),
+            lockoutUntil = prefs.getLong(KEY_LOCKOUT_UNTIL, 0L),
+        )
 
-    override var lockoutUntil: Long
-        get() = prefs.getLong(KEY_LOCKOUT_UNTIL, 0L)
-        set(value) = prefs.edit { putLong(KEY_LOCKOUT_UNTIL, value) }
+    override fun write(snapshot: LockoutSnapshot): Boolean =
+        prefs.edit()
+            .putInt(KEY_FAILURE_COUNT, snapshot.failureCount)
+            .putLong(KEY_LOCKOUT_UNTIL, snapshot.lockoutUntil)
+            .commit()
 
     private companion object {
         const val KEY_FAILURE_COUNT = "failure_count"
