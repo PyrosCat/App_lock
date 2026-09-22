@@ -4,6 +4,28 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F3): HomeResolver on-device check + Moto G report   (2026-09-22)
+-------------------------------------------------------------------------------
+Added an instrumentation test that checks the platform behaviour that the resolver's JVM tests assume, on a real
+device. It uses the production Context constructor, so the real resolveActivity call runs. Test and debug-build
+support only; production is unchanged.
+- HomeResolverDeviceTest has three tests. The resolver returns the current HOME role holder, and one resolve is
+  cheap (the latency is logged; the median ceiling is a loose 50 ms). After a default-launcher change, a new
+  foreground episode returns the new launcher, and the former launcher is not Home. With no HOME role holder, the
+  resolver agrees with resolveActivity; the platform answer is OEM-specific, so it is logged. The tests skip below
+  API 29, where the HOME role does not exist.
+- FakeHomeActivity is a second home launcher in the debug source set. It is declared disabled, so it adds no HOME
+  candidate or launcher chooser for other tests. The test runs in the App Lock process and enables its own
+  component, because on a user build the shell cannot change component states outside test-only packages. The
+  test restores the original role holder and resets the component afterwards.
+- Ran the check on the Moto G 2025 (API 35): 3 of 3 pass. The median resolve takes 0.79 ms. A default-launcher
+  change is visible in 2 ms. With no HOME role holder, the Motorola build keeps resolving its own launcher, and the
+  resolver agrees. The report records the two test-design defects that the validation runs found and fixed. The Moto G
+  row of the reports index now points at it.
+- Gate green on this box: testProdDebugUnitTest 357 tests, 0 failures, detekt clean, assembleProdDebug,
+  assembleProdDebugAndroidTest, and lint with no new findings.
+
+
 M7/WP2 (change F3): HomeResolver tri-state resolve + revalidation   (2026-09-22)
 --------------------------------------------------------------------------------
 This change makes the home-launcher check resolve again on each app switch. The check now finds a change of the

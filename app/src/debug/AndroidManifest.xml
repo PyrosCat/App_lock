@@ -14,5 +14,22 @@
             android:name="com.applock.e2e.SentinelActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Material.NoActionBar" />
+
+        <!--
+          M7 WP2 (change F3) device-test support, DEBUG builds only. FakeHomeActivity is a second home launcher
+          for HomeResolverDeviceTest. It is disabled, so it adds no HOME candidate (and no launcher chooser). The
+          test enables it only while it runs and resets it to this default afterwards.
+        -->
+        <activity
+            android:name="com.applock.e2e.FakeHomeActivity"
+            android:enabled="false"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>
