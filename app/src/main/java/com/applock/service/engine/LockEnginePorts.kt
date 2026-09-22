@@ -110,16 +110,22 @@ interface TimerScheduler {
 
 /**
  * Tells whether a raw foreground package is the current home launcher. The interpreter uses it to classify the
- * package as [Foreground.Home] in the consumer. Home is load-bearing: if the resolver misclassifies the
- * launcher, the interpreter draws a recovery shield under a Failed policy. The real adapter (change E) resolves
- * `MAIN/HOME` through `PackageManager`. It re-resolves when an observed package is different from the cached
- * launcher, which covers a missed broadcast or a change of the default launcher. It can also memoize behind a
- * short TTL. The adapter MUST keep a last-known-good launcher and MUST never throw. Thus a transient
- * `PackageManager` failure does not shield the launcher again and again. The interpreter also treats a throw as
- * fail-secure "not home". It stays a port so the classification stays pure and JVM-testable.
+ * package as [Foreground.Home] in the consumer. The result is security-relevant in both directions. The
+ * interpreter does not evaluate a Home foreground, so a demoted former launcher that is still classified Home
+ * bypasses the lock (fail-dangerous). A new launcher that is not recognized is evaluated as a real app, and gets a
+ * recovery shield under a Failed policy (fail-safe). The real adapter resolves `MAIN/HOME` through
+ * `PackageManager`.
+ *
+ * [newForegroundEpisode] is true when [packageName] differs from the previous raw foreground observation, which
+ * can be `Own` or `Transient`. Those observations never reach the resolver, so only the interpreter can set the
+ * flag. Thus `A -> Own -> A` is a transition, not a repeat, and the adapter can resolve again.
+ *
+ * The adapter MUST keep a last-known-good launcher through a resolve failure, so a transient `PackageManager`
+ * failure does not shield the launcher again and again. The adapter MUST NOT throw. The interpreter also treats a
+ * throw as fail-secure "not home". The port keeps the classification pure and JVM-testable.
  */
 interface HomeResolver {
-    fun isHome(packageName: String): Boolean
+    fun isHome(packageName: String, newForegroundEpisode: Boolean): Boolean
 }
 
 /**

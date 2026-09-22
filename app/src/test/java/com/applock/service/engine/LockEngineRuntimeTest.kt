@@ -3,6 +3,7 @@ package com.applock.service.engine
 import com.applock.domain.LockSessionManager
 import com.applock.domain.PolicyState
 import com.applock.domain.RelockPolicy
+import com.applock.platform.lock.PackageManagerHomeResolver
 import com.applock.security.LockoutManager
 import com.applock.security.LockoutSnapshot
 import com.applock.security.LockoutState
@@ -202,7 +203,10 @@ class LockEngineRuntimeTest {
         private val homePackages: Set<String>,
         var error: Exception? = null,
     ) : HomeResolver {
-        override fun isHome(packageName: String): Boolean {
+        val calls = mutableListOf<Pair<String, Boolean>>() // (package, newForegroundEpisode), in call order
+
+        override fun isHome(packageName: String, newForegroundEpisode: Boolean): Boolean {
+            calls += packageName to newForegroundEpisode
             error?.let { throw it } // a resolver whose PackageManager call throws
             return packageName in homePackages
         }
@@ -297,6 +301,7 @@ class LockEngineRuntimeTest {
         storage: FakeLockoutStorage = FakeLockoutStorage(),
         main: CoroutineDispatcher? = null,
         realLockoutIo: Boolean = false,
+        homeResolver: HomeResolver? = null, // used instead of the fake; Harness.home then records no calls
     ): Harness {
         val log = mutableListOf<String>()
         val policyFlow = MutableStateFlow(policy)
@@ -341,7 +346,7 @@ class LockEngineRuntimeTest {
             presenter = presenter,
             navigator = navigator,
             timerScheduler = timer,
-            homeResolver = home,
+            homeResolver = homeResolver ?: home,
             auditLog = audit,
             intruderCapture = intruder,
             enforcementHealth = health,
@@ -682,6 +687,86 @@ class LockEngineRuntimeTest {
         // isHome throwing is fail-secure "not home", so com.a is evaluated as a real app and locks.
         assertEquals("com.a", h.runtime.state.value.activeRequest?.target)
         assertTrue(h.diagnostics.reports.any { it.first == "home_resolver" })
+    }
+
+    @Test
+    fun `the home resolver sees a new foreground episode across Own and Transient observations`() {
+        val h = buildRuntime()
+        listOf(
+            "com.launcher",
+            "com.launcher", // a repeat
+            "com.applock", // Own
+            "com.launcher",
+            "com.android.systemui", // Transient
+            "com.launcher",
+            "com.free",
+            "com.free", // a repeat
+        ).forEach { h.runtime.onAppForegrounded(it) }
+        h.idle()
+        // Own and Transient never reach the resolver, but they end the episode. So the launcher after each is a new
+        // episode. Only a same-package repeat is flagged false.
+        assertEquals(
+            listOf(
+                "com.launcher" to true,
+                "com.launcher" to false,
+                "com.launcher" to true, // after Own
+                "com.launcher" to true, // after Transient
+                "com.free" to true,
+                "com.free" to false,
+            ),
+            h.home.calls,
+        )
+    }
+
+    /** The real resolver policy on its JVM seam. [nowMs] stays fixed, so every observation is within the TTL. */
+    private fun realHomeResolver(defaultLauncher: () -> String) = PackageManagerHomeResolver(
+        resolveLauncher = { PackageManagerHomeResolver.Resolution.Resolved(defaultLauncher()) },
+        nowMs = { nowMs },
+    )
+
+    @Test
+    fun `a former launcher re-entered across an Own interval is revalidated and locks when protected`() {
+        // The episode flag lets the resolver detect a default-launcher change made while App Lock was in front,
+        // within the TTL.
+        var defaultLauncher = "com.launcher"
+        val h = buildRuntime(
+            policy = PolicyState.Ready(protectedPackages + "com.launcher"), // the launcher is also a protected app
+            homeResolver = realHomeResolver { defaultLauncher },
+        )
+        h.runtime.onAppForegrounded("com.launcher")
+        h.idle()
+        assertNull("the default launcher is home and passes unevaluated", h.runtime.state.value.activeRequest)
+
+        h.runtime.onAppForegrounded("com.applock") // App Lock in front: the resolver never sees this
+        h.idle()
+        defaultLauncher = "com.launcher2" // the default changes during the Own interval
+        h.runtime.onAppForegrounded("com.launcher") // A -> Own -> A is a new episode, so the resolver resolves again
+        h.idle()
+        assertEquals(
+            "a demoted former launcher must be evaluated as a real app, and lock",
+            "com.launcher",
+            h.runtime.state.value.activeRequest?.target,
+        )
+    }
+
+    @Test
+    fun `a new default launcher first seen as a plain app is home on its next episode`() {
+        // launcher2 is first observed as a plain app, so the Failed policy shields it. It becomes the default while
+        // App Lock is in front. Its return within the TTL is a new episode, so the resolver resolves again and the
+        // shield is removed.
+        var defaultLauncher = "com.launcher"
+        val h = buildRuntime(policy = PolicyState.Failed("boom"), homeResolver = realHomeResolver { defaultLauncher })
+        h.runtime.onAppForegrounded("com.launcher2")
+        h.idle()
+        assertEquals(HoldPhase.RECOVERY, h.runtime.state.value.readinessHold?.phase) // a plain app: shielded
+
+        h.runtime.onAppForegrounded("com.applock")
+        h.idle()
+        defaultLauncher = "com.launcher2"
+        h.runtime.onAppForegrounded("com.launcher2")
+        h.idle()
+        assertEquals("the new default launcher must be home, unshielded", Surface.None, h.runtime.state.value.surface)
+        assertNull(h.runtime.state.value.readinessHold)
     }
 
     @Test

@@ -111,6 +111,10 @@ class LockEngineRuntime(
     private var lastReconcileTarget: Surface? = null
     private var redriveAttemptsLeft = MAX_REDRIVE_ATTEMPTS
 
+    // The previous raw foreground package, including Own and Transient. [classify] compares against it to set the
+    // resolver's newForegroundEpisode. Only the single drain reads or writes it, so it needs no lock.
+    private var previousForeground: String? = null
+
     // The lifecycle monitor. It makes [shutdown] a BARRIER for the synchronous self-gate entry points, which
     // bypass the channel. Each self-gate op holds it for the whole op. [shutdown] acquires it before it sets
     // [stopped]. Thus [shutdown] waits for any in-flight self-gate op, and every later call sees [stopped] and
@@ -667,16 +671,23 @@ class LockEngineRuntime(
 
     /**
      * Classifies a raw foreground package, in the consumer. Own and the transient system windows are proven
-     * non-targets. The runtime resolves the launcher through [homeResolver], which is load-bearing: a
-     * misclassified launcher would draw a recovery shield under a `Failed` policy. Everything else is a real app.
-     * The runtime reads its session here, after any earlier queued effect, so the reducer sees the current
-     * session fact.
+     * non-targets. The runtime resolves the launcher through [homeResolver], whose result is security-relevant
+     * (see [HomeResolver]). Everything else is a real app. The runtime reads its session here, after any earlier
+     * queued effect, so the reducer sees the current session fact.
+     *
+     * It sets the resolver's `newForegroundEpisode` from the previous raw observation, including Own and Transient.
+     * The resolver does not see those. Without them, `A -> Own -> A` would look like a repeat of `A`, and the
+     * resolver would use a cached answer that misses a default-launcher change made in between.
      */
-    private fun classify(packageName: String): Foreground = when {
-        packageName == ownPackageName -> Foreground.Own
-        packageName in TRANSIENT_PACKAGES -> Foreground.Transient
-        isHome(packageName) -> Foreground.Home
-        else -> Foreground.Other(packageName, sessionManager.hasValidSession(packageName))
+    private fun classify(packageName: String): Foreground {
+        val newForegroundEpisode = packageName != previousForeground
+        previousForeground = packageName
+        return when {
+            packageName == ownPackageName -> Foreground.Own
+            packageName in TRANSIENT_PACKAGES -> Foreground.Transient
+            isHome(packageName, newForegroundEpisode) -> Foreground.Home
+            else -> Foreground.Other(packageName, sessionManager.hasValidSession(packageName))
+        }
     }
 
     /**
@@ -685,9 +696,9 @@ class LockEngineRuntime(
      * a foreground through without evaluation. A launcher misread as a real app is at worst over-blocked.
      */
     @Suppress("TooGenericExceptionCaught") // fail-secure: a throwing resolver is reported and treated "not home"
-    private fun isHome(packageName: String): Boolean =
+    private fun isHome(packageName: String, newForegroundEpisode: Boolean): Boolean =
         try {
-            homeResolver.isHome(packageName)
+            homeResolver.isHome(packageName, newForegroundEpisode)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

@@ -4,6 +4,45 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F3): HomeResolver tri-state resolve + revalidation   (2026-09-22)
+--------------------------------------------------------------------------------
+This change makes the home-launcher check resolve again on each app switch. The check now finds a change of the
+default launcher on the next switch. Before this change, the resolver could give the answer from its 2 second
+cache. The change is in the resolver, the interpreter classification, and the JVM tests only. The runtime does not
+use the new resolver yet (F5 and F6). Production still uses the previous path.
+- This change replaces the port method with isHome(packageName, newForegroundEpisode). The interpreter sets
+  newForegroundEpisode to true when the package is different from the previous raw foreground. The previous
+  foreground can be App Lock's own user interface or a transient system window. These observations do not reach
+  the resolver. Thus a return to the same app across one of them is a transition, not a repeat.
+- The resolver resolves on each new foreground episode, for each package, at a cost of one resolve for each app
+  switch. The user can change the default launcher while App Lock or a system window is in front. The resolver no
+  longer treats the previous launcher as Home (the fail-dangerous case). A new default launcher counts as Home on
+  its first appearance. This is also true when an earlier resolve did not recognize it (the fail-safe case). A
+  repeat in the same episode uses the cached answer.
+- The resolve gives one of three results: Resolved, NoDefault, or Failure. A Failure result or an exception keeps
+  the last known good launcher. The resolver then makes no new attempt for 2 seconds, as before. A NoDefault
+  result clears the cached launcher. This result occurs when nothing resolves, or when the launcher chooser
+  resolves.
+- The resolver keeps the unconditional resolve when the last attempt is more than 2 seconds old. This includes a
+  repeat of the cached launcher.
+- The resolver records a known limitation. The 2 second value controls when the resolver makes a new attempt. It
+  does not control the age of the answer that the resolver gives. It also does not control how long a
+  classification stays in effect. A classification stays in effect until the next foreground observation.
+- The resolver still uses an previous path in three conditions. First, the default launcher changes with no app
+  switch, for example through adb or device management, and the check finds it only after 2 seconds. Second, an app
+  switch happens within 2 seconds after a failed lookup. Third, resolves continue to fail and keep the last known
+  good launcher until a later resolve is successful. A strict time limit needs scheduled checks and a new
+  evaluation of the current foreground, which this change does not include.
+- This change rewrites PackageManagerHomeResolverTest for the three resolve results. The count goes from 7 to 13
+  tests. This change also adds 3 tests to LockEngineRuntimeTest, for a total of 62.
+- One new test checks the episode flag across Own and Transient observations. Two new tests are end-to-end runs on
+  the real resolver. In the first test, a protected former launcher returns after an Own interval, and App Lock
+  starts the lock. In the second test, App Lock first shields a new default launcher as a normal app. App Lock
+  removes the shield on the launcher's next appearance.
+- All checks pass on this box. The unit tests give 357 tests and 0 failures (PackageManagerHomeResolverTest 13,
+  LockEngineRuntimeTest 62). The detekt, assembleProdDebug, and compileProdDebugAndroidTestKotlin tasks all pass.
+
+
 M7/WP2 (change F2): retain FR-174 JVM re-verification report   (2026-09-20)
 --------------------------------------------------------------------------
 Added the local JVM validation report for commit b9e7c53 covering f2 lockout; the RTM cites it as
