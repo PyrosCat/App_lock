@@ -4,6 +4,18 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F2): record R-007 degraded-storage residuals   (2026-09-20)
+--------------------------------------------------------------------------
+Recorded four proposed R-007 residuals in docs/process/RISK_REGISTER.md, deferred to F6 (the runtime cutover) for
+the accept-vs-fix decision:
+- Cold-start read failure: a persisted lockout stays unenforced while the store is unreadable (fail-open).
+- Restart during a degrade: the in-memory-only lockout is lost on restart (fail-open).
+- Process death before a write commits: an admitted-but-uncommitted mutation can be lost (a lost failure is
+  fail-open, a lost reset is fail-secure).
+- Reset-commit failure then restart: storage can resurrect the pre-reset deadline (fail-secure, cleared by the
+  next unlock).
+
+
 M7/WP2 (change F2): R-007 degraded-storage lockout enforcement   (2026-09-20)
 ----------------------------------------------------------------------------
 Fixed R-007: a lockout storage-write failure now blocks further authentication attempts in memory, even below

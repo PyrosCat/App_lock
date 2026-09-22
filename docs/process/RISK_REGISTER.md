@@ -20,7 +20,7 @@ compensating treatment.
 | [R-004](#r-004) | `fallbackToDestructiveMigration` — silent data-loss trap on schema mismatch | **High** | M1 (WP7) | Closed (2026-08-16) — WP7 device drills PASS (NucBox, API 33): fail-safe preserves data, no wipe |
 | [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** | M7 | Open |
 | [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **Medium** | M1/WP7 | Closed (2026-08-15) — eliminated by WP7(b) path deletion |
-| [R-007](#r-007) | Degraded-storage lockout is unenforced and over-reported: the runtime's fail-closed fallback lives only in `EngineState`, while the real gate reads `LockoutManager.currentState()` | **Medium** | M7 | Open |
+| [R-007](#r-007) | Degraded-storage lockout is unenforced and over-reported: the runtime's fail-closed fallback lives only in `EngineState`, while the real gate reads `LockoutManager.currentState()` | **Medium** | M7 | Open — F2 fix implemented (2026-09-20): manager/storage/legacy live, runtime wiring deferred to F6; 4 residuals proposed |
 
 *Gate identifiers re-pointed 2026-08-14 to the 1.0.0 milestone line M7–M10 (ADR-019 / `ROADMAP.md`):
 old M2-gate risks now block M7 (the detection/enforcement replacement); Play-compliance review moved
@@ -454,7 +454,9 @@ The WP7 scope decision; any change to `AppLockDatabase` migration; M3 backup/res
 **Risk:** Degraded-storage lockout — the runtime's fail-closed fallback is not enforced and over-reports
 
 **Category:** Security / Enforcement · **Likelihood:** Low · **Impact:** High · **Severity:** **Medium**
-(Low × High) · **Status:** Open · **Opened:** 2026-09-11 · **Owner:** project lead
+(Low × High) · **Status:** Open — F2 implemented actions 1 to 3 (2026-09-20): the LockoutManager/storage/legacy
+engine changes are live, the runtime wiring is deferred to F6; four residuals proposed (see below), pending lead
+disposition · **Opened:** 2026-09-11 · **Owner:** project lead
 **Affected gate(s):** **M7** — the fix lands with change F (real adapters + DI cutover), to converge before the
 Phase-3 `enforcement.health` oracle becomes authoritative. Latent until F: the runtime is not yet wired to
 production (the legacy `ApplicationLockEngine` still serves `AuthGateViewModel`).
@@ -493,9 +495,50 @@ of an EncryptedPrefs write fault, and latent until change F wires the runtime in
 3. Add a test proving a failed write followed by successful reads still blocks another attempt until the
    fallback deadline expires.
 
+### F2 implementation (2026-09-20) and proposed residuals
+M7 WP2 change F2 implements planned actions 1 to 3. `LockoutManager` now keeps an in-memory authoritative
+snapshot, published lock-free, and persists off the caller thread through a single-thread dispatcher. A failed
+durable write arms an in-memory degraded monotonic deadline, so the next attempt is blocked even below the
+5-failure threshold (fail-secure). `currentState()` reads the snapshot without the lock and returns the longer
+remaining of the wall and monotonic deadlines, so both hosts (overlay and self-gate) enforce from one source.
+`LockoutState.LockedOut` carries a `degraded` flag, so `LOCKOUT_TRIGGERED` fires only for a recorded (durable)
+lockout while the intruder capture fires on every failure with the actual count. The runtime no longer fabricates
+a threshold count on a storage fault. The `LockoutManager`, storage adapter, and legacy `ApplicationLockEngine`
+changes are live in production: the current self-gate path (`AuthGateViewModel`/`LockScreenActivity`) reads
+`LockoutManager` directly, so the degraded-storage enforcement takes effect now. Only the `LockEngineRuntime`
+suspend self-gate, its drain lockout path (which admits each mutation immediately and resolves the durable outcome
+off the drain), and the reducer degraded gate are inert until F6 wires the overlay/runtime path; they are exercised
+by unit tests until then.
+
+Four residuals remain, proposed. They are deferred for revisit at F6 (the runtime cutover), when the full lockout
+path is production-wired and a storage/restart robustness pass fits; the lead decides accept-vs-fix then. They are
+distinct from the enforcement gap the main entry describes:
+1. **Cold-start read failure.** The seed degrades to `Available`, so a persisted lockout is not enforced while
+   the store stays unreadable, and the retry does not bound that window. Because a local mutation disables the
+   re-seed permanently, recovery is not guaranteed by the store becoming readable: a failure or reset before a
+   re-seed succeeds leaves the persisted lockout unenforced until the next process restart re-seeds. Fail-open.
+2. **Restart during a degrade.** The in-memory monotonic deadline does not survive process death, so a
+   degrade-only lockout is lost on restart. Fail-open.
+3. **Interrupted or not-yet-durable writes on process death.** On the overlay/drain path, persistence completion
+   is independent of authentication handling. The drain admits each lockout mutation synchronously (the counted or
+   cleared state publishes at once and enforces immediately), so the surface dismissal and every subsequent queued
+   event proceed before the durable write resolves; only the failure audit and the intruder capture wait for the
+   write's per-attempt (`FailureToken`-keyed) outcome, delivered off the drain. An admitted-but-uncommitted write is
+   therefore a real window: process death before the write commits loses that pending mutation. The self-gate entry
+   points are distinguished — they await persistence before they audit and capture (a direct caller, not the drain),
+   so within one call they never advance past an unresolved write. Neither path is a global single-in-flight
+   guarantee: overlay and self-gate callers can overlap, and the legacy synchronous-plus-callback path can have
+   several writes admitted but not yet committed, so a death can lose multiple queued mutations. A lost failure
+   count is fail-open (by the lost count); a lost reset is fail-secure. Restart enforces from the last durable
+   snapshot the seed returns.
+4. **Reset-commit failure then restart.** A failed durable clear (`commit() == false` or a throw, contained by the
+   manager as a not-committed outcome and reported to diagnostics on the runtime path) leaves the pre-reset deadline
+   in storage, so a restart can resurrect it. The in-memory reset still stands, so the current session is not
+   re-locked. Fail-secure over-enforcement, cleared by the next successful unlock.
+
 ### Review triggers
 Change F (the DI cutover and real adapters); any change to `LockoutManager` or the lockout read path; the M7
-gate and Phase-3 oracle enablement.
+gate and Phase-3 oracle enablement; the F6 revisit of the four F2 residuals above.
 
 ---
 
