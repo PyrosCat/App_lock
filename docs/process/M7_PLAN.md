@@ -868,11 +868,14 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     only this within-TTL window remains); a JVM test documents this residual (former launcher still home within the TTL,
     not-home past it).
 
-    F revisits the adapter with three changes: a tri-state resolve result that distinguishes no-default from a
-    failure; for the differing-package direction, an immediate probe of a new candidate plus a per-candidate
-    negative cache; and, for the cache-MATCH direction (residual 2, which the immediate probe does not cover),
-    cache-match revalidation on a foreground transition, or another reliable invalidation. Together these close
-    the residual ≤TTL window.
+    **F3 as built (2026-09-22, `30529e2`):** a tri-state resolve result (`Resolved` / `NoDefault` / `Failure`) and
+    a re-resolve on every new foreground episode, whatever the package, in both directions. The runtime flags the
+    episode across App Lock's own UI and the system windows. The planned per-candidate negative cache was dropped,
+    because it could suppress the re-check of a package that later became the default. A default change
+    made through the Settings or role UI is now detected on the next app switch. The ≤TTL windows are not fully
+    closed, because a classification stays in effect until the next foreground observation. The remaining cases are
+    risk **R-008** (proposed, decision at F6). On-device check: Moto G 2025, 3/3 PASS
+    (`docs/reports/campaigns/2026-09-22_m7-wp2-f3-home-resolver_moto-g-2025.md`).
   - **Overlay capability.** Move `SYSTEM_ALERT_WINDOW` out of the throwaway spike block (currently manifest
     line 18, otherwise deleted with the spike) into the permanent permissions. Add the
     `Settings.canDrawOverlays()` check and an `ACTION_MANAGE_OVERLAY_PERMISSION` grant path (onboarding + a

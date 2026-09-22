@@ -21,6 +21,7 @@ compensating treatment.
 | [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** | M7 | Open |
 | [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **Medium** | M1/WP7 | Closed (2026-08-15) — eliminated by WP7(b) path deletion |
 | [R-007](#r-007) | Degraded-storage lockout is unenforced and over-reported: the runtime's fail-closed fallback lives only in `EngineState`, while the real gate reads `LockoutManager.currentState()` | **Medium** | M7 | Open — F2 fix implemented (2026-09-20): manager/storage/legacy live, runtime wiring deferred to F6; 4 residuals proposed |
+| [R-008](#r-008) | Home-launcher classification can use a stale answer, and a classification stays in effect until the next foreground observation | **Low** (proposed) | M7 | Open — proposed F3 residual (2026-09-22), lead disposition at F6 |
 
 *Gate identifiers re-pointed 2026-08-14 to the 1.0.0 milestone line M7–M10 (ADR-019 / `ROADMAP.md`):
 old M2-gate risks now block M7 (the detection/enforcement replacement); Play-compliance review moved
@@ -539,6 +540,62 @@ distinct from the enforcement gap the main entry describes:
 ### Review triggers
 Change F (the DI cutover and real adapters); any change to `LockoutManager` or the lockout read path; the M7
 gate and Phase-3 oracle enablement; the F6 revisit of the four F2 residuals above.
+
+---
+
+## R-008
+
+**Risk:** Home-launcher classification can use a stale answer, and a classification stays in effect until the next
+foreground observation
+
+**Category:** Security / Enforcement · **Likelihood:** Low · **Impact:** Medium · **Severity:** **Low** (Low ×
+Medium, proposed) · **Status:** Open — proposed residual of change F3, pending lead disposition at F6 (accept, or
+add scheduled revalidation) · **Opened:** 2026-09-22 · **Owner:** project lead
+**Affected gate(s):** **M7**. Latent until F6: the runtime that uses the resolver is not yet wired to production.
+**Provenance:** M7 WP2 change-F3 review, 2026-09-22.
+**Related:** FR-052 (Home Screen Transition Handling) · `PackageManagerHomeResolver` · `LockEngineRuntime.classify`
+· on-device evidence `docs/reports/campaigns/2026-09-22_m7-wp2-f3-home-resolver_moto-g-2025.md`.
+
+### Description
+The lock engine classifies each foreground observation once, and it does not evaluate a foreground classified as
+Home. The resolver answers only when the engine classifies an observation. The classification then stays in effect
+until the next foreground observation. The resolver's 2 s TTL limits the re-resolve interval. It does not limit the
+age of the answer that is used, or how long a classification stays in effect. A stale answer is still used in three
+cases:
+1. A default-launcher change with no foreground change in between (for example, through adb or device management)
+   while one app stays in front. The cached answer is used until the first observation after the TTL.
+2. A new foreground episode within 2 s after a failed lookup (the failure backoff).
+3. A run of lookup failures. The last-known-good launcher stays in use until a lookup succeeds.
+
+### Impact
+- **Fail-dangerous direction:** a demoted former launcher that the user also protects can be classified Home and
+  shown without the lock, until the next observation that resolves again.
+- **Fail-safe direction:** a new default launcher can be classified as a real app. Under a failed policy it gets a
+  recovery shield until the next observation.
+
+Bounded by the preconditions: case 1 needs adb or device management, and cases 2 and 3 need a `PackageManager`
+failure. A default change through the normal Settings or role UI is a foreground change, so F3 detects it on the
+next app switch.
+
+### Current mitigations
+- F3 resolves again on every new foreground episode, whatever the package. The runtime also counts App Lock's own
+  UI and the system windows, so a return to the same app across them is a new episode.
+- The unconditional re-resolve after the TTL limits how long a cached answer is reused while observations continue.
+- A failure keeps the last-known-good launcher, so the launcher is not shielded again and again. A `NoDefault`
+  answer drops the cached launcher (fail-secure).
+- On the Moto G 2025 (API 35), `resolveActivity` shows a default change within 2 ms, and one resolve costs 0.79 ms
+  median (report above).
+
+### Options for the F6 decision
+1. **Accept** the residual, on the preconditions above.
+2. **Add scheduled revalidation:** a timer resolves the launcher again while a classification stands, and the
+   runtime re-evaluates the current foreground when the answer changes. The re-evaluation feeds a synthetic
+   observation to the reducer. The reducer re-locks on every foreground event and holds the F1 safe-dismiss arrival
+   logic, so this option needs its own design review.
+
+### Review triggers
+F6 (the runtime cutover); any change to `PackageManagerHomeResolver` or `LockEngineRuntime.classify`; the F fleet
+close-out end-to-end launcher check.
 
 ---
 

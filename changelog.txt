@@ -4,6 +4,19 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F3): record home-resolver residual R-008   (2026-09-22)
+----------------------------------------------------------------------
+Recorded the remaining home-launcher limitation from change F3 as a proposed risk, and updated the M7 plan note
+to match what F3 built.
+- Added R-008 to RISK_REGISTER.md (Low likelihood x Medium impact = Low, proposed; decision at F6). A
+  classification stays in effect until the next foreground observation, and a stale answer is still used in three
+  cases: a default change with no foreground change (adb or device management), an app switch within 2 s after a
+  failed lookup, and a run of lookup failures. The F6 options are to accept the residual or to add scheduled
+  revalidation with a runtime re-evaluation.
+- Updated the HomeResolver note in docs/process/M7_PLAN.md (change E section): it now describes F3 as built,
+  including the dropped negative cache, and points to R-008 and the Moto G report.
+
+
 M7/WP2 (change F3): HomeResolver on-device check + Moto G report   (2026-09-22)
 -------------------------------------------------------------------------------
 Added an instrumentation test that checks the platform behaviour that the resolver's JVM tests assume, on a real
