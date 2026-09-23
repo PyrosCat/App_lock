@@ -31,6 +31,7 @@ beneath its root (GOVERNANCE §2.4).
 | [ADR-014](ADR-014-api-range.md) | Supported API Range: minSdk 26, targetSdk 35, Forward-Compatible to Future Levels | Accepted |
 | [ADR-015](ADR-015-hilt-adoption.md) | Hilt Adoption Plan (Replacing the Graph Service Locator) | Accepted — implemented (WP5), closed at M1 gate (2026-08-17) |
 | [ADR-016](ADR-016-konsist-architecture-enforcement.md) | Konsist for Automated Architecture-Rule Enforcement | Accepted — execution in M1 (WP3) |
+| [ADR-016A](ADR-016A-r2-infrastructure-logging-rank.md) | R2 Layer Ranking: infrastructure/logging Below Domain (supersedes the ADR-016 R2 policy only) | Proposed (2026-09-23) — M7 WP2 F4 |
 | [ADR-017](ADR-017-build-environment-flavors.md) | Build Environment Flavors: dev/qa/staging/prod with Suffixed Application IDs | Accepted — execution in M1 (WP4) |
 | [ADR-018](ADR-018-fqcn-pinning.md) | Permanent FQCN Pinning of AppDetectionService and UninstallProtectionReceiver | Accepted — binding constraint, enforced from WP6 |
 | [ADR-019](ADR-019-version-split-baseline.md) | Version-Split Documentation Baseline: 1.0.0 Active, Existing Full Spec Becomes the 2.0.0 Target | Accepted — execution staged (migration plan) |

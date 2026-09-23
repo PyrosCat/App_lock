@@ -4,6 +4,40 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F4): observational adapters and the logging interface   (2026-09-23)
+-----------------------------------------------------------------------------------
+This change adds the project logging interface and the AuditLog, IntruderCapturePort, and RuntimeDiagnostics
+adapters for the new lock engine.
+- This change adds AppLogger, with the levels debug, info, warn, and error, and its logcat implementation,
+  AndroidAppLogger, in the new infrastructure/logging package. AppModule binds AndroidAppLogger. JVM tests use the
+  new RecordingAppLogger.
+- It defines AppLogger as best effort: an implementation is thread-safe, never waits for sink capacity or delivery,
+  and drops a message under backpressure. The AndroidAppLogger comment gives the evidence: liblog's non-blocking
+  logd socket, which drops a message on EAGAIN.
+- It adds LoggingRuntimeDiagnostics in the new service/adapter package. The adapter writes each report as one
+  warning line and never throws.
+- It adds LoggingAuditLog. The adapter writes each audit event as one info line that holds only the event name. It
+  writes each line before it returns, in call order.
+- It documents that both adapters depend on the best-effort AppLogger contract for the non-blocking requirement of
+  their ports.
+- It adds NoOpIntruderCapturePort, an IntruderCapturePort that does nothing.
+- It updates the AuditLog, IntruderCapturePort, and RuntimeDiagnostics port comments, the AuditEvent comment, and
+  the guard comment in LockEngineRuntime to describe these adapters.
+- It ranks infrastructure/logging below domain in the R2 rule of ArchitectureRulesTest. It also adds a test that
+  checks that R2 gives this rank to the logging files.
+- It adds ADR-016A (Proposed), which ranks infrastructure/logging below domain and supersedes the R2 dependency
+  policy of ADR-016. The ADR index lists ADR-016A under ADR-016.
+- It adds a cross-link to ADR-016A in ADR-016. It adds dated implementation-status lines to ADR-008 for the
+  best-effort logging interface and to ADR-011 for the infrastructure/ package.
+- It updates M7_PLAN.md. The F4 entry describes the adapters, and the step list marks F4 done and F2 hardening
+  next. The D delivery-contract note describes the logcat AuditLog and the no-op IntruderCapturePort. The F6 entry
+  adds a task to disable the intruder UI.
+- It adds LoggingAuditLogTest (2 tests) and LoggingRuntimeDiagnosticsTest (2 tests). A mutation run confirmed that
+  R2 fails on an import of domain from infrastructure/logging.
+- All checks pass on this box. The unit tests give 362 tests and 0 failures, LockEngineRuntimeTest included. The
+  detekt, assembleProdDebug, and compileProdDebugAndroidTestKotlin tasks all pass.
+
+
 M7/WP2: fix report links left by the report-name standardization   (2026-09-22)
 -------------------------------------------------------------------------------
 This change replaces the old m7wp2 report names with the m7-wp2 names from 520f15d in three documents.

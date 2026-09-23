@@ -129,17 +129,16 @@ interface HomeResolver {
 }
 
 /**
- * Records a security audit event ([Effect.Log], and the self-gate audits). The real adapter (change F) maps
- * [AuditEvent] to the persisted `SecurityEventType`. It writes off the interpreter thread, because audit is
- * observational and never on the safety-critical ordered path. It stays a port so the interpreter needs no Room
- * or entity vocabulary and stays JVM-testable.
+ * Records a security audit event ([Effect.Log], and the self-gate audits). The real adapter (change F4,
+ * `LoggingAuditLog`) writes each event to logcat. An adapter MUST NOT write audit events to the database: M7
+ * invariant 6 excludes security-event persistence from 1.0.0. It stays a port so the interpreter has no logging
+ * dependency and stays JVM-testable.
  *
  * The adapter MUST be thread-safe, because the drain and the synchronous self-gate call [record] at the same
  * time. It MUST be non-blocking, because the self-gate holds the runtime lifecycle monitor across the call, so
- * a slow write delays [LockEngineRuntime.shutdown]. It MUST keep the order of the audit records. It writes
- * asynchronously, so the interpreter `guard` cannot see a failure that occurs after [record] returns. Thus the
- * adapter MUST catch failures in its own async job and report them to [RuntimeDiagnostics]. It MUST NOT drop
- * them. An application-scope adapter with one consumer (one queue that drains to the DAO) does all of this.
+ * a slow write delays [LockEngineRuntime.shutdown]. It MUST keep the order of the audit records. The interpreter
+ * `guard` contains and reports a throw from [record]. An adapter that writes asynchronously MUST catch a failure in
+ * its own job and report it to [RuntimeDiagnostics], because the guard cannot see a failure after [record] returns.
  */
 interface AuditLog {
     fun record(event: AuditEvent, packageName: String?)
@@ -147,15 +146,13 @@ interface AuditLog {
 
 /**
  * Reports a failed unlock to the intruder-capture policy ([Effect.CaptureIntruder], and the self-gate). The
- * manager owns the threshold policy, so the interpreter always reports and never decides. The real adapter
- * (change F) wraps `IntruderCaptureManager.onAuthFailure`. It stays a port because that manager is Android-bound
- * (it uses the camera and storage), and the interpreter must stay JVM-testable.
+ * adapter owns the capture policy, so the interpreter always reports and never decides. The M7 adapter is
+ * `NoOpIntruderCapturePort`: intruder capture is descoped from 1.0.0, and `IntruderCaptureManager` writes security
+ * events, which M7 invariant 6 excludes. M8 removes the feature.
  *
- * The delivery contract is the same as [AuditLog]. The adapter MUST be thread-safe, because the drain and the
- * synchronous self-gate call it at the same time. It MUST be non-blocking, because the self-gate holds the
- * lifecycle monitor across the call. The capture runs asynchronously. Thus the adapter MUST catch a failure in
- * its own job and report it to [RuntimeDiagnostics], and not let it become silent. The interpreter `guard`
- * contains only a synchronous throw before [onAuthFailure] returns.
+ * The delivery contract is the same as [AuditLog]: the adapter MUST be thread-safe and non-blocking, and an adapter
+ * that captures asynchronously MUST catch a failure in its own job and report it to [RuntimeDiagnostics]. The
+ * interpreter `guard` contains only a synchronous throw before [onAuthFailure] returns.
  */
 interface IntruderCapturePort {
     fun onAuthFailure(packageName: String, method: UnlockMethod, failureCount: Int)
@@ -167,9 +164,9 @@ interface IntruderCapturePort {
  * [port] and a stable [reason] here, then continues. Thus a broken observational adapter does not become silent
  * security-event loss. It is a REQUIRED dependency (no default), so F cannot forget to bind it. The interpreter
  * still routes each call through an internal guard, so a sink that throws cannot propagate. The real sink
- * (change F) writes a log or a metric and MUST NOT throw. F's own asynchronous adapters ([AuditLog],
- * [IntruderCapturePort]) also report a delivery failure here when it happens after their method returned, beyond
- * the interpreter synchronous guard. Thus the sink MUST be thread-safe.
+ * (change F4, `LoggingRuntimeDiagnostics`) writes a log line and MUST NOT throw. An adapter that delivers
+ * asynchronously also reports here a failure that happens after its method returned, where the interpreter guard
+ * cannot see it. The drain and the self-gate report from different threads, so the sink MUST be thread-safe.
  */
 fun interface RuntimeDiagnostics {
     fun report(port: String, reason: String)

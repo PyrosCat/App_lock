@@ -12,6 +12,8 @@ import com.applock.data.VaultRepository
 import com.applock.domain.IntruderPolicy
 import com.applock.domain.LockPolicyManager
 import com.applock.domain.LockSessionManager
+import com.applock.infrastructure.logging.AndroidAppLogger
+import com.applock.infrastructure.logging.AppLogger
 import com.applock.security.CredentialRepository
 import com.applock.security.EncryptedFileStore
 import com.applock.security.EncryptedPrefsLockoutStorage
@@ -47,6 +49,11 @@ object AppModule {
     @Singleton
     @ApplicationScope
     fun provideAppScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    // The project logging interface (ADR-008), bound to logcat. The F4 adapters use it once F5 wires them.
+    @Provides
+    @Singleton
+    fun provideAppLogger(): AppLogger = AndroidAppLogger
 
     @Provides
     @Singleton

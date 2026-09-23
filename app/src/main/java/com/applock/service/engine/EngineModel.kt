@@ -90,7 +90,7 @@ enum class SafeDestination { HOME, APP_LOCK, OVERLAY_SETTINGS }
 
 enum class UnlockMethod { PIN, BIOMETRIC }
 
-/** Audit events the reducer emits. The adapter maps these to `SecurityEventType`. */
+/** Audit events the reducer emits. The [AuditLog] adapter writes them to logcat. */
 enum class AuditEvent {
     LOCK_TRIGGERED,
     UNLOCK_SUCCESS,

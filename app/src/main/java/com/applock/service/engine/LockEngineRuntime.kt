@@ -509,10 +509,10 @@ class LockEngineRuntime(
     /**
      * Runs an observational side effect (audit, capture, timer cancel, self-gate observational work). On any
      * non-cancellation throw it reports the failing [port] to [diagnostics] (through [safeReport]) and continues.
-     * Thus a misbehaving adapter cannot kill the consumer. It contains only a SYNCHRONOUS throw, one that
-     * surfaces before the port method returns. An adapter that delivers asynchronously (audit and capture persist
-     * off-thread) can fail after it returns, beyond this boundary. That adapter MUST self-report to
-     * [RuntimeDiagnostics] (see the port contracts). So this reports a synchronous fault, not every fault.
+     * Thus a misbehaving adapter cannot kill the consumer. It contains only a synchronous throw, one that
+     * surfaces before the port method returns. An adapter that delivers asynchronously can fail after it returns,
+     * beyond this boundary. That adapter MUST self-report to [RuntimeDiagnostics] (see the port contracts). So this
+     * reports a synchronous fault, not every fault.
      */
     @Suppress("TooGenericExceptionCaught") // observational adapter: report-and-continue (synchronous throws)
     private fun guard(port: String, block: () -> Unit) {

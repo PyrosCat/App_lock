@@ -35,6 +35,9 @@ Staged activation is deliberate and recorded here so it is not mistaken for dead
 ## Related
 ADR-001, ADR-010, ADR-011, ADR-015, ADR-018 (R4 exemption); SDS §5.5, §14; M1_PLAN WP3 (defines), WP5/WP6 (activate rules); RTM FR-358 (static analysis in CI → `implemented` at WP3 close), FR-361, NFR-MNT-003.
 
+**Cross-link (added 2026-09-23):** when accepted, ADR-016A (Proposed) supersedes the R2 dependency policy of this
+ADR. R1, R3, R4, and the choice of Konsist stay here.
+
 ## Implementation note (2026-08-06, WP3) — R1/R3 frozen baselines
 
 Implementation surfaced concrete baselines; recorded here per GOVERNANCE §2.3 (factual

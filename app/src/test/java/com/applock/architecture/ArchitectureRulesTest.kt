@@ -65,21 +65,24 @@ class ArchitectureRulesTest {
         return importsGraph || corePackageUse
     }
 
-    // ---- R2 — layer dependency direction (ADR-001/011) — ACTIVE from WP6 ------------------
+    // ---- R2 — layer dependency direction (ADR-001/011, ADR-016A) — ACTIVE from WP6 -------
     //
-    // Core layers ranked innermost(0)..outermost(3). A core-layer file may import another core
+    // Core layers ranked innermost(0)..outermost(4). A core-layer file may import another core
     // layer only when the target rank is strictly lower (same layer is always allowed; same rank
-    // but a different layer — e.g. data <-> security — is a violation). platform/, di/, the two
-    // ADR-018 pinned entry points and the root Application are adapters/wiring, exempt from R2
-    // (R4 governs platform placement). The five inner->outer edges that clean architecture removes
-    // only via the M2/M3 interface extraction (SDS §5.5) are grandfathered by r2Baseline and burn
-    // down then; any NEW inner->outer edge fails.
+    // but a different layer — e.g. data <-> security — is a violation). infrastructure/logging
+    // (the ADR-008 logging interface) ranks below domain, so every layer may import it, and it
+    // must not import a core layer (ADR-016A). Other infrastructure/ packages have no rank.
+    // platform/, di/, the two ADR-018 pinned entry points and the root Application are
+    // adapters/wiring, exempt from R2 (R4 governs platform placement). The five inner->outer edges
+    // that clean architecture removes only via the M2/M3 interface extraction (SDS §5.5) are
+    // grandfathered by r2Baseline and burn down then; any new inner->outer edge fails.
     private val coreLayerRank = mapOf(
-        "domain" to 0,
-        "data" to 1,
-        "security" to 1,
-        "service" to 2,
-        "presentation" to 3,
+        "infrastructure.logging" to 0,
+        "domain" to 1,
+        "data" to 2,
+        "security" to 2,
+        "service" to 3,
+        "presentation" to 4,
     )
 
     // fromFile (path under com/applock) -> the outer layer it is grandfathered to reach today.
@@ -96,11 +99,22 @@ class ArchitectureRulesTest {
         val violations = productionFiles().flatMap { r2ViolationsIn(it) }
         assertTrue(
             "ADR-001/011 R2: a core layer must depend only on strictly-inner layers " +
-                "(inner to outer: domain < {data, security} < service < presentation). New " +
-                "outward dependencies must go through the proper layer/interface (interface " +
+                "(inner to outer: infrastructure/logging < domain < {data, security} < service < " +
+                "presentation). New outward dependencies must go through the proper layer/interface (interface " +
                 "extraction lands in M2/M3). Offending edge(s):\n" + violations.joinToString("\n"),
             violations.isEmpty(),
         )
+    }
+
+    // Guards the subpackage key: a path mismatch would leave the logging files unranked, and R2
+    // would then pass them without a check.
+    @Test
+    fun `R2 - infrastructure logging files are ranked`() {
+        val loggingFiles = productionFiles()
+            .filter { "/com/applock/infrastructure/logging/" in it.path.replace('\\', '/') }
+        assertTrue("no production file found under infrastructure/logging", loggingFiles.isNotEmpty())
+        val unranked = loggingFiles.filter { coreLayerOf(it) != "infrastructure.logging" }.map { it.relPath() }
+        assertTrue("R2 does not rank:\n" + unranked.joinToString("\n") { "  - $it" }, unranked.isEmpty())
     }
 
     // Wrong-direction core-layer imports in one file (empty for exempt files / clean files).
@@ -117,12 +131,13 @@ class ArchitectureRulesTest {
         }
     }
 
-    private val coreLayers = listOf("domain", "data", "security", "service", "presentation")
+    // A layer key is a package path under com.applock ("infrastructure.logging" is a subpackage).
+    private val coreLayers = coreLayerRank.keys
 
     // The core layer a production FILE belongs to (null = exempt: platform/di/pinned/root).
     private fun coreLayerOf(file: KoFileDeclaration): String? {
         val p = file.path.replace('\\', '/')
-        return coreLayers.firstOrNull { "/com/applock/$it/" in p }
+        return coreLayers.firstOrNull { "/com/applock/${it.replace('.', '/')}/" in p }
     }
 
     private fun coreLayerOfImport(name: String): String? =

@@ -801,16 +801,13 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       surface a queue-lag diagnostic (the age or depth of the oldest un-drained input), so a stuck consumer is
       observable rather than silent unbounded growth. Not a D behaviour change; the seam is the single drain.
     - **(6) Observational-adapter delivery contract (F).** `AuditLog` and `IntruderCapturePort` are called
-      concurrently by the drain AND the synchronous self-gate, and they persist off-thread, so the interpreter's
-      `guard` (which contains only a synchronous throw before the method returns) cannot see an async failure.
-      F's real adapters MUST therefore be **thread-safe**, **non-blocking** (the self-gate holds the lifecycle
-      monitor across them, so a slow adapter delays `shutdown`), **order-preserving** for audit, and MUST
-      **catch failures inside their own async job and report them to `RuntimeDiagnostics`** (never drop them).
-      An application-scope single-consumer adapter (one queue draining to the DAO, serializing drain + self-gate
-      calls) satisfies all of it; the existing `IntruderCaptureManager` is fire-and-forget and does NOT
-      self-report, so F must wrap it accordingly. F tests: an async-failure-after-return reports to diagnostics,
-      and a concurrent drain/self-gate delivery preserves ordering and loses nothing. The D KDocs on these ports
-      record this contract.
+      concurrently by the drain and the synchronous self-gate. F's real adapters MUST therefore be
+      **thread-safe**, **non-blocking** (the self-gate holds the lifecycle monitor across them, so a slow adapter
+      delays `shutdown`), and **order-preserving** for audit. The interpreter's `guard` contains only a synchronous
+      throw before the method returns. So an adapter that delivers asynchronously MUST **catch failures in its own
+      job and report them to `RuntimeDiagnostics`** (never drop them). Invariant 6 excludes audit and intruder
+      writes to the database, so F4 provides a synchronous logcat `AuditLog` and a no-op `IntruderCapturePort` (see
+      F4). The D KDocs on these ports record this contract.
 - **E — real adapters + overlay capability (fleet).**
   - **`OverlayLockPresenter`** (`platform/`, R2-exempt): warm `TYPE_APPLICATION_OVERLAY`, **add-once +
     `updateViewLayout` / visibility toggle** (WP0 swGPU finding; never per-lock add/remove), **`FLAG_SECURE`
@@ -938,8 +935,8 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     1. **F1** safe-dismiss arrival confirmation: done (`b0175fa`).
     2. **F2** R-007 degraded-storage lockout enforcement: done (`b9e7c53`; residuals `dbfb86b`; report `520f15d`).
     3. **F3** HomeResolver tri-state and episode revalidation: done (`30529e2`; device check `8ad3b4c`; R-008).
-    4. **F4** observational adapters: next.
-    5. **F2 hardening** R-007 residual treatment: scheduled; option not chosen.
+    4. **F4** observational adapters: done (not wired).
+    5. **F2 hardening** R-007 residual treatment: next; option not chosen.
     6. **F5** graph wiring, not visible, with a fleet checkpoint: pending.
     7. **F6** activation and RTM flip: pending.
     8. **Fleet close-out**: pending.
@@ -1007,26 +1004,30 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     - Evidence: `PackageManagerHomeResolverTest`, `LockEngineRuntimeTest`, the Moto G device check
       (`docs/reports/campaigns/2026-09-22_m7-wp2-f3-home-resolver_moto-g-2025.md`), and the CI emulator lanes of
       `HomeResolverDeviceTest`.
-  - **F4 — observational adapters.** F4 adds the real `AuditLog`, `IntruderCapturePort`, and `RuntimeDiagnostics`
-    adapters (the `LockEnginePorts.kt` contracts). Delivery is at most once, and every failure is reported.
-    - `RuntimeDiagnostics`: a no-throw, thread-safe `Log.w`/metric sink.
-    - `AuditLog`: maps `AuditEvent` to `SecurityEventType`. One `Channel` consumer on the app scope drains to
-      `SecurityEventDao` and keeps the order of delivered records. Each insert is contained: a DAO failure is caught
-      and reported as undelivered, and the drain continues. There is no retry. A record admitted after close is
-      reported. Scope cancellation stops the drain, and the drain's `finally` reports the still-queued records once,
-      best effort (diagnostics can be tearing down too).
-    - `IntruderCapturePort`: a thin wrapper of `IntruderCaptureManager.onAuthFailure(pkg, method.name, count)`. An
-      optional diagnostics hook on `IntruderCaptureManager` reports its asynchronous insert failure. The hook
-      defaults to a no-op, so legacy construction and tests do not change. This edits a production file although
-      the adapter is not wired, so a test asserts that the no-hook behaviour is unchanged.
-    - Files: new adapters, placed with the Room-bound `service/` collaborators for R2 (check
-      `ArchitectureRulesTest`); a minimal hook edit to `service/IntruderCaptureManager.kt`.
-    - Tests (JVM/Robolectric): audit order; a DAO failure on one record does not stop later records; the
-      admission-failure report; the queued-at-cancellation report; a concurrent drain and self-gate keep the order
-      and lose nothing silently; diagnostics never throws; intruder mapping and the async-failure report; the
-      default-hook behaviour is unchanged.
-    - RTM: no verified row changes. The hook keeps the FR-081/082 behaviour (cite `IntruderPolicyTest` and the
-      unchanged-behaviour test).
+  - **F4 — observational adapters.** F4 adds the `AuditLog`, `IntruderCapturePort`, and `RuntimeDiagnostics`
+    adapters (the `LockEnginePorts.kt` contracts) in `service/adapter`. They are not wired; F5 wires them. They
+    write nothing to the database (invariant 6), and their log lines hold no package names.
+    - Logging: `AppLogger` in `infrastructure/logging` is the ADR-008 logging interface. DI binds its logcat
+      implementation. JVM tests use a recording fake, because `android.util.Log` throws in JVM unit tests. R2 ranks
+      `infrastructure/logging` below domain (ADR-016A, proposed). The F4 adapters log through the interface.
+      `AppLockDatabase`, `VaultRepository`, and `ProtectionWatchdogService` move to it when they next change.
+      `ApplicationLockEngine`, `IntruderCaptureManager`, and `platform/spike` keep `android.util.Log` until they are
+      deleted.
+    - Logging contract: `AppLogger` is best effort. An implementation is thread-safe, never waits for sink capacity
+      or delivery, and drops a message under backpressure. A later central logger queues the work internally. The
+      logcat implementation meets the contract through liblog's non-blocking logd socket, which drops a message on
+      `EAGAIN`. Both adapters run under the runtime lifecycle lock on the self-gate path, and they meet the ports'
+      non-blocking requirement through this contract.
+    - `RuntimeDiagnostics` (`LoggingRuntimeDiagnostics`): writes each report as one warning. It keeps no state and
+      never throws.
+    - `AuditLog` (`LoggingAuditLog`): writes each audit event as one info line with the event name only. The write
+      is synchronous, so the lines keep the call order, and a logger failure reaches the runtime guard, which
+      reports it. It keeps no state, so it is thread-safe.
+    - `IntruderCapturePort` (`NoOpIntruderCapturePort`): does nothing. Intruder capture is descoped from 1.0.0, and
+      `IntruderCaptureManager` writes security events, which invariant 6 excludes. The legacy engine keeps its
+      capture until G deletes it. F6 disables the intruder UI, and M8 removes the feature.
+    - Evidence (JVM): `LoggingAuditLogTest`, `LoggingRuntimeDiagnosticsTest`, and `ArchitectureRulesTest` (R2).
+    - RTM: no row changes. FR-081 to FR-085 are `descoped-v1`.
   - **F2 hardening — R-007 residual treatment.** The four R-007 residuals move here from F6 (placement adopted
     2026-09-22). This is separate work with its own commits and evidence; it does not reopen F2. The options and the
     analysis are in `docs/process/proposals/2026-09-22_R007_F2_HARDENING_OPTIONS.md`.
@@ -1093,6 +1094,10 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       `canDrawOverlays`, protection is reported inactive (present returns `Unavailable`) and the grant UI is
       actionable. After the grant, the monitor's edge fires `retryPresentation()` and protection recovers. Without
       this gate, ungranted users would lose locking, a regression against the Activity, which needs no grant.
+    - Intruder UI: disable the intruder settings in `SettingsScreen` (the capture toggle, the threshold, and the
+      intruder-log entry, about line 215). The new engine binds a no-op `IntruderCapturePort` (F4), so the app must
+      not offer a capture that it does not perform. Decide at F6 whether the intruder log stays viewable, so that
+      the user can still review and delete the stored records until M8 removes the feature and its tables.
     - `OverlayGrantMonitor` callers: startup (`AppLockApplication.onCreate` seeds the fact), `MainActivity.onResume`
       (a grant made in Settings while the app was in the background), and the `ProtectionWatchdogService` tick. All
       go through the single serialized `refresh()`.
