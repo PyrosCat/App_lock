@@ -4,6 +4,15 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2: fix report links left by the report-name standardization   (2026-09-22)
+-------------------------------------------------------------------------------
+This change replaces the old m7wp2 report names with the m7-wp2 names from 520f15d in three documents.
+- The FR-044 and FR-174 verification cells in rtm.csv now cite the current report names.
+- The NucBox row in docs/reports/README.md now links to the renamed report.
+- The Gate-2 NucBox plan (M7_WP2_GATE2_NUCBOX_PLAN.md) now links to the renamed Moto G report and
+  gives the current naming pattern for its own report. Its status line now says that Gate 2 closed on 2026-09-18.
+
+
 M7/WP2 (change F3): declare the HOME query so the resolver sees the launcher   (2026-09-22)
 -------------------------------------------------------------------------------------------
 Fixed a latent resolver defect that the CI emulator lane found. The manifest change ships now and lets App Lock

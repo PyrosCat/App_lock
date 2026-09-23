@@ -1,12 +1,15 @@
 # M7/WP2 Gate-2 (change E) — NucBox emulator plan
 
 **For:** the NucBox G5 emulator host (the fleet's device-verification machine) and its operator.
-**Companion:** the arm64 leg is complete on the Moto G 2025 (`docs/reports/campaigns/2026-09-14_m7wp2-gate2-e_moto-g-2025.md`).
+**Companion:** the arm64 leg is complete on the Moto G 2025
+(`docs/reports/campaigns/2026-09-14_m7-wp2-gate2-e_moto-g-2025.md`).
 **SSOT:** `docs/process/M7_PLAN.md` §WP2 "Phase 2 detail" change E, "Gate-2 execution (fleet)".
 
-Gate 2 for change E is OPEN. The Moto G leg passed the overlay surfaces, the underlying-touch block, the shield
+Gate 2 for change E closed on 2026-09-18. The NucBox run of this plan is recorded in
+`docs/reports/campaigns/2026-09-16_m7-wp2-gate2-e_nucbox.md`, and the lead accepted the hardware-GPU substitution
+for Leg A. The Moto G leg passed the overlay surfaces, the underlying-touch block, the shield
 escape requests, Back on API 35, the window-host fault-atomicity, and the aborted or slow biometric launch on
-API 35. This plan closes the legs that need an x86_64 emulator. This fleet host runs x86_64 emulators. The
+API 35. This plan covers the legs that need an x86_64 emulator. This fleet host runs x86_64 emulators. The
 Moto G and the arm64 lanes cannot.
 
 ## Prerequisites
@@ -106,9 +109,9 @@ this leg.
 
 ## Results and reporting
 
-- Write one campaign report for this host: `docs/reports/campaigns/2026-09-14_m7wp2-gate2-e_nucbox.md`. Set the
-  date to the run date, per the `docs/reports/README.md` naming. Record the API levels, the per-test pass, skip,
-  or fail results, and the image family (`aosp` for Leg A, `google_apis` for Leg B).
+- Write one campaign report for this host: `docs/reports/campaigns/<run date>_m7-wp2-gate2-e_nucbox.md`, named per
+  `docs/reports/README.md`. The Gate-2 run filed `2026-09-16_m7-wp2-gate2-e_nucbox.md`. Record the API levels, the
+  per-test pass, skip, or fail results, and the image family (`aosp` for Leg A, `google_apis` for Leg B).
 - Keep the draft uncommitted until it is final. The user commits it (see `docs/GOVERNANCE.md`). A report is
   immutable after it is committed.
 - RTM: `FR-044` stays `partial`. The full verification is at WP6 against the whole set, not at this run.
