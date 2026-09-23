@@ -51,22 +51,38 @@ class HomeResolverDeviceTest {
         val holders = homeRoleHolders()
         assumeTrue("expected exactly one default launcher, found $holders", holders.size == 1)
         originalHolder = holders.single()
+        val (raw, waitedMs) = pollRawHomePackage { it == originalHolder }
+        assertEquals(
+            "resolveActivity must match the HOME role holder before the test (waited $waitedMs ms)",
+            originalHolder,
+            raw,
+        )
     }
 
     @After
     fun restoreDefaultLauncher() {
         if (!::originalHolder.isInitialized) return
-        // Restore the role holder first. The fake launcher is reset after that, so it is never the holder while
-        // it is disabled.
+        // Switch the role to App Lock and back, so each step is a real holder change and the platform also resets
+        // its default home. A single add-role-holder is a no-op when the platform has already given the role back to
+        // the original launcher by itself. On the API 36 image this happened after clear-role-holders, and
+        // resolveActivity then no longer matched the holder. The fake launcher is reset last, so it is never the
+        // holder while it is disabled.
+        setFakeHomeState(PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+        shell("cmd role add-role-holder $HOME_ROLE ${context.packageName}")
         shell("cmd role add-role-holder $HOME_ROLE $originalHolder")
         setFakeHomeState(PackageManager.COMPONENT_ENABLED_STATE_DEFAULT)
         assertEquals("the original default launcher must be restored", listOf(originalHolder), homeRoleHolders())
+        val (raw, _) = pollRawHomePackage { it == originalHolder }
+        assertEquals("resolveActivity must return the restored default launcher", originalHolder, raw)
     }
 
     @Test
     fun resolvesTheDefaultLauncherCheaply() {
         val resolver = PackageManagerHomeResolver(context)
-        assertTrue("the default launcher must be home", resolver.isHome(originalHolder, true))
+        assertTrue(
+            "the default launcher must be home (resolveActivity: ${rawHomePackage()})",
+            resolver.isHome(originalHolder, true),
+        )
         assertFalse("App Lock must not be home", resolver.isHome(context.packageName, true))
 
         // Within the TTL, every call with a new episode resolves again, so each sample is one real resolve.
@@ -86,7 +102,10 @@ class HomeResolverDeviceTest {
     @Test
     fun aNewEpisodeAfterADefaultLauncherChangeReturnsTheNewLauncher() {
         val resolver = PackageManagerHomeResolver(context)
-        assertTrue("the default launcher must be home", resolver.isHome(originalHolder, true))
+        assertTrue(
+            "the default launcher must be home (resolveActivity: ${rawHomePackage()})",
+            resolver.isHome(originalHolder, true),
+        )
 
         enableFakeHome()
         shell("cmd role add-role-holder $HOME_ROLE ${context.packageName}")

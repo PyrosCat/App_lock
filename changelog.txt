@@ -4,6 +4,21 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F3): make HomeResolverDeviceTest independent of test order   (2026-09-22)
+----------------------------------------------------------------------------------------
+Fixed the second CI failure of the device test, on the API 36 lane. Since a9187ae the API 30 lane skips the class
+as intended.
+- Cause: the no-holder test runs first. After clear-role-holders, the API 36 image gave the HOME role back to its
+  own launcher by itself. The restore (add-role-holder for the original launcher) was then a no-op, and
+  resolveActivity no longer matched the role holder in the next two tests.
+- Fix: the restore switches the role to App Lock and back, so each step is a real holder change, and then waits
+  until resolveActivity returns the original launcher. Before each test, the test waits until resolveActivity
+  matches the role holder, and fails with both values otherwise. The default-launcher assertions now include the
+  resolveActivity answer.
+- Moto G 2025 (API 35): 3 of 3 pass. The CI run of this commit confirms the API 36 lane. The API 35 lane has not
+  run in CI since 8ad3b4c, because the job stops at the first failing lane.
+
+
 M7/WP2 (change F3): fix HomeResolverDeviceTest on the API 30 CI lane   (2026-09-22)
 -----------------------------------------------------------------------------------
 Fixed the device test that has failed in the CI instrumentation job since 8ad3b4c. The workflow runs now stayed green.
