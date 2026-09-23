@@ -936,7 +936,7 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     2. **F2** R-007 degraded-storage lockout enforcement: done (`b9e7c53`; residuals `dbfb86b`; report `520f15d`).
     3. **F3** HomeResolver tri-state and episode revalidation: done (`30529e2`; device check `8ad3b4c`; R-008).
     4. **F4** observational adapters: done (`f828a71`; not wired).
-    5. **F2 hardening** R-007 residual treatment: next; option not chosen.
+    5. **F2 hardening** R-007 residual treatment: in progress (P0 decisions recorded; no mechanism selected).
     6. **F5** graph wiring, not visible, with a fleet checkpoint: pending.
     7. **F6** activation and RTM flip: pending.
     8. **Fleet close-out**: pending.
@@ -1030,18 +1030,64 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     - RTM: no row changes. FR-081 to FR-085 are `descoped-v1`.
   - **F2 hardening — R-007 residual treatment.** The four R-007 residuals move here from F6 (placement adopted
     2026-09-22). This is separate work with its own commits and evidence; it does not reopen F2. The options and the
-    analysis are in `docs/process/proposals/2026-09-22_R007_F2_HARDENING_OPTIONS.md`.
+    analysis are in `docs/process/proposals/2026-09-22_R007_F2_HARDENING_OPTIONS.md`. The test plan
+    `docs/process/proposals/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md` controls the work in phases P0 to P6 and
+    defines the case IDs (H, R1 to R4, X) and the candidate labels (A, B1 to B3, C1 to C7).
     - **Option A**, an authentication redesign: a durable attempt record before PIN verification, and recovery of
       interrupted attempts after a restart. It gives stronger restart protection. It also adds a storage dependency
       to every attempt and can deny legitimate access during a storage fault.
     - **Option B**, mitigation with bounded recovery retries. B1 recovers from a cold-start read failure
-      automatically. B2 retries a failed persistent change safely. B3 (optional) persists the degraded deadline.
-    - **Recommended start: B1 and B2.** B3 is an explicit scope decision. Residual /3 (process death before a write
-      completes) stays largely open under Option B, so the lead must decide it.
-    - **Boundaries for either option:** never await storage on the runtime drain; keep one ordered writer; do not
+      automatically. B2 retries a failed persistent change safely. B3 persists the degraded deadline.
+    - The options proposal recommends B1 and B2. The test plan treats that recommendation as a hypothesis. The
+      mechanism is selected at P5, from the evidence.
+    - **Boundaries for every candidate:** never await storage on the runtime drain; keep one ordered writer; do not
       hold the admission lock across I/O; stale work must not replace newer state; recovery never fabricates
       failures, captures, or audit events, and never extends the fallback deadline; the immediate in-memory reset
       after an accepted success stays.
+    - **P0 decisions (lead, 2026-09-23).** Baseline `19bb707`: F4 done, F5 not started.
+      - Campaign: the full test plan, P0 to P6. The lead can skip a part. A skip is proposed with a reason at a phase
+        exit, and the lead approves it. The campaign report lists each skipped case as a gap, not as a pass.
+      - Candidates: B1, B2, B3, C1, and A. No invariant-6 exception exists. Candidates that add a persisted record
+        (A, C2, C3, C5, C6) are evaluated as a design and a JVM model with fake storage only. A device prototype or
+        a selection of these candidates needs an exception that the lead records first. B3 is eligible only if it
+        writes the existing `failure_count` and `lockout_until` keys, with no new key or version. C4 stays available
+        if the P2 results justify it.
+      - Retry policy for B1 and B2 (production values): the first retry after 1 s, the delay doubles to a 60 s cap,
+        then one retry every 60 s until the recovery succeeds, newer local activity supersedes it, or the manager
+        stops. One recovery chain at a time. The delay does not occupy the writer thread. `currentState()` starts no
+        storage I/O. JVM tests can use shorter schedules; the evidence labels them as test schedules.
+      - Threat assumption: deliberate kill-and-restart cycles are in scope, with a bound. The threat model requires
+        that a restart gives no unrestricted new attempts (VA-AUTH-004). A restart never resets the lockout ladder.
+        The tests measure the extra verified guesses for each restart cycle. The lead sets the numeric limit after P2
+        and before P3.
+      - Unknown or unavailable storage: for a correct PIN, invariant 3 (unknown storage state never yields allow)
+        and invariant 4 (PIN fallback always available) conflict. P2 characterizes the baseline. C1 and A are
+        evaluated under a fail-open policy and a fail-closed policy. The lead selects the policy before P3.
+      - Thresholds (test plan §12, adopted as proposed): zero invariant violations; exact results for the
+        deterministic crash-prefix assertions; control events complete before the I/O gate is released; no new
+        storage-induced ANR; p95 state read or admission ≤ 10 ms and p95 screen-off or dismissal ≤ 100 ms under the
+        fault workload; a healthy-path alert when p95 visible authentication latency increases by more than 10 %
+        and more than 20 ms. A recalibration happens only before P3, with a recorded reason.
+      - Ranking: the hard limits come first, as pass or fail (test plan I1 to I9, the invariants in §2, and the
+        threat and storage policies). Then security exposure, then availability for the legitimate user, then
+        latency, then complexity and migration.
+      - Device fault injection: a debug-only wrapper around the real encrypted store, scripted through adb before
+        the manager is constructed, with barriers before and after the commit. A second check uses real platform
+        file faults through `run-as` (a read-only preferences directory, a corrupted file). Both run only on a
+        disposable install. The evidence records which source produced each fault. New debug entry points go in the
+        debug source set, under `platform/` or `presentation/` (Konsist R4).
+      - Callers at `19bb707`: `MainActivity` (the self-gate, through `AuthGateViewModel`) and `LockScreenActivity`
+        (legacy) verify a PIN now; `OverlayLockPresenter` verifies from F6. These three and `LockEngineRuntime` read
+        the lockout state. `ApplicationLockEngine` (live) and `LockEngineRuntime` (inert until F6) change the
+        counters. A biometric success resets through `LockScreenActivity` (live) and `BiometricHostActivity`
+        (from F6). No other caller verifies a PIN.
+      - Baseline behaviour for P2 to characterize (P0 changes no code): the re-seed starts only when a caller reads
+        `currentState()`, with no backoff, so the 250 ms self-gate poll can start about four reads per second under
+        a persistent read fault; the re-seed read runs on the writer thread, so a stalled read also blocks queued
+        writes; `reseedInFlight` stays set if the read throws a cancellation; the completion callbacks, which
+        include the legacy audit and capture, run inside the manager lock.
+      - Open before P3: the storage policy, the numeric restart limit, and the A policies in §4.2 of the options
+        proposal (needed for the design-level evaluation of A).
     - **Exit:** the selected work passes the local gate and a fleet gate (NucBox, Moto G: fault injection, restart,
       and inspection of the persisted state) with a host-tagged report. The lead records a decision for each
       residual in the risk register. FR-174 cites re-verification evidence in the same commit. If Option A is

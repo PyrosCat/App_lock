@@ -4,6 +4,20 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): test plan and P0 decisions   (2026-09-23)
+----------------------------------------------------------------
+This change adds the R-007 F2 hardening test plan and records the P0 decisions in M7_PLAN.
+- This change adds the R-007 F2 hardening test plan.
+- The M7_PLAN F2 hardening entry now names the test plan as the controlling document.
+- In the same entry, a note that the mechanism is selected at P5 replaces the recommendation to start with B1 and
+  B2.
+- A new P0 section in the entry records the campaign scope, the candidate set, the retry policy, the threat
+  assumption, the thresholds, the ranking order, and the device fault-injection method.
+- The P0 section also lists the callers that verify a PIN, read the lockout state, or change the counters, the
+  baseline behaviour for P2, and the decisions left for P3.
+- The M7_PLAN step list marks F2 hardening as in progress.
+
+
 M7/WP2: accept ADR-016A   (2026-09-23)
 --------------------------------------
 This change records the acceptance of ADR-016A.
