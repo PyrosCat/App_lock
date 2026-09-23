@@ -4,6 +4,22 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): JVM lockout test harness   (2026-09-23)
+--------------------------------------------------------------
+This change adds the JVM part of the R-007 test harness (test plan phase P1) in the new security/harness test
+package.
+- This change adds SimulatedLockoutStore, a fake lockout store with a durable state and a separate cache for each
+  simulated process.
+- FaultPlan, a new class, scripts storage faults for single reads and writes.
+- The new LockoutHarness runs the real LockoutManager in simulated processes and can kill a process.
+- LockoutModel, a reference model written from the F2 specification, is new. The harness compares the model with
+  the manager and the store after every step.
+- ScheduleDriver, also new, runs seeded random schedules of harness actions.
+- LockoutHarnessTest adds 21 tests for the store, the faults, process death, the harness controls, the seeded
+  driver, and 100 seeded schedules.
+- The local gate ran 383 unit tests with no failures.
+
+
 M7/WP2 (F2 hardening): test plan and P0 decisions   (2026-09-23)
 ----------------------------------------------------------------
 This change adds the R-007 F2 hardening test plan and records the P0 decisions in M7_PLAN.
