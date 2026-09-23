@@ -20,7 +20,7 @@ compensating treatment.
 | [R-004](#r-004) | `fallbackToDestructiveMigration` — silent data-loss trap on schema mismatch | **High** | M1 (WP7) | Closed (2026-08-16) — WP7 device drills PASS (NucBox, API 33): fail-safe preserves data, no wipe |
 | [R-005](#r-005) | Cold-start policy fail-open: protection cache empty until async load completes | **High** | M7 | Open |
 | [R-006](#r-006) | Non-atomic legacy plaintext→encrypted migration: rollback source deleted before import commits | **Medium** | M1/WP7 | Closed (2026-08-15) — eliminated by WP7(b) path deletion |
-| [R-007](#r-007) | Degraded-storage lockout is unenforced and over-reported: the runtime's fail-closed fallback lives only in `EngineState`, while the real gate reads `LockoutManager.currentState()` | **Medium** | M7 | Open — F2 fix implemented (2026-09-20): manager/storage/legacy live, runtime wiring deferred to F6; 4 residuals proposed |
+| [R-007](#r-007) | Degraded-storage lockout is unenforced and over-reported: the runtime's fail-closed fallback lives only in `EngineState`, while the real gate reads `LockoutManager.currentState()` | **Medium** | M7 | Open — F2 fix implemented (2026-09-20): manager/storage/legacy live, runtime wiring deferred to F6; 4 residuals proposed, treated at F2 hardening (after F4, before F5) |
 | [R-008](#r-008) | Home-launcher classification can use a stale answer, and a classification stays in effect until the next foreground observation | **Low** (proposed) | M7 | Open — proposed F3 residual (2026-09-22), lead disposition at F6 |
 
 *Gate identifiers re-pointed 2026-08-14 to the 1.0.0 milestone line M7–M10 (ADR-019 / `ROADMAP.md`):
@@ -457,7 +457,7 @@ The WP7 scope decision; any change to `AppLockDatabase` migration; M3 backup/res
 **Category:** Security / Enforcement · **Likelihood:** Low · **Impact:** High · **Severity:** **Medium**
 (Low × High) · **Status:** Open — F2 implemented actions 1 to 3 (2026-09-20): the LockoutManager/storage/legacy
 engine changes are live, the runtime wiring is deferred to F6; four residuals proposed (see below), pending lead
-disposition · **Opened:** 2026-09-11 · **Owner:** project lead
+disposition at F2 hardening · **Opened:** 2026-09-11 · **Owner:** project lead
 **Affected gate(s):** **M7** — the fix lands with change F (real adapters + DI cutover), to converge before the
 Phase-3 `enforcement.health` oracle becomes authoritative. Latent until F: the runtime is not yet wired to
 production (the legacy `ApplicationLockEngine` still serves `AuthGateViewModel`).
@@ -511,9 +511,11 @@ suspend self-gate, its drain lockout path (which admits each mutation immediatel
 off the drain), and the reducer degraded gate are inert until F6 wires the overlay/runtime path; they are exercised
 by unit tests until then.
 
-Four residuals remain, proposed. They are deferred for revisit at F6 (the runtime cutover), when the full lockout
-path is production-wired and a storage/restart robustness pass fits; the lead decides accept-vs-fix then. They are
-distinct from the enforcement gap the main entry describes:
+Four residuals remain, proposed. They are treated at **F2 hardening**, a milestone after F4 and before F5
+(placement adopted 2026-09-22). The milestone selects Option A (a durable attempt record before PIN verification)
+or Option B (bounded recovery retries; B1 and B2 recommended, B3 optional). The analysis is in
+`docs/process/proposals/2026-09-22_R007_F2_HARDENING_OPTIONS.md`. The lead records a disposition for each residual
+there. The residuals are distinct from the enforcement gap that the main entry describes:
 1. **Cold-start read failure.** The seed degrades to `Available`, so a persisted lockout is not enforced while
    the store stays unreadable, and the retry does not bound that window. Because a local mutation disables the
    re-seed permanently, recovery is not guaranteed by the store becoming readable: a failure or reset before a
@@ -539,7 +541,7 @@ distinct from the enforcement gap the main entry describes:
 
 ### Review triggers
 Change F (the DI cutover and real adapters); any change to `LockoutManager` or the lockout read path; the M7
-gate and Phase-3 oracle enablement; the F6 revisit of the four F2 residuals above.
+gate and Phase-3 oracle enablement; F2 hardening, the treatment of the four F2 residuals above.
 
 ---
 

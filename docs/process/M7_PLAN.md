@@ -928,39 +928,190 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     `docs/testing/M7_WP2_GATE2_NUCBOX_PLAN.md`.
     Gate 2 is not closed until the Moto G run passes. RTM: **FR-044** Overlay Permission Verification
     (`not-started`->`partial`; verification WP6).
-- **F — production cutover (fleet).** Swap DI (`AppModule`) to `LockEngineRuntime` built with the real
-  adapters and the **application scope** (not a service scope — see D's lifetime contract). `AppDetectionService`
-  injects the runtime (edge classification is internal, so it still forwards the raw package + `onScreenOff`),
-  and **`AuthGateViewModel` is rewired to the runtime's `onUnlockSuccess` / `onUnlockFailure`** (the self-gate
-  is implemented in the runtime as of D — there is no separate `SelfGateAuthPort`). F therefore only supplies
-  the real `AuditLog`, `IntruderCapturePort`, and `RuntimeDiagnostics` adapters the self-gate uses. Overlay +
-  host completions are request-token-keyed (the token is read from the observed `EngineState`); the self-gate
-  stays package-keyed, never forced through a request-id overload. The watchdog and the MainActivity banner
-  read the **derived health**, so "Protected" requires detector-enabled ∧ overlay-granted ∧ no present-failure;
-  a `SurfaceApplyResult.Unavailable/Failed` is recorded, never swallowed.
-  F wires `retryPresentation()` for edge-triggered recovery ONLY (a restored overlay grant, and an
-  out-of-band host detach), never from a `present()` fault: change E removed the presenter's BadToken
-  self-trigger, because feeding it back into the failing present resets the re-drive budget and defeats the
-  bound (a busy retry loop), so a present()-internal fault relies on the runtime's bounded re-drive. The
-  out-of-band detach signal (the `ComposeView` / overlay host destroyed outside a runtime-driven present)
-  must be **de-duplicated** and **suppressed during teardown**, so one unexpected detach re-arms once while a
-  normal dismiss / shutdown does not. That handler MUST first invalidate the stale host
-  (`presenter.release()`, which clears the host after confirming it is detached) and only THEN call
-  `retryPresentation()`: `ensureAdded()`
-  early-returns on a non-null `overlayRoot`, so a retry alone would keep reconciling against the detached
-  root and never re-add. F must also treat a `LockCompletionBridge.bind()` that returns false as
-  **cutover-fatal**: an unbound (or mis-bound) bridge drops completions, so correct PINs never unlock and
-  failed PINs never reach lockout accounting.
-  **Protection is gated on the overlay grant (Decision D-P2-2):** it cannot be reported or enabled active
-  without `canDrawOverlays`, and the grant path is verified **before** the cutover flips. Otherwise
-  ungranted users lose locking entirely, a regression against the Activity, which needs no overlay grant.
-  **Deployed-secure FLAG_SECURE proof (deferred from change E's Gate 2, Decision 2026-09-14):** on a
-  `prodRelease` build the real overlay shows over a protected app, so the proof is direct here: `screencap`
-  returns black over the overlay region, and `dumpsys window` shows the `FLAG_SECURE` flag on the
-  `AppLockOverlay` window. `OverlayWindowFlagsTest` covers the flag policy until this lands.
-  Replace `LockScreenLaunchTest` with a **replacement smoke** over the overlay / biometric-host surface,
-  keep the GMD matrix green, and update the WP8 runbook reference. RTM (same commit): **FR-027**
-  `partial`->`implemented`, **FR-028** `not-started`->`implemented`.
+- **F — production cutover (fleet).** F replaces the legacy lock path in production. It swaps DI (`AppModule`) to
+  `LockEngineRuntime` with the real adapters on the **application scope** (not a service scope; see D's lifetime
+  contract). It also delivers three logic pieces that earlier changes deferred to F: safe-dismiss **arrival**
+  confirmation (F1), **R-007** degraded-storage lockout enforcement (F2), and the **HomeResolver** residuals (F3).
+  The plan was approved on 2026-09-18. This entry is the design record for change F; the changelog holds the
+  per-commit detail.
+  - **Sequence and status.** Each step is one or more independently gate-green commits. The user commits each one.
+    1. **F1** safe-dismiss arrival confirmation: done (`b0175fa`).
+    2. **F2** R-007 degraded-storage lockout enforcement: done (`b9e7c53`; residuals `dbfb86b`; report `520f15d`).
+    3. **F3** HomeResolver tri-state and episode revalidation: done (`30529e2`; device check `8ad3b4c`; R-008).
+    4. **F4** observational adapters: next.
+    5. **F2 hardening** R-007 residual treatment: scheduled; option not chosen.
+    6. **F5** graph wiring, not visible, with a fleet checkpoint: pending.
+    7. **F6** activation and RTM flip: pending.
+    8. **Fleet close-out**: pending.
+  - **Delivery rules.** The local gate for each step is `gradlew.bat testProdDebugUnitTest detekt assembleProdDebug
+    compileProdDebugAndroidTestKotlin`. This box cannot boot emulators, so emulator runs and the `prodRelease`
+    FLAG_SECURE proof run on the NucBox. Real-hardware runs use the Moto G, which is attached to this box. A step
+    that changes the implementation of an RTM row cites requirement-specific evidence in the same commit. F1 and F3
+    are isolated (not wired). F2, F2 hardening, and F4 edit production singletons that the legacy engine and the
+    self-gate use now, so each keeps the healthy-path behaviour and tests those callers.
+  - **Invariants carried from E (do not change).** Biometric `acknowledge` accepts only the exact live lease
+    (ADR-020), and the ack latch lives on the `LeaseHandle`. The overlay auto-prompt is consumed only on ack, with
+    one bounded retry whose budget is kept outside Compose. The overlay is added dismissed and is revealed only
+    after the fallible flag-apply. `resetHost` is total and failure-atomic. The ViewTree owners sit on the
+    window-root `OverlayRoot`. The HomeResolver re-resolves unconditionally once the last attempt is older than the
+    TTL. The runtime is the only `present`/`dismiss` caller, surfaces never dismiss themselves, and
+    `retryPresentation` is edge-triggered only.
+  - **F1 — safe-dismiss arrival confirmation.**
+    - `startActivity` also returns for a silently aborted background launch (`START_ABORTED`). So the reducer no
+      longer hides the surface when the launch call returns. An escape ends only when its destination is observed.
+    - Arrival evidence: `Foreground.Home` for HOME. For OVERLAY_SETTINGS, an approved package that differs from the
+      guarded origin; a same-package observation stays an origin re-present. For APP_LOCK, an explicit
+      `AppLockForeground` signal keyed by the attempt. `Foreground.Own` is never arrival evidence, because it cannot
+      tell `MainActivity` from `BiometricHostActivity`.
+    - APP_LOCK and OVERLAY_SETTINGS escapes need a shield (`ReadinessToken`). `LeavingFor.navigationIssued`
+      records the issue. An arrival completes the escape in either state, because the drain can see the destination
+      before the issued echo.
+    - An attempt-keyed arrival timeout (`TimerToken.ArrivalTimer`, through `TimerScheduler`) reverts an escape that
+      does not arrive. A scheduling failure reverts at once. Completion, supersession, screen-off, and shutdown
+      cancel the timeout.
+    - F6 connects `MainActivity.onResume` to the signal and adds the attempt to the launch intent.
+    - Evidence: `LockEngineReducerTest`, `LockEngineSafeDismissTest`, `LockEngineRuntimeTest` (M7-new; no verified
+      RTM row).
+  - **F2 — R-007 degraded-storage lockout enforcement.**
+    - `LockoutManager` keeps an in-memory authoritative snapshot, which `currentState()` reads without a lock. It
+      persists on a dedicated single-thread dispatcher. A short `synchronized` section admits each mutation: it
+      assigns the revision, publishes the snapshot, and enqueues the write. So the snapshot order equals the disk
+      order. Persistence is never awaited inside that section.
+    - The recorded (persisted) deadline and the in-memory fallback deadline are separate, and `degraded` is derived
+      from them. A failed failure-write arms the fallback, also below the 5-failure threshold, if its authentication
+      streak is still current. The fallback window starts when the write completes. Only a committed threshold write
+      clears `degraded`. A successful unlock advances the streak.
+    - `EncryptedPrefsLockoutStorage` calls `commit()` directly and returns its result. Re-seeding after a cold-start
+      read failure stops at the first local mutation. Production injects a sleep-aware clock
+      (`SystemClock.elapsedRealtime`).
+    - The runtime drain never awaits persistence: it admits the mutation at once and awaits the result off the
+      drain. The runtime self-gate entry points are `suspend` and await outside the `lifecycleLock` barrier.
+      `ApplicationLockEngine` (live until G) uses a completion callback.
+    - `LOCKOUT_TRIGGERED` is audited only for a recorded lockout. Intruder capture receives the actual count of
+      every failure. A failed reset is reported (`lockout_reset`) and never re-locks the user.
+    - RTM: FR-174 stays `implemented-verified` (`docs/reports/campaigns/2026-09-21_m7-wp2-f2-lockout-jvm_2012-i7.md`
+      and per-push CI). The four R-007 residuals are treated at F2 hardening.
+  - **F3 — HomeResolver tri-state and episode revalidation.**
+    - The port is `isHome(packageName, newForegroundEpisode)`. The runtime sets the flag when a package differs from
+      the previous raw foreground, including Own and Transient, so `A -> Own -> A` is a transition. ScreenOff does
+      not reset the flag.
+    - The resolver resolves on the first call, when the last attempt is older than the 2 s TTL, and on every new
+      episode, for every package. A repeat within one episode uses the cached answer. After a failure, it makes no
+      attempt until the TTL expires.
+    - `Failure` keeps the last-known-good launcher. `NoDefault` (null, or the chooser `android`) clears it.
+    - The planned negative cache was dropped (see the HomeResolver note in E). The remaining stale-answer cases are
+      risk R-008 (proposed; decision at F6).
+    - Evidence: `PackageManagerHomeResolverTest`, `LockEngineRuntimeTest`, and the Moto G device check
+      (`docs/reports/campaigns/2026-09-22_m7-wp2-f3-home-resolver_moto-g-2025.md`).
+  - **F4 — observational adapters.** F4 adds the real `AuditLog`, `IntruderCapturePort`, and `RuntimeDiagnostics`
+    adapters (the `LockEnginePorts.kt` contracts). Delivery is at most once, and every failure is reported.
+    - `RuntimeDiagnostics`: a no-throw, thread-safe `Log.w`/metric sink.
+    - `AuditLog`: maps `AuditEvent` to `SecurityEventType`. One `Channel` consumer on the app scope drains to
+      `SecurityEventDao` and keeps the order of delivered records. Each insert is contained: a DAO failure is caught
+      and reported as undelivered, and the drain continues. There is no retry. A record admitted after close is
+      reported. Scope cancellation stops the drain, and the drain's `finally` reports the still-queued records once,
+      best effort (diagnostics can be tearing down too).
+    - `IntruderCapturePort`: a thin wrapper of `IntruderCaptureManager.onAuthFailure(pkg, method.name, count)`. An
+      optional diagnostics hook on `IntruderCaptureManager` reports its asynchronous insert failure. The hook
+      defaults to a no-op, so legacy construction and tests do not change. This edits a production file although
+      the adapter is not wired, so a test asserts that the no-hook behaviour is unchanged.
+    - Files: new adapters, placed with the Room-bound `service/` collaborators for R2 (check
+      `ArchitectureRulesTest`); a minimal hook edit to `service/IntruderCaptureManager.kt`.
+    - Tests (JVM/Robolectric): audit order; a DAO failure on one record does not stop later records; the
+      admission-failure report; the queued-at-cancellation report; a concurrent drain and self-gate keep the order
+      and lose nothing silently; diagnostics never throws; intruder mapping and the async-failure report; the
+      default-hook behaviour is unchanged.
+    - RTM: no verified row changes. The hook keeps the FR-081/082 behaviour (cite `IntruderPolicyTest` and the
+      unchanged-behaviour test).
+  - **F2 hardening — R-007 residual treatment.** The four R-007 residuals move here from F6 (placement adopted
+    2026-09-22). This is separate work with its own commits and evidence; it does not reopen F2. The options and the
+    analysis are in `docs/process/proposals/2026-09-22_R007_F2_HARDENING_OPTIONS.md`.
+    - **Option A**, an authentication redesign: a durable attempt record before PIN verification, and recovery of
+      interrupted attempts after a restart. It gives stronger restart protection. It also adds a storage dependency
+      to every attempt and can deny legitimate access during a storage fault.
+    - **Option B**, mitigation with bounded recovery retries. B1 recovers from a cold-start read failure
+      automatically. B2 retries a failed persistent change safely. B3 (optional) persists the degraded deadline.
+    - **Recommended start: B1 and B2.** B3 is an explicit scope decision. Residual /3 (process death before a write
+      completes) stays largely open under Option B, so the lead must decide it.
+    - **Boundaries for either option:** never await storage on the runtime drain; keep one ordered writer; do not
+      hold the admission lock across I/O; stale work must not replace newer state; recovery never fabricates
+      failures, captures, or audit events, and never extends the fallback deadline; the immediate in-memory reset
+      after an accepted success stays.
+    - **Exit:** the selected work passes the local gate and a fleet gate (NucBox, Moto G: fault injection, restart,
+      and inspection of the persisted state) with a host-tagged report. The lead records a decision for each
+      residual in the risk register. FR-174 cites re-verification evidence in the same commit. If Option A is
+      chosen, the asynchronous self-gate work planned for F6 moves into it.
+  - **F5 — graph wiring, not visible.** F5 adds providers, binding, and monitoring only. It makes no user-visible or
+    health-visible change. The new engine is constructed and bound but stays inert: no foreground events reach it,
+    and no overlay is shown.
+    - `di/AppModule.kt` provides `EnforcementHealth` (`@Singleton`), the F4 adapters, and `LockEngineRuntime` on
+      `@ApplicationScope`: a fresh `Epoch`; `policyState = LockPolicyManager.state`; `Dispatchers.Main`; the real
+      `OverlayLockPresenter`, `RealSafeNavigator`, `HandlerTimerScheduler.create()`, and
+      `PackageManagerHomeResolver(context)`; `ownPackageName`; `SystemClock::elapsedRealtime`. The singleton scope
+      gives one shared `EnforcementHealth`.
+    - `AppLockApplication.onCreate` injects the runtime and calls `LockCompletionBridge.bind()` once. A `false`
+      return is fatal, and the app throws. An unbound or wrongly bound bridge drops completions, so correct PINs
+      never unlock and failed PINs never reach lockout accounting.
+    - `OverlayGrantMonitor` (singleton) owns the overlay-grant fact and its false-to-true edge. `refresh()` submits
+      `submitOverlayGrant(...)`. On a false-to-true edge it calls `runtime.retryPresentation()` exactly once. It is
+      the only place with edge detection, so no two callers reset the re-drive budget twice.
+    - The unexpected-detach handler on `OverlayLockPresenter.OverlayRoot.onDetachedFromWindow` is de-duplicated and
+      suppressed during teardown: one unexpected detach re-arms once, and a normal dismiss or shutdown does not. It
+      calls `presenter.release()` first, which clears the host after it confirms the detach. It then calls
+      `retryPresentation()`. The order matters, because `ensureAdded()` returns early on a non-null `overlayRoot`.
+    - `retryPresentation()` is used for edge-triggered recovery only (a restored overlay grant, an out-of-band host
+      detach), never after a `present()` fault. Change E removed the presenter's BadToken self-trigger: a fault fed
+      back into the failing present resets the re-drive budget and defeats the bound. A fault inside `present()`
+      relies on the runtime's bounded re-drive.
+    - **Fleet checkpoint before F6.** It runs the tests, not only compiles them. The runtime, the monitor, and the
+      readers share one `EnforcementHealth` instance. `bind()` succeeds once, and a second bind is fatal. An
+      overlay-grant revoke and restore flips the fact and fires one `retryPresentation()`. An unexpected detach runs
+      release-then-retry once and re-adds. The wired graph uses the hardened `LockoutManager`. Record the result in a
+      host-tagged checkpoint report. F6 does not start until this checkpoint passes.
+  - **F6 — activation and RTM flip.** The user-visible switch, after the F5 checkpoint passes.
+    - `AppDetectionService` injects `LockEngineRuntime`, forwards the raw package and `onScreenOff`, and submits the
+      detector health fact on connect and destroy.
+    - `AuthGateViewModel` routes `onUnlockSuccess`/`onUnlockFailure` to the runtime self-gate (no
+      `SelfGateAuthPort`), keeps `lockoutState()` live, and drops the `ApplicationLockEngine` dependency. Overlay and
+      biometric-host completions stay keyed by the request token (read from the observed `EngineState`). The
+      self-gate stays keyed by package and is never forced through a request-id overload.
+    - The self-gate PIN callback (`MainActivity.kt`, about line 225) becomes asynchronous. A coroutine awaits the F2
+      suspend mutation. An in-flight guard prevents a duplicate submission while one is pending, and a
+      submission-keyed result prevents a stale unlock from a superseded submission. If F2 hardening selects Option
+      A, this work is done there, and F6 reuses it.
+    - `MainActivity.onResume` reports the APP_LOCK arrival signal (the F1 seam; the launch intent carries the
+      attempt token) and reads the derived `EnforcementHealth.state` for the banner.
+    - Health readers: `ProtectionWatchdogService` and the `MainActivity` banner read the derived health.
+      "Protected" requires the detector enabled, the overlay granted, and no present failure. A
+      `SurfaceApplyResult.Unavailable` or `Failed` is shown, never swallowed.
+    - Grant UI: set `OverlayEnforcement.uiEnabled = true` (the cards in `MainActivity`, about line 342, and
+      `SettingsScreen`, about line 178). **Protection is gated on the overlay grant (D-P2-2).** Without
+      `canDrawOverlays`, protection is reported inactive (present returns `Unavailable`) and the grant UI is
+      actionable. After the grant, the monitor's edge fires `retryPresentation()` and protection recovers. Without
+      this gate, ungranted users would lose locking, a regression against the Activity, which needs no grant.
+    - `OverlayGrantMonitor` callers: startup (`AppLockApplication.onCreate` seeds the fact), `MainActivity.onResume`
+      (a grant made in Settings while the app was in the background), and the `ProtectionWatchdogService` tick. All
+      go through the single serialized `refresh()`.
+    - The legacy path stays in the tree, unwired (deleted in G). A replacement smoke over the overlay and
+      biometric-host surface replaces `LockScreenLaunchTest`. Update the WP8 runbook and keep the GMD matrix green.
+    - Decide **R-008**: accept it, or add scheduled revalidation.
+    - RTM (same commit): **FR-027** `partial`->`implemented`, **FR-028** `not-started`->`implemented`;
+      `implemented-verified` at WP6. Check `rtm.csv` for any `implemented-verified` row that this step touches, and
+      cite its regression suite. The changelog records the lead's Gate-2 acceptance of 2026-09-18.
+  - **Fleet close-out (NucBox, Moto G).** After F6 is pushed:
+    - **Deployed-secure FLAG_SECURE proof** (deferred from change E's Gate 2, Decision 2026-09-14). On a
+      `prodRelease` build the real overlay shows over a protected app. `screencap` returns black over the overlay
+      region, and `dumpsys window` shows `FLAG_SECURE` on the `AppLockOverlay` window. `OverlayWindowFlagsTest`
+      covers the flag policy until then.
+    - The replacement smoke on a device.
+    - Ungranted-upgrade acceptance: start ungranted (protection inactive, banner actionable), grant "display over
+      other apps", and confirm that the monitor recovers protection and a real app then locks through the overlay.
+    - End-to-end launcher check: after a default-launcher change, a protected former launcher locks, and a new
+      default launcher is not shielded.
+    - Re-validation of the WP2 acceptance below: the overlay removes `ABSENT`, no Moto G regression, biometric
+      unlock from the overlay, and the OV-3 relock, the Phase 3 F3 self-gate check (the Phase 3 self-gate
+      resume-bypass finding, not change F3), and smoke_core green.
+    - One host-tagged campaign report per host.
 - **G — retire the old path (this box).** Delete `LockScreenActivity.kt` + its manifest `<activity>` +
   `ApplicationLockEngine.kt`. **Remove** (not reshape) the `service/ApplicationLockEngine.kt -> presentation`
   R2 baseline row (`ArchitectureRulesTest.kt`); the `IntruderCaptureManager -> presentation` row stays. Do

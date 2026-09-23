@@ -4,6 +4,23 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F): change-F design record in M7_PLAN; schedule F2 hardening   (2026-09-22)
+------------------------------------------------------------------------------------------
+Moved the change-F design record into the repository. The approved step plan was in a working file outside the
+project. M7_PLAN.md is now the single source for change F.
+- Rewrote the change-F entry in M7_PLAN.md (WP2, Phase 2 detail). It holds the step sequence with the
+  status and commits, the delivery rules, the invariants carried from change E, an as-built record for F1 to F3,
+  and the full design for F4, F5, F6, and the fleet close-out. The cutover contracts of the previous entry (grant
+  gating, the detach handler, the fatal bind failure, the FLAG_SECURE proof, the replacement smoke, the RTM
+  changes) are in the steps they belong to.
+- Scheduled F2 hardening between F4 and F5. The four R-007 residuals move there from F6. The choice between Option A 
+  (an authentication redesign) and Option B (bounded recovery retries) is still open. Added the options analysis 
+  as 2026-09-22_R007_F2_HARDENING_OPTIONS.md.
+- Updated R-007 in RISK_REGISTER.md to match: the residuals are treated at F2 hardening, and the review triggers 
+  name it. The runtime wiring stays at F6.
+- Added two items to the plan: the R-008 decision at F6, and an end-to-end launcher check in the fleet close-out.
+
+
 M7/WP2 (change F3): record home-resolver residual R-008   (2026-09-22)
 ----------------------------------------------------------------------
 Recorded the remaining home-launcher limitation from change F3 as a proposed risk, and updated the M7 plan note
@@ -13,7 +30,7 @@ to match what F3 built.
   cases: a default change with no foreground change (adb or device management), an app switch within 2 s after a
   failed lookup, and a run of lookup failures. The F6 options are to accept the residual or to add scheduled
   revalidation with a runtime re-evaluation.
-- Updated the HomeResolver note in docs/process/M7_PLAN.md (change E section): it now describes F3 as built,
+- Updated the HomeResolver note in M7_PLAN.md (change E section): it now describes F3 as built,
   including the dropped negative cache, and points to R-008 and the Moto G report.
 
 
