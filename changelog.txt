@@ -4,6 +4,21 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F3): fix HomeResolverDeviceTest on the API 30 CI lane   (2026-09-22)
+-----------------------------------------------------------------------------------
+Fixed the device test that has failed in the CI instrumentation job since 8ad3b4c. The workflow runs now stayed green.
+- Cause: the API 30 emulator image has no `cmd role get-role-holders` command. The shell printed "Unknown command:
+  get-role-holders" on stdout, and the test read that line as one role holder. The precondition passed, and two
+  tests failed.
+- Fix: homeRoleHolders() accepts only package names and skips the tests where the command is not available. The
+  first assertion of the default-change test now has a message.
+- Effect: the job stops at the first failing lane, so the API 35 and 36 lanes, including the smoke tests, have not
+  run in CI since 8ad3b4c. They run again with this fix.
+- Correction: the 2026-09-22 Moto G report says that on the other lanes the test skips only below API 29. On the
+  API 30 image it failed instead. With this fix it skips there.
+- Moto G 2025 (API 35) re-run: 3 of 3 pass. The CI run of this commit confirms the API 30 path.
+
+
 M7/WP2 (change F): change-F design record in M7_PLAN; schedule F2 hardening   (2026-09-22)
 ------------------------------------------------------------------------------------------
 Moved the change-F design record into the repository. The approved step plan was in a working file outside the

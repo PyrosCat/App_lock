@@ -33,8 +33,9 @@ import org.junit.runner.RunWith
  *
  * The second launcher is [FakeHomeActivity], a disabled debug-only activity of App Lock itself. Each test that
  * needs it enables it, so App Lock becomes a HOME candidate, and [restoreDefaultLauncher] restores the original
- * role holder, then resets the component. The tests change the device's default launcher for a few seconds. The
- * HOME role needs API 29, so the tests skip below that.
+ * role holder, then resets the component. The tests change the device's default launcher for a few seconds. They
+ * skip below API 29, where the HOME role does not exist. They also skip where `cmd role get-role-holders` is not
+ * available.
  */
 @RunWith(AndroidJUnit4::class)
 class HomeResolverDeviceTest {
@@ -85,7 +86,7 @@ class HomeResolverDeviceTest {
     @Test
     fun aNewEpisodeAfterADefaultLauncherChangeReturnsTheNewLauncher() {
         val resolver = PackageManagerHomeResolver(context)
-        assertTrue(resolver.isHome(originalHolder, true))
+        assertTrue("the default launcher must be home", resolver.isHome(originalHolder, true))
 
         enableFakeHome()
         shell("cmd role add-role-holder $HOME_ROLE ${context.packageName}")
@@ -126,8 +127,20 @@ class HomeResolverDeviceTest {
     private fun setFakeHomeState(state: Int) =
         context.packageManager.setComponentEnabledSetting(fakeHome, state, PackageManager.DONT_KILL_APP)
 
-    private fun homeRoleHolders(): List<String> =
-        shell("cmd role get-role-holders $HOME_ROLE").trim().split(';').filter { it.isNotBlank() }
+    /**
+     * The HOME role holders from `cmd role get-role-holders`. Older releases (for example, the API 30 CI image) do
+     * not have this command and print an error on stdout. The tests skip there, because an error line must never be
+     * read as a package name.
+     */
+    private fun homeRoleHolders(): List<String> {
+        val output = shell("cmd role get-role-holders $HOME_ROLE").trim()
+        val holders = output.split(';').filter { it.isNotBlank() }
+        assumeTrue(
+            "`cmd role get-role-holders` is not available here: $output",
+            holders.all { PACKAGE_NAME.matches(it) },
+        )
+        return holders
+    }
 
     /** The package that `resolveActivity` returns for `MAIN/HOME`, the same call as the production resolver. */
     @Suppress("DEPRECATION") // the int-flags overload is used below API 33
@@ -164,6 +177,7 @@ class HomeResolverDeviceTest {
     private companion object {
         const val TAG = "HomeResolverDeviceTest"
         const val HOME_ROLE = "android.app.role.HOME"
+        val PACKAGE_NAME = Regex("[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+")
         const val LATENCY_SAMPLES = 50
         const val NANOS_PER_MICRO = 1_000L
 
