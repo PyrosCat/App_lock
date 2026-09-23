@@ -17,6 +17,6 @@ Layer violations are caught by lint/detekt dependency rules rather than compiler
 **Cross-links (added 2026-08-06, GOVERNANCE §2.3):** the M1 check this ADR requires is delivered by **ADR-016** (Konsist rules R1–R4). The WP6 package realignment executing this layout is constrained by **ADR-018**: `AppDetectionService` and `UninstallProtectionReceiver` are permanently FQCN-pinned and stay outside the target layers.
 
 **Implementation status (2026-09-23, M7 WP2 change F4):** `infrastructure/` exists, with one subpackage,
-`infrastructure/logging` (the ADR-008 logging interface). ADR-016A (Proposed) ranks it below domain in R2.
+`infrastructure/logging` (the ADR-008 logging interface). ADR-016A ranks it below domain in R2.
 
 **Implementation status (2026-08-11, WP6):** realized. Source moved into `di / domain / service / data / security / platform / presentation`; the layer/dependency rules are enforced by Konsist R2/R4 (ADR-016), with the two ADR-018 pinned components deliberately outside the layers (Konsist R4 exemption). The single-module `:app` structure is unchanged.

@@ -1,6 +1,6 @@
 # ADR-016A — R2 Layer Ranking: infrastructure/logging Below Domain
 
-**Status:** Proposed · **Date:** 2026-09-23 · **Source/authority:** Project lead, M7 WP2 change F4 design
+**Status:** Accepted (2026-09-23) · **Date:** 2026-09-23 · **Source/authority:** Project lead, M7 WP2 change F4 design
 check · **Supersedes:** ADR-016, R2 dependency policy only (R1, R3, R4, and the choice of Konsist stay under
 ADR-016)
 
@@ -51,8 +51,7 @@ The complete R2 policy is:
 NFR-MNT-001, NFR-MNT-002, NFR-MNT-003.
 
 ## Related
-ADR-001, ADR-008, ADR-011, ADR-016 (R2 policy superseded on acceptance), ADR-018.
+ADR-001, ADR-008, ADR-011, ADR-016 (R2 policy superseded), ADR-018.
 
 ## Implementation status
-2026-09-23: proposed with change F4 (M7 WP2). `ArchitectureRulesTest` already enforces the rank. Acceptance changes
-the status of this ADR and of ADR-016, and both index rows, in one commit.
+2026-09-23: proposed with change F4 and accepted 2026-09-23. `ArchitectureRulesTest` enforces the rank.

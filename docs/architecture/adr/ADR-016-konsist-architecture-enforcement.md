@@ -1,6 +1,6 @@
 # ADR-016 — Konsist for Automated Architecture-Rule Enforcement
 
-**Status:** Accepted — execution in M1 (WP3) · **Date:** 2026-08-06 · **Source:** M1_PLAN §2 (WP3) + §4 (D2); operationalizes ADR-001 / ADR-010 / ADR-011 / ADR-015
+**Status:** Accepted — execution in M1 (WP3); R2 dependency policy superseded by ADR-016A (2026-09-23) · **Date:** 2026-08-06 · **Source:** M1_PLAN §2 (WP3) + §4 (D2); operationalizes ADR-001 / ADR-010 / ADR-011 / ADR-015
 
 ## Context
 ADR-001 (layered clean architecture) and ADR-011 (single-module `:app` with package-enforced layering) define the target layer structure, and ADR-015 (Hilt) carries an interim rule — *no new `Graph.*` lookup sites*. None of these are mechanically enforced today: layering is upheld by review only (ADR-010 gates major changes manually). M1 will **delete `Graph`** (WP5) and **move packages into the target layers** (WP6); across those mechanical refactors, layer violations and `Graph` reintroduction can regress silently between review points. WP3 introduces static analysis: detekt/ktlint cover style and complexity well but express layer-direction and package-boundary rules poorly.
@@ -35,8 +35,8 @@ Staged activation is deliberate and recorded here so it is not mistaken for dead
 ## Related
 ADR-001, ADR-010, ADR-011, ADR-015, ADR-018 (R4 exemption); SDS §5.5, §14; M1_PLAN WP3 (defines), WP5/WP6 (activate rules); RTM FR-358 (static analysis in CI → `implemented` at WP3 close), FR-361, NFR-MNT-003.
 
-**Cross-link (added 2026-09-23):** when accepted, ADR-016A (Proposed) supersedes the R2 dependency policy of this
-ADR. R1, R3, R4, and the choice of Konsist stay here.
+**Cross-link (added 2026-09-23):** ADR-016A supersedes the R2 dependency policy of this ADR. R1, R3, R4, and the
+choice of Konsist stay here.
 
 ## Implementation note (2026-08-06, WP3) — R1/R3 frozen baselines
 

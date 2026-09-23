@@ -4,6 +4,19 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2: accept ADR-016A   (2026-09-23)
+--------------------------------------
+This change records the acceptance of ADR-016A.
+- This change sets the status of ADR-016A to Accepted 2026-09-23 and records the acceptance in the ADR-016A
+  implementation-status line. The Related list of ADR-016A marks the R2 policy of ADR-016 as superseded.
+- The status of ADR-016 shows that ADR-016A supersedes the R2 dependency policy of ADR-016. The ADR-016 cross-link
+  states the same supersession.
+- The ADR index rows for ADR-016 and ADR-016A show the new statuses.
+- This change removes "Proposed" from the ADR-011 implementation-status line and from the ADR-016A reference in the
+  M7_PLAN F4 entry.
+- The M7_PLAN step list gives the F4 commit hash.
+
+
 M7/WP2 (change F4): observational adapters and the logging interface   (2026-09-23)
 -----------------------------------------------------------------------------------
 This change adds the project logging interface and the AuditLog, IntruderCapturePort, and RuntimeDiagnostics

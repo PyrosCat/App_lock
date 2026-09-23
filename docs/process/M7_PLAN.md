@@ -935,7 +935,7 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     1. **F1** safe-dismiss arrival confirmation: done (`b0175fa`).
     2. **F2** R-007 degraded-storage lockout enforcement: done (`b9e7c53`; residuals `dbfb86b`; report `520f15d`).
     3. **F3** HomeResolver tri-state and episode revalidation: done (`30529e2`; device check `8ad3b4c`; R-008).
-    4. **F4** observational adapters: done (not wired).
+    4. **F4** observational adapters: done (`f828a71`; not wired).
     5. **F2 hardening** R-007 residual treatment: next; option not chosen.
     6. **F5** graph wiring, not visible, with a fleet checkpoint: pending.
     7. **F6** activation and RTM flip: pending.
@@ -1009,7 +1009,7 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     write nothing to the database (invariant 6), and their log lines hold no package names.
     - Logging: `AppLogger` in `infrastructure/logging` is the ADR-008 logging interface. DI binds its logcat
       implementation. JVM tests use a recording fake, because `android.util.Log` throws in JVM unit tests. R2 ranks
-      `infrastructure/logging` below domain (ADR-016A, proposed). The F4 adapters log through the interface.
+      `infrastructure/logging` below domain (ADR-016A). The F4 adapters log through the interface.
       `AppLockDatabase`, `VaultRepository`, and `ProtectionWatchdogService` move to it when they next change.
       `ApplicationLockEngine`, `IntruderCaptureManager`, and `platform/spike` keep `android.util.Log` until they are
       deleted.
