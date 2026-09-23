@@ -16,6 +16,14 @@
             <action android:name="android.settings.action.MANAGE_OVERLAY_PERMISSION" />
             <data android:scheme="package" />
         </intent>
+        <!-- M7 WP2 (change F3): lets PackageManagerHomeResolver see the default launcher under Android 11+
+             package visibility. Without this query, Android hides a launcher that has no LAUNCHER-category
+             activity (for example, AOSP Launcher3). resolveActivity(MAIN/HOME) then returns Settings'
+             FallbackHome, and Settings would be classified as Home and skip the lock. -->
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.HOME" />
+        </intent>
     </queries>
 
     <!-- Baseline lock presentation: App Lock draws the lock over the protected app via a

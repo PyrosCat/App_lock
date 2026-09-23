@@ -4,6 +4,29 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (change F3): declare the HOME query so the resolver sees the launcher   (2026-09-22)
+-------------------------------------------------------------------------------------------
+Fixed a latent resolver defect that the CI emulator lane found. The manifest change ships now and lets App Lock
+see all HOME-capable apps. The lock behaviour does not change until F5/F6 wire the resolver.
+- Cause: the manifest queries declared MAIN/LAUNCHER but not MAIN/HOME. Under Android 11+ package visibility,
+  Android hides a launcher that has no LAUNCHER-category activity. AOSP Launcher3 declares HOME and LAUNCHER_APP,
+  not LAUNCHER. On the API 36 image, com.android.launcher3 held the HOME role, but resolveActivity(MAIN/HOME)
+  returned Settings' FallbackHome (com.android.settings).
+- Impact after wiring: the resolver would classify Settings as Home, so a protected Settings would skip the lock.
+  The real launcher would read as a plain app.
+- The Moto G 2025 did not show it, because Motorola makes com.motorola.launcher3 visible to all apps
+  (forceQueryable). The 2026-09-22 Moto G report is correct for that device, but it did not cover a hidden launcher.
+- Fix: added a MAIN/HOME intent to the manifest's <queries>. No permission changes. The app list, which queries
+  MAIN/LAUNCHER, is unaffected. The F3 entry of M7_PLAN.md now lists the query as a rule not to
+  remove.
+- Evidence: HomeResolverDeviceTest found it in CI run 35806146172 on API 36, before any test changed the device.
+  The CI run of this commit checks the API 35 and 36 lanes. The Moto G re-run passes 3 of 3, as before.
+- Correction to the previous entry (test-order independence): it blamed the API 36 failures on the platform state
+  after clear-role-holders. The real cause was this visibility defect. The role-switch restore stays, because a
+  single add-role-holder does nothing after the platform gives the role back by itself. Corrected the matching
+  comment in HomeResolverDeviceTest.
+
+
 M7/WP2 (change F3): make HomeResolverDeviceTest independent of test order   (2026-09-22)
 ----------------------------------------------------------------------------------------
 Fixed the second CI failure of the device test, on the API 36 lane. Since a9187ae the API 30 lane skips the class

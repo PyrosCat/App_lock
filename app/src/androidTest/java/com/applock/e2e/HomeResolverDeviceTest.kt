@@ -62,11 +62,10 @@ class HomeResolverDeviceTest {
     @After
     fun restoreDefaultLauncher() {
         if (!::originalHolder.isInitialized) return
-        // Switch the role to App Lock and back, so each step is a real holder change and the platform also resets
-        // its default home. A single add-role-holder is a no-op when the platform has already given the role back to
-        // the original launcher by itself. On the API 36 image this happened after clear-role-holders, and
-        // resolveActivity then no longer matched the holder. The fake launcher is reset last, so it is never the
-        // holder while it is disabled.
+        // Switch the role to App Lock and back, so each step is a real holder change and the platform resets its
+        // default home. A single add-role-holder does nothing when the platform has already given the role back to
+        // the original launcher by itself, which the API 36 image does after clear-role-holders. The fake launcher is
+        // reset last, so it is never the holder while it is disabled.
         setFakeHomeState(PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
         shell("cmd role add-role-holder $HOME_ROLE ${context.packageName}")
         shell("cmd role add-role-holder $HOME_ROLE $originalHolder")

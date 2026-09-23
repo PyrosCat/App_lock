@@ -999,10 +999,14 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       episode, for every package. A repeat within one episode uses the cached answer. After a failure, it makes no
       attempt until the TTL expires.
     - `Failure` keeps the last-known-good launcher. `NoDefault` (null, or the chooser `android`) clears it.
+    - The manifest `<queries>` declares `MAIN/HOME`. Do not remove it. Without it, Android 11+ package visibility
+      can hide the default launcher (for example, AOSP Launcher3). `resolveActivity` then returns Settings'
+      `FallbackHome`, and Settings would be classified as Home.
     - The planned negative cache was dropped (see the HomeResolver note in E). The remaining stale-answer cases are
       risk R-008 (proposed; decision at F6).
-    - Evidence: `PackageManagerHomeResolverTest`, `LockEngineRuntimeTest`, and the Moto G device check
-      (`docs/reports/campaigns/2026-09-22_m7-wp2-f3-home-resolver_moto-g-2025.md`).
+    - Evidence: `PackageManagerHomeResolverTest`, `LockEngineRuntimeTest`, the Moto G device check
+      (`docs/reports/campaigns/2026-09-22_m7-wp2-f3-home-resolver_moto-g-2025.md`), and the CI emulator lanes of
+      `HomeResolverDeviceTest`.
   - **F4 — observational adapters.** F4 adds the real `AuditLog`, `IntruderCapturePort`, and `RuntimeDiagnostics`
     adapters (the `LockEnginePorts.kt` contracts). Delivery is at most once, and every failure is reported.
     - `RuntimeDiagnostics`: a no-throw, thread-safe `Log.w`/metric sink.
