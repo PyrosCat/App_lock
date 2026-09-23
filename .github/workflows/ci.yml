@@ -134,10 +134,11 @@ jobs:
       # per-push gate — it is a test-tiering choice (build/CI config, not an ADR: GOVERNANCE §2.7).
       # OV-4 runs in its own lanes: the `full` GMD sweep (NucBox) + Moto G connected (api/no-regression)
       # and Firebase Test Lab (multi-OEM, scripts/ftl/). See M7_PLAN §10.
+      # It also excludes the R-007 device tools (@R007DeviceTool), which scripts/r007/ runs on request.
       - name: GMD smoke matrix (API 30 + 35 + 36), prodDebug
         run: >
           ./gradlew ciGroupProdDebugAndroidTest
-          -Pandroid.testInstrumentationRunnerArguments.notAnnotation=com.applock.e2e.OverlayRaceTest
+          -Pandroid.testInstrumentationRunnerArguments.notAnnotation=com.applock.e2e.OverlayRaceTest,com.applock.r007.R007DeviceTool
           -Pandroid.experimental.testOptions.managedDevices.maxConcurrentDevices=1
           -PbuildTime="$(date -u +%Y-%m-%dT%H:%M:%SZ)" --stacktrace
 

@@ -4,6 +4,29 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): Android lockout fault harness   (2026-09-23)
+-------------------------------------------------------------------
+This change adds the Android part of the R-007 test harness (test plan phase P1).
+- This change adds a lockoutStorage() function to the release and debug source sets. In a release build, the
+  function returns EncryptedPrefsLockoutStorage. In a debug build, the function wraps EncryptedPrefsLockoutStorage
+  in the new FaultInjectingLockoutStorage. AppModule now calls lockoutStorage() to get the lockout store.
+- This change adds FaultInjectingLockoutStorage and DeviceFaultScript to the debug source set. These classes inject
+  scripted storage faults on a device from a script file in the app's private directory.
+- FaultInjectingLockoutStorageTest adds 11 JVM tests for the wrapper and the script parser.
+- FaultScriptHostListTest adds 3 JVM tests that compare the script names in lib_r007.sh with the device enums.
+- This change adds the LockoutStoreInspector device tool to the androidTest source set. The tool reads the stored
+  lockout pair in a fresh process.
+- The new R007DeviceTool annotation marks the inspector, and the CI instrumentation job now excludes that
+  annotation.
+- This change adds three scripts in the new scripts/r007 folder. The lib_r007.sh script is the host controller and
+  builds on scripts/e2e/lib.sh. The p1_validate.sh script checks the harness on a device. The test_lib_r007.sh
+  script tests lib_r007.sh on the host with a stub adb.
+- The M7_PLAN F2 hardening entry records the P1 harness decisions.
+- The FR-174 verification cell in rtm.csv cites the local gate on this change.
+- The local gate ran 397 unit tests with no failures, and assembleProdRelease passed.
+- The test_lib_r007.sh script ran 41 tests with no failures.
+
+
 M7/WP2 (F2 hardening): JVM lockout test harness   (2026-09-23)
 --------------------------------------------------------------
 This change adds the JVM part of the R-007 test harness (test plan phase P1) in the new security/harness test

@@ -1088,6 +1088,15 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         include the legacy audit and capture, run inside the manager lock.
       - Open before P3: the storage policy, the numeric restart limit, and the A policies in §4.2 of the options
         proposal (needed for the design-level evaluation of A).
+    - **P1 harness decisions (lead, 2026-09-23).**
+      - JVM (`security/harness` tests): the harness observes only the public manager API, the simulated store, and
+        its ledger. `LockoutManager` has no test seam.
+      - Device: `lockoutStorage()` is defined per build type. The release version returns
+        `EncryptedPrefsLockoutStorage`; the debug version wraps it in `FaultInjectingLockoutStorage`, which the host
+        controls with files written through `run-as` (no new component or receiver). Device runs use a disposable
+        `prodDebug` install.
+      - `LockoutStoreInspector` (androidTest, `@R007DeviceTool`, excluded in CI) reads the stored pair in a fresh
+        process. The host controller is bash in `scripts/r007/`, on top of `scripts/e2e/lib.sh`.
     - **Exit:** the selected work passes the local gate and a fleet gate (NucBox, Moto G: fault injection, restart,
       and inspection of the persisted state) with a host-tagged report. The lead records a decision for each
       residual in the risk register. FR-174 cites re-verification evidence in the same commit. If Option A is

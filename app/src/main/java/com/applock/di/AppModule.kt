@@ -16,8 +16,8 @@ import com.applock.infrastructure.logging.AndroidAppLogger
 import com.applock.infrastructure.logging.AppLogger
 import com.applock.security.CredentialRepository
 import com.applock.security.EncryptedFileStore
-import com.applock.security.EncryptedPrefsLockoutStorage
 import com.applock.security.LockoutManager
+import com.applock.security.lockoutStorage
 import com.applock.service.ApplicationLockEngine
 import com.applock.service.IntruderCaptureManager
 import dagger.Module
@@ -93,8 +93,10 @@ object AppModule {
         // Inject Android's boot-time clock for the monotonic deadline. SystemClock.elapsedRealtime() advances during
         // deep sleep; the manager's JVM default (System.nanoTime) does not, which would let a lockout outlive its
         // wall deadline after the device wakes (the longer-remaining rule keeps a frozen mono alive).
+        // lockoutStorage() is defined per build type: release returns EncryptedPrefsLockoutStorage; debug wraps it
+        // for R-007 fault injection.
         LockoutManager(
-            EncryptedPrefsLockoutStorage(context),
+            lockoutStorage(context),
             elapsedRealtime = SystemClock::elapsedRealtime,
         )
 
