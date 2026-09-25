@@ -4,6 +4,20 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/M8: security-crypto replacement and installed-user migration plan (proposal)   (2026-09-24)
+-----------------------------------------------------------------------------------------
+This change adds proposals/2026-09-24_SECURITY_CRYPTO_REPLACEMENT_PLAN.md. The proposal describes how
+to replace the deprecated Jetpack security-crypto library and migrate the data of existing installs.
+- The opening sections record the official API evidence and list every consumer of the library at the inspected
+  revision.
+- A design section specifies the encrypted record serializer, the key scheme, and the integration with startup,
+  authentication, and the current storage callers.
+- The migration section gives a step-by-step protocol for installed users.
+- Qualification sections define the test harness, the evidence contract, and test cases with pass and fail criteria.
+- The closing sections list open review decisions, implementation slices, alternatives, remaining risks, and the
+  removal of the old library.
+
+
 M7/WP2 (F2 hardening): Android lockout fault harness   (2026-09-23)
 -------------------------------------------------------------------
 This change adds the Android part of the R-007 test harness (test plan phase P1).
