@@ -1,0 +1,23 @@
+{
+  "date": "2026-09-25",
+  "commit": "e521026e2838c2bff592022046d6d0571d0e818f",
+  "gradle": "8.13",
+  "java": "21.0.10",
+  "javaVendor": "JetBrains s.r.o.",
+  "offline": false,
+  "resolutionStartedUtc": "2026-09-25T11:29:03.843508500Z",
+  "resolutionCompletedUtc": "2026-09-25T11:29:40.543014Z",
+  "configurations": 123,
+  "uniqueMavenCoordinates": 478,
+  "uniqueExternalArtifacts": 427,
+  "unresolved": 0.0,
+  "artifactFailures": 0.0,
+  "osvStartedUtc": "2026-09-25T11:30:35.2667137Z",
+  "osvCompletedUtc": "2026-09-25T11:30:53.0040098Z",
+  "osvQueries": 478,
+  "matchedCoordinates": 21,
+  "uniqueAdvisories": 51,
+  "releaseCoordinates": 133,
+  "releaseMatchedCoordinates": 1,
+  "limits": "Online evaluation with normal cache reuse; not a clean-room publisher-integrity check. Raw external artifacts exclude project outputs. OSV Maven coverage is not native/Gradle distribution/GitHub Actions coverage or exploit proof."
+}

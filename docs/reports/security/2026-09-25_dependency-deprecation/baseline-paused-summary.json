@@ -1,0 +1,20 @@
+{
+  "date": "2026-09-25",
+  "commit": "e521026e2838c2bff592022046d6d0571d0e818f",
+  "outcome": "Canceled at user-requested pause",
+  "exitCode": 1,
+  "completed": [
+    "397 JVM tests: 0 failures/errors/skips",
+    "detekt",
+    "assembleDevDebug",
+    "prodRelease main compilation",
+    "lintVitalProdRelease"
+  ],
+  "incomplete": [
+    "assembleProdRelease",
+    "lintProdDebug",
+    "compileProdDebugAndroidTestKotlin",
+    "generateLicenseReport"
+  ],
+  "limits": "No full-build pass; no candidate dependency changes, device tests, migration or vulnerability PoC. Existing release/lint/license outputs must not be treated as fresh."
+}

@@ -1,0 +1,20 @@
+{
+  "verifiedDate": "2026-09-25",
+  "verifiedAtUtc": "2026-09-26T02:02:00.3316966Z",
+  "versions": 25,
+  "libraries": 34,
+  "plugins": 7,
+  "totalCatalogEntries": 66,
+  "missingCatalogDispositions": [],
+  "sourceDefinitions": 58,
+  "missingSourceDefinitions": [],
+  "missingLocalLinks": [],
+  "freshLibrarySelectionsChecked": 34,
+  "selectionErrors": [],
+  "historicalToFreshReleaseDifference": [],
+  "freshLicenseToReleaseDifference": [],
+  "identityFilesChecked": 40,
+  "compressedFilesChecked": 3,
+  "personalIdentityFiles": [],
+  "scope": "Document/catalog/retained graph consistency and recursive identity-pattern checks including decompressed evidence; not build, device or migration qualification"
+}

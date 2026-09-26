@@ -1,0 +1,9 @@
+Queried 100/478 public Maven versions
+Queried 200/478 public Maven versions
+Queried 300/478 public Maven versions
+Queried 400/478 public Maven versions
+Queried 478/478 public Maven versions
+
+queries matchedPackageVersions uniqueAdvisories
+------- ---------------------- ----------------
+    478                     21               51

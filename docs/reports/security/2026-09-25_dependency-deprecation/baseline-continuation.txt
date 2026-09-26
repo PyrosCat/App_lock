@@ -1,0 +1,124 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+
+> Configure project :app
+WARNING: The option setting 'android.experimental.testOptions.managedDevices.allowOldApiLevelDevices=true' is experimental.
+The current default is 'false'.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preProdReleaseBuild UP-TO-DATE
+> Task :app:mergeProdReleaseJniLibFolders UP-TO-DATE
+> Task :app:mergeProdReleaseNativeLibs UP-TO-DATE
+> Task :app:stripProdReleaseDebugSymbols UP-TO-DATE
+> Task :app:extractProdReleaseNativeSymbolTables UP-TO-DATE
+> Task :app:mergeProdReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:checkProdReleaseDuplicateClasses UP-TO-DATE
+> Task :app:mergeProdReleaseArtProfile UP-TO-DATE
+> Task :app:buildKotlinToolingMetadata UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateProdReleaseBuildConfig UP-TO-DATE
+> Task :app:checkProdReleaseAarMetadata UP-TO-DATE
+> Task :app:processProdReleaseNavigationResources UP-TO-DATE
+> Task :app:compileProdReleaseNavigationResources UP-TO-DATE
+> Task :app:generateProdReleaseResValues UP-TO-DATE
+> Task :app:mapProdReleaseSourceSetPaths UP-TO-DATE
+> Task :app:generateProdReleaseResources UP-TO-DATE
+> Task :app:mergeProdReleaseResources UP-TO-DATE
+> Task :app:packageProdReleaseResources UP-TO-DATE
+> Task :app:parseProdReleaseLocalResources UP-TO-DATE
+> Task :app:createProdReleaseCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksProdRelease UP-TO-DATE
+> Task :app:processProdReleaseMainManifest UP-TO-DATE
+> Task :app:processProdReleaseManifest UP-TO-DATE
+> Task :app:processProdReleaseManifestForPackage UP-TO-DATE
+> Task :app:processProdReleaseResources UP-TO-DATE
+> Task :app:kspProdReleaseKotlin UP-TO-DATE
+> Task :app:compileProdReleaseKotlin UP-TO-DATE
+> Task :app:javaPreCompileProdRelease UP-TO-DATE
+> Task :app:compileProdReleaseJavaWithJavac UP-TO-DATE
+> Task :app:hiltAggregateDepsProdRelease UP-TO-DATE
+> Task :app:hiltJavaCompileProdRelease UP-TO-DATE
+> Task :app:transformProdReleaseClassesWithAsm UP-TO-DATE
+> Task :app:expandProdReleaseArtProfileWildcards UP-TO-DATE
+> Task :app:extractProguardFiles UP-TO-DATE
+> Task :app:mergeProdReleaseGeneratedProguardFiles UP-TO-DATE
+> Task :app:processProdReleaseJavaRes UP-TO-DATE
+> Task :app:mergeProdReleaseJavaResource UP-TO-DATE
+> Task :app:mergeProdReleaseStartupProfile UP-TO-DATE
+> Task :app:minifyProdReleaseWithR8 UP-TO-DATE
+> Task :app:compileProdReleaseArtProfile UP-TO-DATE
+> Task :app:mergeProdReleaseShaders UP-TO-DATE
+> Task :app:compileProdReleaseShaders NO-SOURCE
+> Task :app:generateProdReleaseAssets UP-TO-DATE
+> Task :app:mergeProdReleaseAssets UP-TO-DATE
+> Task :app:compressProdReleaseAssets UP-TO-DATE
+> Task :app:extractProdReleaseVersionControlInfo UP-TO-DATE
+> Task :app:generateProdReleaseLintVitalReportModel UP-TO-DATE
+> Task :app:lintVitalAnalyzeProdRelease UP-TO-DATE
+> Task :app:lintVitalReportProdRelease UP-TO-DATE
+> Task :app:lintVitalProdRelease
+> Task :app:convertShrunkResourcesToBinaryProdRelease UP-TO-DATE
+> Task :app:optimizeProdReleaseResources UP-TO-DATE
+> Task :app:collectProdReleaseDependencies UP-TO-DATE
+> Task :app:sdkProdReleaseDependencyData UP-TO-DATE
+> Task :app:writeProdReleaseAppMetadata UP-TO-DATE
+> Task :app:writeProdReleaseSigningConfigVersions UP-TO-DATE
+> Task :app:packageProdRelease UP-TO-DATE
+> Task :app:createProdReleaseApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleProdRelease UP-TO-DATE
+> Task :app:preProdDebugBuild UP-TO-DATE
+> Task :app:generateProdDebugBuildConfig UP-TO-DATE
+> Task :app:checkProdDebugAarMetadata UP-TO-DATE
+> Task :app:processProdDebugNavigationResources UP-TO-DATE
+> Task :app:compileProdDebugNavigationResources UP-TO-DATE
+> Task :app:generateProdDebugResValues UP-TO-DATE
+> Task :app:mapProdDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateProdDebugResources UP-TO-DATE
+> Task :app:mergeProdDebugResources UP-TO-DATE
+> Task :app:packageProdDebugResources UP-TO-DATE
+> Task :app:parseProdDebugLocalResources UP-TO-DATE
+> Task :app:createProdDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksProdDebug UP-TO-DATE
+> Task :app:processProdDebugMainManifest UP-TO-DATE
+> Task :app:processProdDebugManifest UP-TO-DATE
+> Task :app:processProdDebugManifestForPackage UP-TO-DATE
+> Task :app:processProdDebugResources FROM-CACHE
+> Task :app:kspProdDebugKotlin UP-TO-DATE
+> Task :app:compileProdDebugKotlin UP-TO-DATE
+> Task :app:javaPreCompileProdDebug UP-TO-DATE
+> Task :app:compileProdDebugJavaWithJavac UP-TO-DATE
+> Task :app:hiltAggregateDepsProdDebug UP-TO-DATE
+> Task :app:hiltJavaCompileProdDebug UP-TO-DATE
+> Task :app:bundleProdDebugClassesToCompileJar UP-TO-DATE
+> Task :app:preProdDebugAndroidTestBuild SKIPPED
+> Task :app:generateProdDebugAndroidTestResValues UP-TO-DATE
+> Task :app:generateProdDebugAndroidTestLintModel
+> Task :app:generateProdDebugLintReportModel
+> Task :app:preProdDebugUnitTestBuild UP-TO-DATE
+> Task :app:generateProdDebugUnitTestLintModel
+> Task :app:lintAnalyzeProdDebug FROM-CACHE
+> Task :app:lintAnalyzeProdDebugAndroidTest FROM-CACHE
+> Task :app:processProdDebugAndroidTestManifest UP-TO-DATE
+> Task :app:generateProdDebugAndroidTestBuildConfig UP-TO-DATE
+> Task :app:checkProdDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :app:processProdDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :app:compileProdDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :app:mapProdDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :app:generateProdDebugAndroidTestResources UP-TO-DATE
+> Task :app:mergeProdDebugAndroidTestResources UP-TO-DATE
+> Task :app:processProdDebugAndroidTestResources
+> Task :app:kspProdDebugAndroidTestKotlin UP-TO-DATE
+> Task :app:compileProdDebugAndroidTestKotlin UP-TO-DATE
+> Task :app:lintAnalyzeProdDebugUnitTest
+> Task :app:generateLicenseReport
+
+> Task :app:lintReportProdDebug
+Wrote HTML report to file:///<workspace>/app/build/reports/lint-results-prodDebug.html
+Lint found 40 warnings (and 1 error, 13 warnings and 1 hint filtered by baseline lint-baseline.xml)
+
+42 errors/warnings were listed in the baseline file (<workspace>\app\lint-baseline.xml) but not found in the project; perhaps they have been fixed?
+
+> Task :app:lintProdDebug
+
+BUILD SUCCESSFUL in 3m 46s
+98 actionable tasks: 9 executed, 3 from cache, 86 up-to-date

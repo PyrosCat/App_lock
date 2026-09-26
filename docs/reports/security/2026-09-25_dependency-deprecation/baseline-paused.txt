@@ -1,0 +1,171 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+
+> Configure project :app
+WARNING: The option setting 'android.experimental.testOptions.managedDevices.allowOldApiLevelDevices=true' is experimental.
+The current default is 'false'.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preProdDebugBuild UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateProdDebugBuildConfig
+> Task :app:checkProdDebugAarMetadata
+> Task :app:processProdDebugNavigationResources
+> Task :app:generateProdDebugResValues
+> Task :app:compileProdDebugNavigationResources
+> Task :app:mapProdDebugSourceSetPaths
+> Task :app:generateProdDebugResources
+> Task :app:mergeProdDebugResources
+> Task :app:packageProdDebugResources
+> Task :app:createProdDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksProdDebug
+> Task :app:parseProdDebugLocalResources
+> Task :app:processProdDebugMainManifest
+> Task :app:processProdDebugManifest
+> Task :app:processProdDebugManifestForPackage
+> Task :app:javaPreCompileProdDebug
+> Task :app:preProdDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileProdDebugUnitTest
+> Task :app:processProdDebugResources
+> Task :app:detekt
+> Task :app:kspProdDebugKotlin
+> Task :app:preDevDebugBuild UP-TO-DATE
+> Task :app:mergeDevDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generateDevDebugBuildConfig
+> Task :app:checkDevDebugAarMetadata
+> Task :app:processDevDebugNavigationResources
+> Task :app:compileDevDebugNavigationResources
+> Task :app:generateDevDebugResValues
+> Task :app:mapDevDebugSourceSetPaths
+> Task :app:generateDevDebugResources
+> Task :app:mergeDevDebugResources
+> Task :app:packageDevDebugResources
+> Task :app:parseDevDebugLocalResources
+> Task :app:createDevDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDevDebug
+> Task :app:processDevDebugMainManifest
+> Task :app:processDevDebugManifest
+> Task :app:processDevDebugManifestForPackage
+> Task :app:processDevDebugResources
+> Task :app:kspDevDebugKotlin
+> Task :app:compileProdDebugKotlin
+> Task :app:compileDevDebugKotlin
+> Task :app:javaPreCompileDevDebug
+> Task :app:compileDevDebugJavaWithJavac
+> Task :app:compileProdDebugJavaWithJavac
+> Task :app:hiltAggregateDepsProdDebug
+> Task :app:mergeDevDebugShaders
+> Task :app:compileDevDebugShaders NO-SOURCE
+> Task :app:generateDevDebugAssets UP-TO-DATE
+> Task :app:mergeDevDebugAssets
+> Task :app:hiltJavaCompileProdDebug
+> Task :app:processProdDebugJavaRes
+> Task :app:bundleProdDebugClassesToCompileJar
+> Task :app:kspProdDebugUnitTestKotlin
+> Task :app:transformProdDebugClassesWithAsm
+> Task :app:bundleProdDebugClassesToRuntimeJar
+> Task :app:compressDevDebugAssets
+> Task :app:desugarDevDebugFileDependencies
+> Task :app:compileProdDebugUnitTestKotlin
+> Task :app:hiltAggregateDepsDevDebug
+> Task :app:hiltJavaCompileDevDebug
+> Task :app:compileProdDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:hiltAggregateDepsProdDebugUnitTest
+> Task :app:hiltJavaCompileProdDebugUnitTest NO-SOURCE
+> Task :app:processProdDebugUnitTestJavaRes
+> Task :app:transformDevDebugClassesWithAsm
+> Task :app:transformProdDebugUnitTestClassesWithAsm
+> Task :app:testProdDebugUnitTest
+> Task :app:dexBuilderDevDebug
+> Task :app:mergeDevDebugGlobalSynthetics
+> Task :app:processDevDebugJavaRes
+> Task :app:checkDevDebugDuplicateClasses
+> Task :app:mergeDevDebugJavaResource
+> Task :app:mergeExtDexDevDebug
+> Task :app:mergeLibDexDevDebug
+> Task :app:mergeProjectDexDevDebug
+> Task :app:mergeDevDebugJniLibFolders
+> Task :app:mergeDevDebugNativeLibs
+
+> Task :app:stripDevDebugDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libimage_processing_util_jni.so, libsqlcipher.so, libsurface_util_jni.so. Run with --info option to learn more.
+
+> Task :app:validateSigningDevDebug
+> Task :app:writeDevDebugAppMetadata
+> Task :app:writeDevDebugSigningConfigVersions
+> Task :app:preProdReleaseBuild UP-TO-DATE
+> Task :app:mergeProdReleaseJniLibFolders
+> Task :app:mergeProdReleaseNativeLibs
+
+> Task :app:stripProdReleaseDebugSymbols
+Unable to strip the following libraries, packaging them as they are: libandroidx.graphics.path.so, libimage_processing_util_jni.so, libsqlcipher.so, libsurface_util_jni.so. Run with --info option to learn more.
+
+> Task :app:extractProdReleaseNativeSymbolTables
+> Task :app:packageDevDebug
+> Task :app:createDevDebugApkListingFileRedirect
+> Task :app:assembleDevDebug
+> Task :app:mergeProdReleaseNativeDebugMetadata NO-SOURCE
+> Task :app:checkProdReleaseDuplicateClasses
+> Task :app:mergeProdReleaseArtProfile
+> Task :app:buildKotlinToolingMetadata
+> Task :app:generateProdReleaseBuildConfig
+> Task :app:processProdReleaseNavigationResources
+> Task :app:compileProdReleaseNavigationResources
+> Task :app:checkProdReleaseAarMetadata
+> Task :app:generateProdReleaseResValues
+> Task :app:mapProdReleaseSourceSetPaths
+> Task :app:generateProdReleaseResources
+> Task :app:mergeProdReleaseResources
+> Task :app:packageProdReleaseResources
+> Task :app:parseProdReleaseLocalResources
+> Task :app:createProdReleaseCompatibleScreenManifests
+> Task :app:extractDeepLinksProdRelease
+> Task :app:processProdReleaseMainManifest
+> Task :app:processProdReleaseManifest
+> Task :app:processProdReleaseManifestForPackage
+> Task :app:javaPreCompileProdRelease
+> Task :app:extractProguardFiles
+> Task :app:mergeProdReleaseStartupProfile
+> Task :app:mergeProdReleaseShaders
+> Task :app:compileProdReleaseShaders NO-SOURCE
+> Task :app:generateProdReleaseAssets UP-TO-DATE
+> Task :app:mergeProdReleaseAssets
+> Task :app:compressProdReleaseAssets
+> Task :app:extractProdReleaseVersionControlInfo
+> Task :app:collectProdReleaseDependencies
+> Task :app:sdkProdReleaseDependencyData
+> Task :app:writeProdReleaseAppMetadata
+> Task :app:writeProdReleaseSigningConfigVersions
+> Task :app:preProdDebugAndroidTestBuild SKIPPED
+> Task :app:generateProdDebugAndroidTestResValues
+> Task :app:generateProdDebugAndroidTestLintModel
+> Task :app:processProdReleaseResources
+> Task :app:generateProdDebugLintReportModel
+> Task :app:generateProdDebugUnitTestLintModel
+> Task :app:kspProdReleaseKotlin
+> Task :app:lintAnalyzeProdDebug
+> Task :app:compileProdReleaseKotlin
+> Task :app:compileProdReleaseJavaWithJavac
+> Task :app:hiltAggregateDepsProdRelease
+> Task :app:hiltJavaCompileProdRelease
+> Task :app:transformProdReleaseClassesWithAsm
+> Task :app:expandProdReleaseArtProfileWildcards
+> Task :app:mergeProdReleaseGeneratedProguardFiles
+> Task :app:processProdReleaseJavaRes
+> Task :app:mergeProdReleaseJavaResource
+> Task :app:minifyProdReleaseWithR8
+> Task :app:generateProdReleaseLintVitalReportModel
+> Task :app:lintVitalAnalyzeProdRelease
+
+> Task :app:lintVitalReportProdRelease
+Lint found no errors or warnings
+
+57 errors/warnings were listed in the baseline file (<workspace>\app\lint-baseline.xml) but not found in the project; perhaps they have been fixed?
+
+Note: The baseline was created using a different target/variant than it was checked against.
+Creation variant: lint
+Current variant: lintVitalRelease
+
+> Task :app:lintVitalProdRelease
+> Task :app:lintAnalyzeProdDebugAndroidTest
+> Task :app:lintAnalyzeProdDebugUnitTest

@@ -1,0 +1,266 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+
+> Configure project :app
+WARNING: The option setting 'android.experimental.testOptions.managedDevices.allowOldApiLevelDevices=true' is experimental.
+The current default is 'false'.
+
+> Task :reviewDependencyInventory
+REVIEW resolving : buildscript:classpath
+REVIEW done classpath: 158 components, 149 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-android-device-provider-ddmlib
+REVIEW done _internal-unified-test-platform-android-device-provider-ddmlib: 36 components, 33 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-android-driver-instrumentation
+REVIEW done _internal-unified-test-platform-android-driver-instrumentation: 27 components, 25 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-android-test-plugin
+REVIEW done _internal-unified-test-platform-android-test-plugin: 21 components, 20 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-android-test-plugin-host-additional-test-output
+REVIEW done _internal-unified-test-platform-android-test-plugin-host-additional-test-output: 38 components, 34 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-android-test-plugin-host-apk-installer
+REVIEW done _internal-unified-test-platform-android-test-plugin-host-apk-installer: 32 components, 29 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-android-test-plugin-host-coverage
+REVIEW done _internal-unified-test-platform-android-test-plugin-host-coverage: 31 components, 28 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-android-test-plugin-host-device-info
+REVIEW done _internal-unified-test-platform-android-test-plugin-host-device-info: 38 components, 34 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-android-test-plugin-host-emulator-control
+REVIEW done _internal-unified-test-platform-android-test-plugin-host-emulator-control: 62 components, 58 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-android-test-plugin-host-logcat
+REVIEW done _internal-unified-test-platform-android-test-plugin-host-logcat: 38 components, 34 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-android-test-plugin-result-listener-gradle
+REVIEW done _internal-unified-test-platform-android-test-plugin-result-listener-gradle: 57 components, 54 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-core
+REVIEW done _internal-unified-test-platform-core: 48 components, 46 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:_internal-unified-test-platform-launcher
+REVIEW done _internal-unified-test-platform-launcher: 24 components, 21 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:detekt
+REVIEW done detekt: 45 components, 40 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:detektPlugins
+REVIEW done detektPlugins: 10 components, 10 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devDebugAndroidTestAnnotationProcessorClasspath
+REVIEW done devDebugAndroidTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devDebugAndroidTestCompileClasspath
+REVIEW done devDebugAndroidTestCompileClasspath: 127 components, 104 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devDebugAndroidTestRuntimeClasspath
+REVIEW done devDebugAndroidTestRuntimeClasspath: 87 components, 67 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devDebugAnnotationProcessorClasspath
+REVIEW done devDebugAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devDebugCompileClasspath
+REVIEW done devDebugCompileClasspath: 109 components, 89 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devDebugRuntimeClasspath
+REVIEW done devDebugRuntimeClasspath: 134 components, 113 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devDebugUnitTestAnnotationProcessorClasspath
+REVIEW done devDebugUnitTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devDebugUnitTestCompileClasspath
+REVIEW done devDebugUnitTestCompileClasspath: 114 components, 93 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devDebugUnitTestRuntimeClasspath
+REVIEW done devDebugUnitTestRuntimeClasspath: 144 components, 14 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devReleaseAnnotationProcessorClasspath
+REVIEW done devReleaseAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devReleaseCompileClasspath
+REVIEW done devReleaseCompileClasspath: 108 components, 88 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devReleaseRuntimeClasspath
+REVIEW done devReleaseRuntimeClasspath: 133 components, 112 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devReleaseUnitTestAnnotationProcessorClasspath
+REVIEW done devReleaseUnitTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devReleaseUnitTestCompileClasspath
+REVIEW done devReleaseUnitTestCompileClasspath: 113 components, 92 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:devReleaseUnitTestRuntimeClasspath
+REVIEW done devReleaseUnitTestRuntimeClasspath: 143 components, 14 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinBuildToolsApiClasspath
+REVIEW done kotlinBuildToolsApiClasspath: 17 components, 17 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerClasspath
+REVIEW done kotlinCompilerClasspath: 8 components, 8 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspath
+REVIEW done kotlinCompilerPluginClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathDevDebug
+REVIEW done kotlinCompilerPluginClasspathDevDebug: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathDevDebugAndroidTest
+REVIEW done kotlinCompilerPluginClasspathDevDebugAndroidTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathDevDebugUnitTest
+REVIEW done kotlinCompilerPluginClasspathDevDebugUnitTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathDevRelease
+REVIEW done kotlinCompilerPluginClasspathDevRelease: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathDevReleaseUnitTest
+REVIEW done kotlinCompilerPluginClasspathDevReleaseUnitTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathProdDebug
+REVIEW done kotlinCompilerPluginClasspathProdDebug: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathProdDebugAndroidTest
+REVIEW done kotlinCompilerPluginClasspathProdDebugAndroidTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathProdDebugUnitTest
+REVIEW done kotlinCompilerPluginClasspathProdDebugUnitTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathProdRelease
+REVIEW done kotlinCompilerPluginClasspathProdRelease: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathProdReleaseUnitTest
+REVIEW done kotlinCompilerPluginClasspathProdReleaseUnitTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathQaDebug
+REVIEW done kotlinCompilerPluginClasspathQaDebug: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathQaDebugAndroidTest
+REVIEW done kotlinCompilerPluginClasspathQaDebugAndroidTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathQaDebugUnitTest
+REVIEW done kotlinCompilerPluginClasspathQaDebugUnitTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathQaRelease
+REVIEW done kotlinCompilerPluginClasspathQaRelease: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathQaReleaseUnitTest
+REVIEW done kotlinCompilerPluginClasspathQaReleaseUnitTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathStagingDebug
+REVIEW done kotlinCompilerPluginClasspathStagingDebug: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathStagingDebugAndroidTest
+REVIEW done kotlinCompilerPluginClasspathStagingDebugAndroidTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathStagingDebugUnitTest
+REVIEW done kotlinCompilerPluginClasspathStagingDebugUnitTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathStagingRelease
+REVIEW done kotlinCompilerPluginClasspathStagingRelease: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kotlinCompilerPluginClasspathStagingReleaseUnitTest
+REVIEW done kotlinCompilerPluginClasspathStagingReleaseUnitTest: 11 components, 7 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspDevDebugAndroidTestKotlinProcessorClasspath
+REVIEW done kspDevDebugAndroidTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspDevDebugKotlinProcessorClasspath
+REVIEW done kspDevDebugKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspDevDebugUnitTestKotlinProcessorClasspath
+REVIEW done kspDevDebugUnitTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspDevReleaseKotlinProcessorClasspath
+REVIEW done kspDevReleaseKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspDevReleaseUnitTestKotlinProcessorClasspath
+REVIEW done kspDevReleaseUnitTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspPluginClasspath
+REVIEW done kspPluginClasspath: 10 components, 6 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspPluginClasspathNonEmbeddable
+REVIEW done kspPluginClasspathNonEmbeddable: 10 components, 6 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspProdDebugAndroidTestKotlinProcessorClasspath
+REVIEW done kspProdDebugAndroidTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspProdDebugKotlinProcessorClasspath
+REVIEW done kspProdDebugKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspProdDebugUnitTestKotlinProcessorClasspath
+REVIEW done kspProdDebugUnitTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspProdReleaseKotlinProcessorClasspath
+REVIEW done kspProdReleaseKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspProdReleaseUnitTestKotlinProcessorClasspath
+REVIEW done kspProdReleaseUnitTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspQaDebugAndroidTestKotlinProcessorClasspath
+REVIEW done kspQaDebugAndroidTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspQaDebugKotlinProcessorClasspath
+REVIEW done kspQaDebugKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspQaDebugUnitTestKotlinProcessorClasspath
+REVIEW done kspQaDebugUnitTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspQaReleaseKotlinProcessorClasspath
+REVIEW done kspQaReleaseKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspQaReleaseUnitTestKotlinProcessorClasspath
+REVIEW done kspQaReleaseUnitTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspStagingDebugAndroidTestKotlinProcessorClasspath
+REVIEW done kspStagingDebugAndroidTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspStagingDebugKotlinProcessorClasspath
+REVIEW done kspStagingDebugKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspStagingDebugUnitTestKotlinProcessorClasspath
+REVIEW done kspStagingDebugUnitTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspStagingReleaseKotlinProcessorClasspath
+REVIEW done kspStagingReleaseKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:kspStagingReleaseUnitTestKotlinProcessorClasspath
+REVIEW done kspStagingReleaseUnitTestKotlinProcessorClasspath: 37 components, 37 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:lintChecks
+REVIEW done lintChecks: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:lintPublish
+REVIEW done lintPublish: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodDebugAndroidTestAnnotationProcessorClasspath
+REVIEW done prodDebugAndroidTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodDebugAndroidTestCompileClasspath
+REVIEW done prodDebugAndroidTestCompileClasspath: 127 components, 104 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodDebugAndroidTestRuntimeClasspath
+REVIEW done prodDebugAndroidTestRuntimeClasspath: 87 components, 67 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodDebugAnnotationProcessorClasspath
+REVIEW done prodDebugAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodDebugCompileClasspath
+REVIEW done prodDebugCompileClasspath: 109 components, 89 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodDebugRuntimeClasspath
+REVIEW done prodDebugRuntimeClasspath: 134 components, 113 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodDebugUnitTestAnnotationProcessorClasspath
+REVIEW done prodDebugUnitTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodDebugUnitTestCompileClasspath
+REVIEW done prodDebugUnitTestCompileClasspath: 114 components, 93 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodDebugUnitTestRuntimeClasspath
+REVIEW done prodDebugUnitTestRuntimeClasspath: 144 components, 14 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodReleaseAnnotationProcessorClasspath
+REVIEW done prodReleaseAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodReleaseCompileClasspath
+REVIEW done prodReleaseCompileClasspath: 108 components, 88 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodReleaseRuntimeClasspath
+REVIEW done prodReleaseRuntimeClasspath: 133 components, 112 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodReleaseUnitTestAnnotationProcessorClasspath
+REVIEW done prodReleaseUnitTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodReleaseUnitTestCompileClasspath
+REVIEW done prodReleaseUnitTestCompileClasspath: 113 components, 92 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:prodReleaseUnitTestRuntimeClasspath
+REVIEW done prodReleaseUnitTestRuntimeClasspath: 143 components, 14 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaDebugAndroidTestAnnotationProcessorClasspath
+REVIEW done qaDebugAndroidTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaDebugAndroidTestCompileClasspath
+REVIEW done qaDebugAndroidTestCompileClasspath: 127 components, 104 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaDebugAndroidTestRuntimeClasspath
+REVIEW done qaDebugAndroidTestRuntimeClasspath: 87 components, 67 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaDebugAnnotationProcessorClasspath
+REVIEW done qaDebugAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaDebugCompileClasspath
+REVIEW done qaDebugCompileClasspath: 109 components, 89 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaDebugRuntimeClasspath
+REVIEW done qaDebugRuntimeClasspath: 134 components, 113 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaDebugUnitTestAnnotationProcessorClasspath
+REVIEW done qaDebugUnitTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaDebugUnitTestCompileClasspath
+REVIEW done qaDebugUnitTestCompileClasspath: 114 components, 93 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaDebugUnitTestRuntimeClasspath
+REVIEW done qaDebugUnitTestRuntimeClasspath: 144 components, 14 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaReleaseAnnotationProcessorClasspath
+REVIEW done qaReleaseAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaReleaseCompileClasspath
+REVIEW done qaReleaseCompileClasspath: 108 components, 88 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaReleaseRuntimeClasspath
+REVIEW done qaReleaseRuntimeClasspath: 133 components, 112 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaReleaseUnitTestAnnotationProcessorClasspath
+REVIEW done qaReleaseUnitTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaReleaseUnitTestCompileClasspath
+REVIEW done qaReleaseUnitTestCompileClasspath: 113 components, 92 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:qaReleaseUnitTestRuntimeClasspath
+REVIEW done qaReleaseUnitTestRuntimeClasspath: 143 components, 14 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingDebugAndroidTestAnnotationProcessorClasspath
+REVIEW done stagingDebugAndroidTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingDebugAndroidTestCompileClasspath
+REVIEW done stagingDebugAndroidTestCompileClasspath: 127 components, 104 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingDebugAndroidTestRuntimeClasspath
+REVIEW done stagingDebugAndroidTestRuntimeClasspath: 87 components, 67 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingDebugAnnotationProcessorClasspath
+REVIEW done stagingDebugAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingDebugCompileClasspath
+REVIEW done stagingDebugCompileClasspath: 109 components, 89 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingDebugRuntimeClasspath
+REVIEW done stagingDebugRuntimeClasspath: 134 components, 113 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingDebugUnitTestAnnotationProcessorClasspath
+REVIEW done stagingDebugUnitTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingDebugUnitTestCompileClasspath
+REVIEW done stagingDebugUnitTestCompileClasspath: 114 components, 93 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingDebugUnitTestRuntimeClasspath
+REVIEW done stagingDebugUnitTestRuntimeClasspath: 144 components, 14 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingReleaseAnnotationProcessorClasspath
+REVIEW done stagingReleaseAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingReleaseCompileClasspath
+REVIEW done stagingReleaseCompileClasspath: 108 components, 88 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingReleaseRuntimeClasspath
+REVIEW done stagingReleaseRuntimeClasspath: 133 components, 112 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingReleaseUnitTestAnnotationProcessorClasspath
+REVIEW done stagingReleaseUnitTestAnnotationProcessorClasspath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingReleaseUnitTestCompileClasspath
+REVIEW done stagingReleaseUnitTestCompileClasspath: 113 components, 92 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app project:stagingReleaseUnitTestRuntimeClasspath
+REVIEW done stagingReleaseUnitTestRuntimeClasspath: 143 components, 14 artifacts, 0 unresolved, 0 artifact failures
+REVIEW resolving :app buildscript:classpath
+REVIEW done classpath: 0 components, 0 artifacts, 0 unresolved, 0 artifact failures
+REVIEW COMPLETE: 123 configurations, 0 failures
+
+[Incubating] Problems report is available at: file:///<workspace>/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.13/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 1m 23s
+1 actionable task: 1 executed

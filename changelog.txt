@@ -4,6 +4,32 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/M8: dependency and deprecation review with baseline evidence   (2026-09-26)
+------------------------------------------------------------------------------
+This change adds a review of the project dependencies and deprecated APIs at commit e521026. The review is
+security/2026-09-25_dependency-deprecation-review.md, and its evidence is in the folder
+security/2026-09-25_dependency-deprecation.
+- Each of the 66 version-catalog entries has a disposition in the review: 25 version aliases, 34 libraries, and 7
+  plugins.
+- The review records a security advisory for the Gradle 8.13 wrapper, a Kotlin 2.1.0 compatibility gap with AGP
+  8.13.2, and the end of life of the license-report 2.x plugin.
+- A separate section of the review lists the deprecated APIs and legacy components in the source and gives a
+  disposition for each.
+- A Gradle audit at e521026 resolved 123 configurations and 478 coordinates with no unresolved dependencies. The
+  evidence folder holds the full graph, the selected versions, and the artifact hashes.
+- An OSV lookup of those coordinates matched 51 advisories on 21 coordinates. A triage file gives an initial
+  disposition for each advisory.
+- In a baseline run at the same commit, 397 unit tests passed, detekt reported no findings, and lintProdDebug
+  reported 40 warnings and no errors.
+- That run also built a debug APK and generated a license report with the same 133 release coordinates as the audit.
+- Section 9 of the review proposes a sequence of work packages, with steps, tests, and a rollback plan for each
+  package.
+- Other sections of the review give inputs for the security-crypto replacement proposal, the verification commands,
+  eight test cases, and the release gates.
+- The evidence folder also holds the audit and OSV query scripts, the unit-test results, the lint output, and the APK
+  hashes.
+
+
 M7/WP2 (F2 hardening): P1 harness preconditions and unknown-state case   (2026-09-26)
 -------------------------------------------------------------------------------------
 This change extends the P1 device harness in scripts/r007. It fixes the two false V0 failures that the Moto G report

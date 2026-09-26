@@ -1,0 +1,2801 @@
+{
+  "startedAtUtc": "2026-09-25T11:30:35.2667137Z",
+  "endpoint": "https://api.osv.dev/v1/querybatch",
+  "method": "Public Maven package/version lookup; no source code or project identity sent",
+  "inputCount": 478,
+  "results": [
+    {
+      "package": "androidx.activity:activity",
+      "version": "1.9.3",
+      "vulns": []
+    },
+    {
+      "package": "androidx.activity:activity-compose",
+      "version": "1.9.3",
+      "vulns": []
+    },
+    {
+      "package": "androidx.activity:activity-ktx",
+      "version": "1.9.3",
+      "vulns": []
+    },
+    {
+      "package": "androidx.annotation:annotation",
+      "version": "1.3.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.annotation:annotation",
+      "version": "1.8.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.annotation:annotation-experimental",
+      "version": "1.4.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.annotation:annotation-jvm",
+      "version": "1.8.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.appcompat:appcompat",
+      "version": "1.2.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.appcompat:appcompat-resources",
+      "version": "1.2.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.arch.core:core-common",
+      "version": "2.2.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.arch.core:core-runtime",
+      "version": "2.2.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.autofill:autofill",
+      "version": "1.0.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.biometric:biometric",
+      "version": "1.1.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.camera:camera-camera2",
+      "version": "1.4.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.camera:camera-core",
+      "version": "1.4.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.camera:camera-lifecycle",
+      "version": "1.4.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.collection:collection",
+      "version": "1.4.4",
+      "vulns": []
+    },
+    {
+      "package": "androidx.collection:collection-jvm",
+      "version": "1.4.4",
+      "vulns": []
+    },
+    {
+      "package": "androidx.collection:collection-ktx",
+      "version": "1.4.4",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose:compose-bom",
+      "version": "2024.12.01",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.animation:animation",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.animation:animation-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.animation:animation-core",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.animation:animation-core-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.foundation:foundation",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.foundation:foundation-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.foundation:foundation-layout",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.foundation:foundation-layout-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.material:material-icons-core",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.material:material-icons-core-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.material:material-icons-extended",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.material:material-icons-extended-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.material:material-ripple",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.material:material-ripple-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.material3:material3",
+      "version": "1.3.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.material3:material3-android",
+      "version": "1.3.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.runtime:runtime",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.runtime:runtime-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.runtime:runtime-saveable",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.runtime:runtime-saveable-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-geometry",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-geometry-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-graphics",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-graphics-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-test",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-test-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-test-junit4",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-test-junit4-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-test-manifest",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-text",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-text-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-tooling-preview",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-tooling-preview-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-unit",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-unit-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-util",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.compose.ui:ui-util-android",
+      "version": "1.7.6",
+      "vulns": []
+    },
+    {
+      "package": "androidx.concurrent:concurrent-futures",
+      "version": "1.1.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.concurrent:concurrent-futures-ktx",
+      "version": "1.1.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.core:core",
+      "version": "1.15.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.core:core-ktx",
+      "version": "1.15.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.cursoradapter:cursoradapter",
+      "version": "1.0.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.customview:customview",
+      "version": "1.0.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.customview:customview-poolingcontainer",
+      "version": "1.0.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.databinding:databinding-common",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "androidx.databinding:databinding-compiler-common",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "androidx.drawerlayout:drawerlayout",
+      "version": "1.0.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.emoji2:emoji2",
+      "version": "1.3.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.exifinterface:exifinterface",
+      "version": "1.3.2",
+      "vulns": []
+    },
+    {
+      "package": "androidx.fragment:fragment",
+      "version": "1.5.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.graphics:graphics-path",
+      "version": "1.0.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.hilt:hilt-navigation",
+      "version": "1.2.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.hilt:hilt-navigation-compose",
+      "version": "1.2.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.interpolator:interpolator",
+      "version": "1.0.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-common",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-common-java8",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-common-jvm",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-livedata",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-livedata-core",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-livedata-core-ktx",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-process",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-runtime",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-runtime-android",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-runtime-compose",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-runtime-compose-android",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-runtime-ktx",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-runtime-ktx-android",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-viewmodel",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-viewmodel-android",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-viewmodel-compose",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-viewmodel-compose-android",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-viewmodel-ktx",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.lifecycle:lifecycle-viewmodel-savedstate",
+      "version": "2.8.7",
+      "vulns": []
+    },
+    {
+      "package": "androidx.loader:loader",
+      "version": "1.0.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.navigation:navigation-common",
+      "version": "2.5.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.navigation:navigation-common-ktx",
+      "version": "2.5.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.navigation:navigation-compose",
+      "version": "2.5.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.navigation:navigation-runtime",
+      "version": "2.5.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.navigation:navigation-runtime-ktx",
+      "version": "2.5.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.profileinstaller:profileinstaller",
+      "version": "1.3.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.room:room-common",
+      "version": "2.6.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.room:room-compiler",
+      "version": "2.6.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.room:room-compiler-processing",
+      "version": "2.6.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.room:room-ktx",
+      "version": "2.6.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.room:room-migration",
+      "version": "2.6.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.room:room-runtime",
+      "version": "2.6.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.savedstate:savedstate",
+      "version": "1.2.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.savedstate:savedstate-ktx",
+      "version": "1.2.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.security:security-crypto",
+      "version": "1.1.0-alpha06",
+      "vulns": []
+    },
+    {
+      "package": "androidx.sqlite:sqlite",
+      "version": "2.4.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.sqlite:sqlite-framework",
+      "version": "2.4.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.sqlite:sqlite-ktx",
+      "version": "2.4.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.startup:startup-runtime",
+      "version": "1.1.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.test:annotation",
+      "version": "1.0.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.test:core",
+      "version": "1.6.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.test:core-ktx",
+      "version": "1.6.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.test:monitor",
+      "version": "1.7.2",
+      "vulns": []
+    },
+    {
+      "package": "androidx.test:runner",
+      "version": "1.6.2",
+      "vulns": []
+    },
+    {
+      "package": "androidx.test.espresso:espresso-core",
+      "version": "3.5.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.test.espresso:espresso-idling-resource",
+      "version": "3.5.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.test.ext:junit",
+      "version": "1.2.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.test.services:storage",
+      "version": "1.5.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.test.uiautomator:uiautomator",
+      "version": "2.3.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.tracing:tracing",
+      "version": "1.2.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.tracing:tracing-ktx",
+      "version": "1.2.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.vectordrawable:vectordrawable",
+      "version": "1.1.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.vectordrawable:vectordrawable-animated",
+      "version": "1.1.0",
+      "vulns": []
+    },
+    {
+      "package": "androidx.versionedparcelable:versionedparcelable",
+      "version": "1.1.1",
+      "vulns": []
+    },
+    {
+      "package": "androidx.viewpager:viewpager",
+      "version": "1.0.0",
+      "vulns": []
+    },
+    {
+      "package": "com.android:signflinger",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android:zipflinger",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.application:com.android.application.gradle.plugin",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.databinding:baseLibrary",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools:annotations",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools:common",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools:dvlib",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools:repository",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools:sdk-common",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools:sdklib",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.analytics-library:crash",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.analytics-library:protos",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.analytics-library:shared",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.analytics-library:tracker",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:aapt2-proto",
+      "version": "8.13.2-14304508",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:aaptcompiler",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:apksig",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:apkzlib",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:builder",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:builder-model",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:builder-test-api",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:bundletool",
+      "version": "1.18.1",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:gradle",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:gradle-api",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:gradle-common-api",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:gradle-settings-api",
+      "version": "8.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:manifest-merger",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build:transform-api",
+      "version": "2.0.0-deprecated-use-gradle-api",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build.jetifier:jetifier-core",
+      "version": "1.0.0-beta10",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.build.jetifier:jetifier-processor",
+      "version": "1.0.0-beta10",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.ddms:ddmlib",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.emulator:proto",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.layoutlib:layoutlib-api",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.lint:lint-model",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.lint:lint-typedef-remover",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-device-provider-ddmlib",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-device-provider-ddmlib-proto",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-device-provider-profile",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-device-provider-profile-proto",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-additional-test-output",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-additional-test-output-proto",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-apk-installer",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-apk-installer-proto",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-coverage",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-coverage-proto",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-device-info",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-device-info-proto",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-emulator-control",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-emulator-control-proto",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-logcat",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-host-logcat-proto",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-result-listener-gradle",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:android-test-plugin-result-listener-gradle-proto",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.android.tools.utp:utp-common",
+      "version": "31.13.2",
+      "vulns": []
+    },
+    {
+      "package": "com.github.jk1:gradle-license-report",
+      "version": "2.9",
+      "vulns": []
+    },
+    {
+      "package": "com.github.jk1.dependency-license-report:com.github.jk1.dependency-license-report.gradle.plugin",
+      "version": "2.9",
+      "vulns": []
+    },
+    {
+      "package": "com.google.android:annotations",
+      "version": "4.1.1.4",
+      "vulns": []
+    },
+    {
+      "package": "com.google.api.grpc:proto-google-common-protos",
+      "version": "2.17.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.api.grpc:proto-google-common-protos",
+      "version": "2.48.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.auto:auto-common",
+      "version": "0.11",
+      "vulns": []
+    },
+    {
+      "package": "com.google.auto:auto-common",
+      "version": "1.2.1",
+      "vulns": []
+    },
+    {
+      "package": "com.google.auto.service:auto-service",
+      "version": "1.1.1",
+      "vulns": []
+    },
+    {
+      "package": "com.google.auto.service:auto-service-annotations",
+      "version": "1.1.1",
+      "vulns": []
+    },
+    {
+      "package": "com.google.auto.value:auto-value-annotations",
+      "version": "1.6.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.auto.value:auto-value-annotations",
+      "version": "1.6.3",
+      "vulns": []
+    },
+    {
+      "package": "com.google.code.findbugs:jsr305",
+      "version": "3.0.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.code.gson:gson",
+      "version": "2.10.1",
+      "vulns": []
+    },
+    {
+      "package": "com.google.code.gson:gson",
+      "version": "2.11.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.code.gson:gson",
+      "version": "2.8.9",
+      "vulns": []
+    },
+    {
+      "package": "com.google.code.gson:gson",
+      "version": "2.9.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.crypto.tink:tink",
+      "version": "1.7.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.crypto.tink:tink-android",
+      "version": "1.8.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.dagger:dagger",
+      "version": "2.28.3",
+      "vulns": []
+    },
+    {
+      "package": "com.google.dagger:dagger",
+      "version": "2.48",
+      "vulns": []
+    },
+    {
+      "package": "com.google.dagger:dagger",
+      "version": "2.56.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.dagger:dagger-compiler",
+      "version": "2.56.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.dagger:dagger-lint-aar",
+      "version": "2.56.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.dagger:dagger-spi",
+      "version": "2.56.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.dagger:hilt-android",
+      "version": "2.56.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.dagger:hilt-android-compiler",
+      "version": "2.56.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.dagger:hilt-android-gradle-plugin",
+      "version": "2.56.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.dagger:hilt-core",
+      "version": "2.56.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.dagger.hilt.android:com.google.dagger.hilt.android.gradle.plugin",
+      "version": "2.56.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.devtools.ksp:com.google.devtools.ksp.gradle.plugin",
+      "version": "2.1.0-1.0.29",
+      "vulns": []
+    },
+    {
+      "package": "com.google.devtools.ksp:symbol-processing",
+      "version": "2.1.0-1.0.29",
+      "vulns": []
+    },
+    {
+      "package": "com.google.devtools.ksp:symbol-processing-api",
+      "version": "2.1.0-1.0.29",
+      "vulns": []
+    },
+    {
+      "package": "com.google.devtools.ksp:symbol-processing-api",
+      "version": "2.1.10-1.0.31",
+      "vulns": []
+    },
+    {
+      "package": "com.google.devtools.ksp:symbol-processing-cmdline",
+      "version": "2.1.0-1.0.29",
+      "vulns": []
+    },
+    {
+      "package": "com.google.devtools.ksp:symbol-processing-common-deps",
+      "version": "2.1.0-1.0.29",
+      "vulns": []
+    },
+    {
+      "package": "com.google.devtools.ksp:symbol-processing-gradle-plugin",
+      "version": "2.1.0-1.0.29",
+      "vulns": []
+    },
+    {
+      "package": "com.google.errorprone:error_prone_annotations",
+      "version": "2.23.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.errorprone:error_prone_annotations",
+      "version": "2.28.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.errorprone:error_prone_annotations",
+      "version": "2.30.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.errorprone:javac-shaded",
+      "version": "9-dev-r4023-3",
+      "vulns": []
+    },
+    {
+      "package": "com.google.flatbuffers:flatbuffers-java",
+      "version": "1.12.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.googlejavaformat:google-java-format",
+      "version": "1.5",
+      "vulns": []
+    },
+    {
+      "package": "com.google.guava:failureaccess",
+      "version": "1.0.1",
+      "vulns": []
+    },
+    {
+      "package": "com.google.guava:failureaccess",
+      "version": "1.0.2",
+      "vulns": []
+    },
+    {
+      "package": "com.google.guava:guava",
+      "version": "32.0.1-jre",
+      "vulns": []
+    },
+    {
+      "package": "com.google.guava:guava",
+      "version": "33.0.0-jre",
+      "vulns": []
+    },
+    {
+      "package": "com.google.guava:guava",
+      "version": "33.3.1-jre",
+      "vulns": []
+    },
+    {
+      "package": "com.google.guava:listenablefuture",
+      "version": "1.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.guava:listenablefuture",
+      "version": "9999.0-empty-to-avoid-conflict-with-guava",
+      "vulns": []
+    },
+    {
+      "package": "com.google.j2objc:j2objc-annotations",
+      "version": "2.8",
+      "vulns": []
+    },
+    {
+      "package": "com.google.j2objc:j2objc-annotations",
+      "version": "3.0.0",
+      "vulns": []
+    },
+    {
+      "package": "com.google.jimfs:jimfs",
+      "version": "1.1",
+      "vulns": []
+    },
+    {
+      "package": "com.google.protobuf:protobuf-java",
+      "version": "3.24.4",
+      "vulns": [
+        {
+          "id": "GHSA-735f-pc8j-v9w8",
+          "modified": "2026-09-10T03:50:19.212518Z"
+        }
+      ]
+    },
+    {
+      "package": "com.google.protobuf:protobuf-java",
+      "version": "3.25.5",
+      "vulns": []
+    },
+    {
+      "package": "com.google.protobuf:protobuf-java-util",
+      "version": "3.22.3",
+      "vulns": []
+    },
+    {
+      "package": "com.google.protobuf:protobuf-java-util",
+      "version": "3.24.4",
+      "vulns": []
+    },
+    {
+      "package": "com.google.protobuf:protobuf-java-util",
+      "version": "3.25.5",
+      "vulns": []
+    },
+    {
+      "package": "com.google.protobuf:protobuf-kotlin",
+      "version": "3.24.4",
+      "vulns": [
+        {
+          "id": "GHSA-735f-pc8j-v9w8",
+          "modified": "2026-09-10T03:50:19.212518Z"
+        }
+      ]
+    },
+    {
+      "package": "com.google.testing.platform:android-device-provider-local",
+      "version": "0.0.9-alpha03",
+      "vulns": []
+    },
+    {
+      "package": "com.google.testing.platform:android-driver-instrumentation",
+      "version": "0.0.9-alpha03",
+      "vulns": []
+    },
+    {
+      "package": "com.google.testing.platform:android-test-plugin",
+      "version": "0.0.9-alpha03",
+      "vulns": []
+    },
+    {
+      "package": "com.google.testing.platform:core",
+      "version": "0.0.9-alpha03",
+      "vulns": []
+    },
+    {
+      "package": "com.google.testing.platform:core-proto",
+      "version": "0.0.9-alpha03",
+      "vulns": []
+    },
+    {
+      "package": "com.google.testing.platform:launcher",
+      "version": "0.0.9-alpha03",
+      "vulns": []
+    },
+    {
+      "package": "com.googlecode.juniversalchardet:juniversalchardet",
+      "version": "1.0.3",
+      "vulns": []
+    },
+    {
+      "package": "com.intellij:annotations",
+      "version": "12.0",
+      "vulns": []
+    },
+    {
+      "package": "com.lemonappdev:konsist",
+      "version": "0.17.3",
+      "vulns": []
+    },
+    {
+      "package": "com.pinterest.ktlint:ktlint-cli-ruleset-core",
+      "version": "0.50.0",
+      "vulns": []
+    },
+    {
+      "package": "com.pinterest.ktlint:ktlint-logger",
+      "version": "0.50.0",
+      "vulns": []
+    },
+    {
+      "package": "com.pinterest.ktlint:ktlint-rule-engine-core",
+      "version": "0.50.0",
+      "vulns": []
+    },
+    {
+      "package": "com.pinterest.ktlint:ktlint-ruleset-standard",
+      "version": "0.50.0",
+      "vulns": []
+    },
+    {
+      "package": "com.squareup:javapoet",
+      "version": "1.13.0",
+      "vulns": []
+    },
+    {
+      "package": "com.squareup:javawriter",
+      "version": "2.1.1",
+      "vulns": []
+    },
+    {
+      "package": "com.squareup:javawriter",
+      "version": "2.5.0",
+      "vulns": []
+    },
+    {
+      "package": "com.squareup:kotlinpoet",
+      "version": "1.14.2",
+      "vulns": []
+    },
+    {
+      "package": "com.squareup:kotlinpoet-javapoet",
+      "version": "1.14.2",
+      "vulns": []
+    },
+    {
+      "package": "com.sun.activation:javax.activation",
+      "version": "1.2.0",
+      "vulns": []
+    },
+    {
+      "package": "com.sun.istack:istack-commons-runtime",
+      "version": "3.0.8",
+      "vulns": []
+    },
+    {
+      "package": "com.sun.xml.fastinfoset:FastInfoset",
+      "version": "1.2.16",
+      "vulns": []
+    },
+    {
+      "package": "commons-codec:commons-codec",
+      "version": "1.11",
+      "vulns": []
+    },
+    {
+      "package": "commons-codec:commons-codec",
+      "version": "1.15",
+      "vulns": []
+    },
+    {
+      "package": "commons-io:commons-io",
+      "version": "2.16.1",
+      "vulns": []
+    },
+    {
+      "package": "commons-logging:commons-logging",
+      "version": "1.2",
+      "vulns": []
+    },
+    {
+      "package": "dev.drewhamilton.poko:poko-annotations",
+      "version": "0.16.0",
+      "vulns": []
+    },
+    {
+      "package": "dev.drewhamilton.poko:poko-annotations-jvm",
+      "version": "0.16.0",
+      "vulns": []
+    },
+    {
+      "package": "io.github.davidburstrom.contester:contester-breakpoint",
+      "version": "0.2.0",
+      "vulns": []
+    },
+    {
+      "package": "io.github.detekt.sarif4k:sarif4k",
+      "version": "0.6.0",
+      "vulns": []
+    },
+    {
+      "package": "io.github.detekt.sarif4k:sarif4k-jvm",
+      "version": "0.6.0",
+      "vulns": []
+    },
+    {
+      "package": "io.github.microutils:kotlin-logging-jvm",
+      "version": "3.0.5",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-api",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-cli",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-core",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-formatting",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-gradle-plugin",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-metrics",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-parser",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-psi-utils",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-report-html",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-report-md",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-report-sarif",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-report-txt",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-report-xml",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-rules",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-rules-complexity",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-rules-coroutines",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-rules-documentation",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-rules-empty",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-rules-errorprone",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-rules-exceptions",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-rules-naming",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-rules-performance",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-rules-style",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-tooling",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:detekt-utils",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.gitlab.arturbosch.detekt:io.gitlab.arturbosch.detekt.gradle.plugin",
+      "version": "1.23.7",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-api",
+      "version": "1.57.2",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-api",
+      "version": "1.69.1",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-context",
+      "version": "1.57.2",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-context",
+      "version": "1.69.1",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-core",
+      "version": "1.57.2",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-core",
+      "version": "1.69.1",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-inprocess",
+      "version": "1.69.1",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-netty",
+      "version": "1.57.2",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-netty",
+      "version": "1.69.1",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-protobuf",
+      "version": "1.57.2",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-protobuf",
+      "version": "1.69.1",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-protobuf-lite",
+      "version": "1.57.2",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-protobuf-lite",
+      "version": "1.69.1",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-services",
+      "version": "1.57.2",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-stub",
+      "version": "1.57.2",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-stub",
+      "version": "1.69.1",
+      "vulns": []
+    },
+    {
+      "package": "io.grpc:grpc-util",
+      "version": "1.69.1",
+      "vulns": []
+    },
+    {
+      "package": "io.netty:netty-buffer",
+      "version": "4.1.110.Final",
+      "vulns": []
+    },
+    {
+      "package": "io.netty:netty-buffer",
+      "version": "4.1.93.Final",
+      "vulns": []
+    },
+    {
+      "package": "io.netty:netty-codec",
+      "version": "4.1.110.Final",
+      "vulns": [
+        {
+          "id": "GHSA-3p8m-j85q-pgmj",
+          "modified": "2026-09-10T03:50:27.942019Z"
+        },
+        {
+          "id": "GHSA-558v-64gr-wgg4",
+          "modified": "2026-09-10T03:50:12.358146Z"
+        },
+        {
+          "id": "GHSA-mj4r-2hfc-f8p6",
+          "modified": "2026-09-10T03:51:06.526589Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-codec",
+      "version": "4.1.93.Final",
+      "vulns": [
+        {
+          "id": "GHSA-3p8m-j85q-pgmj",
+          "modified": "2026-09-10T03:50:27.942019Z"
+        },
+        {
+          "id": "GHSA-558v-64gr-wgg4",
+          "modified": "2026-09-10T03:50:12.358146Z"
+        },
+        {
+          "id": "GHSA-mj4r-2hfc-f8p6",
+          "modified": "2026-09-10T03:51:06.526589Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-codec-http",
+      "version": "4.1.110.Final",
+      "vulns": [
+        {
+          "id": "GHSA-38f8-5428-x5cv",
+          "modified": "2026-09-10T03:51:04.415985Z"
+        },
+        {
+          "id": "GHSA-4mp9-239f-g9hg",
+          "modified": "2026-09-10T03:51:10.413004Z"
+        },
+        {
+          "id": "GHSA-57rv-r2g8-2cj3",
+          "modified": "2026-09-10T03:51:04.645242Z"
+        },
+        {
+          "id": "GHSA-6cqp-g7gg-8hr5",
+          "modified": "2026-09-10T03:51:10.615779Z"
+        },
+        {
+          "id": "GHSA-6jqx-86gh-f27w",
+          "modified": "2026-09-10T03:51:10.812069Z"
+        },
+        {
+          "id": "GHSA-84h7-rjj3-6jx4",
+          "modified": "2026-09-10T03:50:31.724062Z"
+        },
+        {
+          "id": "GHSA-8c42-7qj2-3j46",
+          "modified": "2026-09-10T03:51:13.389261Z"
+        },
+        {
+          "id": "GHSA-f6hv-jmp6-3vwv",
+          "modified": "2026-09-10T03:51:05.447415Z"
+        },
+        {
+          "id": "GHSA-fghv-69vj-qj49",
+          "modified": "2026-09-10T03:50:28.33305Z"
+        },
+        {
+          "id": "GHSA-gcjf-9mgh-3p7g",
+          "modified": "2026-09-10T03:50:52.172506Z"
+        },
+        {
+          "id": "GHSA-hvcg-qmg6-jm4c",
+          "modified": "2026-09-10T03:50:50.025404Z"
+        },
+        {
+          "id": "GHSA-jppx-w49h-x2qq",
+          "modified": "2026-09-10T03:50:12.368445Z"
+        },
+        {
+          "id": "GHSA-m4cv-j2px-7723",
+          "modified": "2026-09-10T03:51:06.37921Z"
+        },
+        {
+          "id": "GHSA-mvh2-crg5-v77c",
+          "modified": "2026-09-10T03:50:52.830435Z"
+        },
+        {
+          "id": "GHSA-pwqr-wmgm-9rr8",
+          "modified": "2026-09-10T03:50:40.493461Z"
+        },
+        {
+          "id": "GHSA-q4f6-jm68-57ww",
+          "modified": "2026-09-10T03:50:52.883743Z"
+        },
+        {
+          "id": "GHSA-v8h7-rr48-vmmv",
+          "modified": "2026-09-10T03:50:47.637727Z"
+        },
+        {
+          "id": "GHSA-xxqh-mfjm-7mv9",
+          "modified": "2026-09-10T03:51:07.381332Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-codec-http",
+      "version": "4.1.93.Final",
+      "vulns": [
+        {
+          "id": "GHSA-38f8-5428-x5cv",
+          "modified": "2026-09-10T03:51:04.415985Z"
+        },
+        {
+          "id": "GHSA-4mp9-239f-g9hg",
+          "modified": "2026-09-10T03:51:10.413004Z"
+        },
+        {
+          "id": "GHSA-57rv-r2g8-2cj3",
+          "modified": "2026-09-10T03:51:04.645242Z"
+        },
+        {
+          "id": "GHSA-5jpm-x58v-624v",
+          "modified": "2026-09-10T03:50:10.174704Z"
+        },
+        {
+          "id": "GHSA-6cqp-g7gg-8hr5",
+          "modified": "2026-09-10T03:51:10.615779Z"
+        },
+        {
+          "id": "GHSA-6jqx-86gh-f27w",
+          "modified": "2026-09-10T03:51:10.812069Z"
+        },
+        {
+          "id": "GHSA-84h7-rjj3-6jx4",
+          "modified": "2026-09-10T03:50:31.724062Z"
+        },
+        {
+          "id": "GHSA-8c42-7qj2-3j46",
+          "modified": "2026-09-10T03:51:13.389261Z"
+        },
+        {
+          "id": "GHSA-f6hv-jmp6-3vwv",
+          "modified": "2026-09-10T03:51:05.447415Z"
+        },
+        {
+          "id": "GHSA-fghv-69vj-qj49",
+          "modified": "2026-09-10T03:50:28.33305Z"
+        },
+        {
+          "id": "GHSA-gcjf-9mgh-3p7g",
+          "modified": "2026-09-10T03:50:52.172506Z"
+        },
+        {
+          "id": "GHSA-hvcg-qmg6-jm4c",
+          "modified": "2026-09-10T03:50:50.025404Z"
+        },
+        {
+          "id": "GHSA-jppx-w49h-x2qq",
+          "modified": "2026-09-10T03:50:12.368445Z"
+        },
+        {
+          "id": "GHSA-m4cv-j2px-7723",
+          "modified": "2026-09-10T03:51:06.37921Z"
+        },
+        {
+          "id": "GHSA-mvh2-crg5-v77c",
+          "modified": "2026-09-10T03:50:52.830435Z"
+        },
+        {
+          "id": "GHSA-pwqr-wmgm-9rr8",
+          "modified": "2026-09-10T03:50:40.493461Z"
+        },
+        {
+          "id": "GHSA-q4f6-jm68-57ww",
+          "modified": "2026-09-10T03:50:52.883743Z"
+        },
+        {
+          "id": "GHSA-v8h7-rr48-vmmv",
+          "modified": "2026-09-10T03:50:47.637727Z"
+        },
+        {
+          "id": "GHSA-xxqh-mfjm-7mv9",
+          "modified": "2026-09-10T03:51:07.381332Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-codec-http2",
+      "version": "4.1.110.Final",
+      "vulns": [
+        {
+          "id": "GHSA-563q-j3cm-6jxm",
+          "modified": "2026-09-10T03:50:48.396944Z"
+        },
+        {
+          "id": "GHSA-5x3r-wrvg-rp6q",
+          "modified": "2026-09-10T03:50:48.488084Z"
+        },
+        {
+          "id": "GHSA-93wv-jw9v-4972",
+          "modified": "2026-09-10T03:51:11.318239Z"
+        },
+        {
+          "id": "GHSA-c2gf-v879-257j",
+          "modified": "2026-09-18T15:45:05.615379Z"
+        },
+        {
+          "id": "GHSA-c69g-56f8-xwqj",
+          "modified": "2026-09-10T03:51:11.564389Z"
+        },
+        {
+          "id": "GHSA-f6hv-jmp6-3vwv",
+          "modified": "2026-09-10T03:51:05.447415Z"
+        },
+        {
+          "id": "GHSA-prj3-ccx8-p6x4",
+          "modified": "2026-09-10T03:50:27.396257Z"
+        },
+        {
+          "id": "GHSA-w9fj-cfpg-grvv",
+          "modified": "2026-09-10T03:50:41.535305Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-codec-http2",
+      "version": "4.1.93.Final",
+      "vulns": [
+        {
+          "id": "GHSA-563q-j3cm-6jxm",
+          "modified": "2026-09-10T03:50:48.396944Z"
+        },
+        {
+          "id": "GHSA-5x3r-wrvg-rp6q",
+          "modified": "2026-09-10T03:50:48.488084Z"
+        },
+        {
+          "id": "GHSA-93wv-jw9v-4972",
+          "modified": "2026-09-10T03:51:11.318239Z"
+        },
+        {
+          "id": "GHSA-c2gf-v879-257j",
+          "modified": "2026-09-18T15:45:05.615379Z"
+        },
+        {
+          "id": "GHSA-c69g-56f8-xwqj",
+          "modified": "2026-09-10T03:51:11.564389Z"
+        },
+        {
+          "id": "GHSA-f6hv-jmp6-3vwv",
+          "modified": "2026-09-10T03:51:05.447415Z"
+        },
+        {
+          "id": "GHSA-prj3-ccx8-p6x4",
+          "modified": "2026-09-10T03:50:27.396257Z"
+        },
+        {
+          "id": "GHSA-w9fj-cfpg-grvv",
+          "modified": "2026-09-10T03:50:41.535305Z"
+        },
+        {
+          "id": "GHSA-xpw8-rcwv-8f8p",
+          "modified": "2026-09-10T03:49:58.760787Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-codec-socks",
+      "version": "4.1.110.Final",
+      "vulns": []
+    },
+    {
+      "package": "io.netty:netty-codec-socks",
+      "version": "4.1.93.Final",
+      "vulns": []
+    },
+    {
+      "package": "io.netty:netty-common",
+      "version": "4.1.110.Final",
+      "vulns": [
+        {
+          "id": "GHSA-389x-839f-4rhx",
+          "modified": "2026-09-10T03:50:22.454183Z"
+        },
+        {
+          "id": "GHSA-xq3w-v528-46rv",
+          "modified": "2026-09-10T03:50:56.073045Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-common",
+      "version": "4.1.93.Final",
+      "vulns": [
+        {
+          "id": "GHSA-389x-839f-4rhx",
+          "modified": "2026-09-10T03:50:22.454183Z"
+        },
+        {
+          "id": "GHSA-xq3w-v528-46rv",
+          "modified": "2026-09-10T03:50:56.073045Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-handler",
+      "version": "4.1.110.Final",
+      "vulns": [
+        {
+          "id": "GHSA-3qp7-7mw8-wx86",
+          "modified": "2026-09-10T03:50:55.436123Z"
+        },
+        {
+          "id": "GHSA-4g8c-wm8x-jfhw",
+          "modified": "2026-09-10T03:50:22.400091Z"
+        },
+        {
+          "id": "GHSA-c4c3-7fpv-j4q5",
+          "modified": "2026-09-08T18:27:48.571082Z"
+        },
+        {
+          "id": "GHSA-c653-97m9-rcg9",
+          "modified": "2026-09-10T03:51:08.552933Z"
+        },
+        {
+          "id": "GHSA-fccg-mwvh-qqg4",
+          "modified": "2026-09-08T18:27:48.113951Z"
+        },
+        {
+          "id": "GHSA-x4gw-5cx5-pgmh",
+          "modified": "2026-09-10T03:50:12.401611Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-handler",
+      "version": "4.1.93.Final",
+      "vulns": [
+        {
+          "id": "GHSA-3qp7-7mw8-wx86",
+          "modified": "2026-09-10T03:50:55.436123Z"
+        },
+        {
+          "id": "GHSA-4g8c-wm8x-jfhw",
+          "modified": "2026-09-10T03:50:22.400091Z"
+        },
+        {
+          "id": "GHSA-6mjq-h674-j845",
+          "modified": "2026-09-10T03:50:02.086375Z"
+        },
+        {
+          "id": "GHSA-c4c3-7fpv-j4q5",
+          "modified": "2026-09-08T18:27:48.571082Z"
+        },
+        {
+          "id": "GHSA-c653-97m9-rcg9",
+          "modified": "2026-09-10T03:51:08.552933Z"
+        },
+        {
+          "id": "GHSA-fccg-mwvh-qqg4",
+          "modified": "2026-09-08T18:27:48.113951Z"
+        },
+        {
+          "id": "GHSA-x4gw-5cx5-pgmh",
+          "modified": "2026-09-10T03:50:12.401611Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-handler-proxy",
+      "version": "4.1.110.Final",
+      "vulns": [
+        {
+          "id": "GHSA-45q3-82m4-75jr",
+          "modified": "2026-09-10T03:51:04.662453Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-handler-proxy",
+      "version": "4.1.93.Final",
+      "vulns": [
+        {
+          "id": "GHSA-45q3-82m4-75jr",
+          "modified": "2026-09-10T03:51:04.662453Z"
+        }
+      ]
+    },
+    {
+      "package": "io.netty:netty-resolver",
+      "version": "4.1.110.Final",
+      "vulns": []
+    },
+    {
+      "package": "io.netty:netty-resolver",
+      "version": "4.1.93.Final",
+      "vulns": []
+    },
+    {
+      "package": "io.netty:netty-transport",
+      "version": "4.1.110.Final",
+      "vulns": []
+    },
+    {
+      "package": "io.netty:netty-transport",
+      "version": "4.1.93.Final",
+      "vulns": []
+    },
+    {
+      "package": "io.netty:netty-transport-native-unix-common",
+      "version": "4.1.110.Final",
+      "vulns": []
+    },
+    {
+      "package": "io.netty:netty-transport-native-unix-common",
+      "version": "4.1.93.Final",
+      "vulns": []
+    },
+    {
+      "package": "io.opencensus:opencensus-api",
+      "version": "0.31.0",
+      "vulns": []
+    },
+    {
+      "package": "io.opencensus:opencensus-proto",
+      "version": "0.2.0",
+      "vulns": []
+    },
+    {
+      "package": "io.perfmark:perfmark-api",
+      "version": "0.26.0",
+      "vulns": []
+    },
+    {
+      "package": "io.perfmark:perfmark-api",
+      "version": "0.27.0",
+      "vulns": []
+    },
+    {
+      "package": "jakarta.activation:jakarta.activation-api",
+      "version": "1.2.1",
+      "vulns": []
+    },
+    {
+      "package": "jakarta.inject:jakarta.inject-api",
+      "version": "2.0.1",
+      "vulns": []
+    },
+    {
+      "package": "jakarta.xml.bind:jakarta.xml.bind-api",
+      "version": "2.3.2",
+      "vulns": []
+    },
+    {
+      "package": "javax.annotation:javax.annotation-api",
+      "version": "1.3.2",
+      "vulns": []
+    },
+    {
+      "package": "javax.inject:javax.inject",
+      "version": "1",
+      "vulns": []
+    },
+    {
+      "package": "junit:junit",
+      "version": "4.13.2",
+      "vulns": []
+    },
+    {
+      "package": "net.java.dev.jna:jna",
+      "version": "5.6.0",
+      "vulns": []
+    },
+    {
+      "package": "net.java.dev.jna:jna-platform",
+      "version": "5.6.0",
+      "vulns": []
+    },
+    {
+      "package": "net.ltgt.gradle.incap:incap",
+      "version": "0.2",
+      "vulns": []
+    },
+    {
+      "package": "net.sf.jopt-simple:jopt-simple",
+      "version": "4.9",
+      "vulns": []
+    },
+    {
+      "package": "net.sf.kxml:kxml2",
+      "version": "2.3.0",
+      "vulns": []
+    },
+    {
+      "package": "net.zetetic:sqlcipher-android",
+      "version": "4.6.1",
+      "vulns": []
+    },
+    {
+      "package": "org.apache.commons:commons-compress",
+      "version": "1.21",
+      "vulns": [
+        {
+          "id": "GHSA-4265-ccf5-phj5",
+          "modified": "2026-09-10T03:50:05.280645Z"
+        },
+        {
+          "id": "GHSA-4g9r-vxhx-9pgx",
+          "modified": "2026-09-10T03:50:05.286961Z"
+        }
+      ]
+    },
+    {
+      "package": "org.apache.httpcomponents:httpclient",
+      "version": "4.5.14",
+      "vulns": []
+    },
+    {
+      "package": "org.apache.httpcomponents:httpcore",
+      "version": "4.4.16",
+      "vulns": []
+    },
+    {
+      "package": "org.apache.httpcomponents:httpmime",
+      "version": "4.5.6",
+      "vulns": []
+    },
+    {
+      "package": "org.bitbucket.b_c:jose4j",
+      "version": "0.9.5",
+      "vulns": [
+        {
+          "id": "GHSA-3677-xxcr-wjqv",
+          "modified": "2026-09-10T03:50:31.318789Z"
+        }
+      ]
+    },
+    {
+      "package": "org.bouncycastle:bcpkix-jdk18on",
+      "version": "1.79",
+      "vulns": [
+        {
+          "id": "GHSA-wg6q-6289-32hp",
+          "modified": "2026-09-10T03:50:45.0759Z"
+        }
+      ]
+    },
+    {
+      "package": "org.bouncycastle:bcprov-jdk18on",
+      "version": "1.78.1",
+      "vulns": [
+        {
+          "id": "GHSA-574f-3g2m-x479",
+          "modified": "2026-09-24T15:30:06.452617Z"
+        },
+        {
+          "id": "GHSA-9pwp-9qqc-pr26",
+          "modified": "2026-09-18T17:45:06.105254Z"
+        },
+        {
+          "id": "GHSA-c3fc-8qff-9hwx",
+          "modified": "2026-09-10T03:51:01.534612Z"
+        },
+        {
+          "id": "GHSA-qp49-qgx5-5m26",
+          "modified": "2026-09-18T17:45:06.096277Z"
+        }
+      ]
+    },
+    {
+      "package": "org.bouncycastle:bcprov-jdk18on",
+      "version": "1.79",
+      "vulns": [
+        {
+          "id": "GHSA-574f-3g2m-x479",
+          "modified": "2026-09-24T15:30:06.452617Z"
+        },
+        {
+          "id": "GHSA-9pwp-9qqc-pr26",
+          "modified": "2026-09-18T17:45:06.105254Z"
+        },
+        {
+          "id": "GHSA-c3fc-8qff-9hwx",
+          "modified": "2026-09-10T03:51:01.534612Z"
+        },
+        {
+          "id": "GHSA-qp49-qgx5-5m26",
+          "modified": "2026-09-18T17:45:06.096277Z"
+        }
+      ]
+    },
+    {
+      "package": "org.bouncycastle:bcutil-jdk18on",
+      "version": "1.79",
+      "vulns": []
+    },
+    {
+      "package": "org.checkerframework:checker-compat-qual",
+      "version": "2.5.3",
+      "vulns": []
+    },
+    {
+      "package": "org.checkerframework:checker-qual",
+      "version": "3.33.0",
+      "vulns": []
+    },
+    {
+      "package": "org.checkerframework:checker-qual",
+      "version": "3.41.0",
+      "vulns": []
+    },
+    {
+      "package": "org.checkerframework:checker-qual",
+      "version": "3.43.0",
+      "vulns": []
+    },
+    {
+      "package": "org.codehaus.mojo:animal-sniffer-annotations",
+      "version": "1.23",
+      "vulns": []
+    },
+    {
+      "package": "org.codehaus.mojo:animal-sniffer-annotations",
+      "version": "1.24",
+      "vulns": []
+    },
+    {
+      "package": "org.ec4j.core:ec4j-core",
+      "version": "0.3.0",
+      "vulns": []
+    },
+    {
+      "package": "org.glassfish.jaxb:jaxb-runtime",
+      "version": "2.3.2",
+      "vulns": []
+    },
+    {
+      "package": "org.glassfish.jaxb:txw2",
+      "version": "2.3.2",
+      "vulns": []
+    },
+    {
+      "package": "org.hamcrest:hamcrest-core",
+      "version": "1.3",
+      "vulns": []
+    },
+    {
+      "package": "org.hamcrest:hamcrest-integration",
+      "version": "1.3",
+      "vulns": []
+    },
+    {
+      "package": "org.hamcrest:hamcrest-library",
+      "version": "1.3",
+      "vulns": []
+    },
+    {
+      "package": "org.jcommander:jcommander",
+      "version": "1.85",
+      "vulns": []
+    },
+    {
+      "package": "org.jdom:jdom2",
+      "version": "2.0.6",
+      "vulns": [
+        {
+          "id": "GHSA-2363-cqg2-863c",
+          "modified": "2025-09-16T15:52:31.388959Z"
+        }
+      ]
+    },
+    {
+      "package": "org.jetbrains:annotations",
+      "version": "13.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains:annotations",
+      "version": "23.0.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.intellij.deps:trove4j",
+      "version": "1.0.20200330",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:compose-compiler-gradle-plugin",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-build-common",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-build-statistics",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-build-tools-api",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-build-tools-impl",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-compiler-embeddable",
+      "version": "2.0.10",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-compiler-embeddable",
+      "version": "2.0.21",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-compiler-embeddable",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-compiler-runner",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-daemon-client",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-daemon-embeddable",
+      "version": "2.0.10",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-daemon-embeddable",
+      "version": "2.0.21",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-daemon-embeddable",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-gradle-plugin",
+      "version": "2.1.0",
+      "vulns": [
+        {
+          "id": "GHSA-r937-wjx7-w2jp",
+          "modified": "2026-08-12T19:40:59.256901Z"
+        }
+      ]
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-gradle-plugin-annotations",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-gradle-plugin-api",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-gradle-plugin-idea",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-gradle-plugin-idea-proto",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-gradle-plugin-model",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-gradle-plugins-bom",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-klib-commonizer-api",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-native-utils",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-reflect",
+      "version": "1.6.10",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-reflect",
+      "version": "1.8.21",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-reflect",
+      "version": "2.0.10",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-reflect",
+      "version": "2.0.21",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-script-runtime",
+      "version": "2.0.10",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-script-runtime",
+      "version": "2.0.21",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-script-runtime",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-scripting-common",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-scripting-compiler-embeddable",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-scripting-compiler-impl-embeddable",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-scripting-jvm",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib",
+      "version": "1.8.21",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib",
+      "version": "1.9.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib",
+      "version": "2.0.10",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib",
+      "version": "2.0.21",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib",
+      "version": "2.1.10",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib",
+      "version": "2.2.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-common",
+      "version": "1.8.21",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-common",
+      "version": "1.9.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-common",
+      "version": "2.0.10",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-common",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-common",
+      "version": "2.1.10",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-common",
+      "version": "2.2.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-jdk7",
+      "version": "1.8.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-jdk7",
+      "version": "1.8.20",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-jdk7",
+      "version": "1.8.22",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-jdk7",
+      "version": "2.0.21",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-jdk7",
+      "version": "2.2.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
+      "version": "1.8.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
+      "version": "1.8.20",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
+      "version": "1.8.22",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
+      "version": "2.0.21",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-stdlib-jdk8",
+      "version": "2.2.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-tooling-core",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-util-io",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-util-klib",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin:kotlin-util-klib-metadata",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin.android:org.jetbrains.kotlin.android.gradle.plugin",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlin.plugin.compose:org.jetbrains.kotlin.plugin.compose.gradle.plugin",
+      "version": "2.1.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:atomicfu",
+      "version": "0.22.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:atomicfu-jvm",
+      "version": "0.22.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-coroutines-android",
+      "version": "1.9.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-coroutines-bom",
+      "version": "1.7.3",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-coroutines-bom",
+      "version": "1.9.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+      "version": "1.7.3",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-coroutines-core",
+      "version": "1.9.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm",
+      "version": "1.6.4",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm",
+      "version": "1.7.3",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm",
+      "version": "1.9.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-coroutines-test",
+      "version": "1.9.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm",
+      "version": "1.9.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-html-jvm",
+      "version": "0.8.1",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-serialization-bom",
+      "version": "1.6.3",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-serialization-core",
+      "version": "1.4.1",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-serialization-core",
+      "version": "1.6.3",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm",
+      "version": "1.4.1",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-serialization-core-jvm",
+      "version": "1.6.3",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-serialization-json",
+      "version": "1.4.1",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-serialization-json",
+      "version": "1.6.3",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm",
+      "version": "1.4.1",
+      "vulns": []
+    },
+    {
+      "package": "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm",
+      "version": "1.6.3",
+      "vulns": []
+    },
+    {
+      "package": "org.jspecify:jspecify",
+      "version": "1.0.0",
+      "vulns": []
+    },
+    {
+      "package": "org.jvnet.staxex:stax-ex",
+      "version": "1.8.1",
+      "vulns": []
+    },
+    {
+      "package": "org.ow2.asm:asm",
+      "version": "9.8",
+      "vulns": []
+    },
+    {
+      "package": "org.ow2.asm:asm-analysis",
+      "version": "9.8",
+      "vulns": []
+    },
+    {
+      "package": "org.ow2.asm:asm-commons",
+      "version": "9.8",
+      "vulns": []
+    },
+    {
+      "package": "org.ow2.asm:asm-tree",
+      "version": "9.8",
+      "vulns": []
+    },
+    {
+      "package": "org.ow2.asm:asm-util",
+      "version": "9.8",
+      "vulns": []
+    },
+    {
+      "package": "org.slf4j:slf4j-api",
+      "version": "1.7.30",
+      "vulns": []
+    },
+    {
+      "package": "org.slf4j:slf4j-api",
+      "version": "2.0.3",
+      "vulns": []
+    },
+    {
+      "package": "org.snakeyaml:snakeyaml-engine",
+      "version": "2.7",
+      "vulns": []
+    },
+    {
+      "package": "org.tensorflow:tensorflow-lite-metadata",
+      "version": "0.2.0",
+      "vulns": []
+    },
+    {
+      "package": "org.xerial:sqlite-jdbc",
+      "version": "3.41.2.2",
+      "vulns": []
+    }
+  ],
+  "fetchedAdvisoryCount": 51,
+  "completedAtUtc": "2026-09-25T11:30:53.0040098Z"
+}

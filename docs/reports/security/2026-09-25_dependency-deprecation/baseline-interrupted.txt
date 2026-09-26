@@ -1,0 +1,17 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build
+
+> Configure project :app
+WARNING: The option setting 'android.experimental.testOptions.managedDevices.allowOldApiLevelDevices=true' is experimental.
+The current default is 'false'.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preProdDebugBuild UP-TO-DATE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateProdDebugBuildConfig
+> Task :app:checkProdDebugAarMetadata
+> Task :app:processProdDebugNavigationResources
+> Task :app:compileProdDebugNavigationResources
+> Task :app:generateProdDebugResValues
+> Task :app:mapProdDebugSourceSetPaths
+> Task :app:generateProdDebugResources

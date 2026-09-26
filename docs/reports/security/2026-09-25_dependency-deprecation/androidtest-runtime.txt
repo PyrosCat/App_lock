@@ -1,0 +1,23 @@
+
+> Configure project :app
+WARNING: The option setting 'android.experimental.testOptions.managedDevices.allowOldApiLevelDevices=true' is experimental.
+The current default is 'false'.
+
+> Task :app:dependencies
+
+------------------------------------------------------------
+Project ':app'
+------------------------------------------------------------
+
+prodDebugAndroidTestRuntimeClasspath - Runtime classpath of '/prodDebugAndroidTest'.
++--- androidx.test.ext:junit:1.2.1 FAILED
++--- androidx.test:core-ktx:1.6.1 FAILED
++--- androidx.test:runner:1.6.2 FAILED
++--- androidx.test.uiautomator:uiautomator:2.3.0 FAILED
++--- androidx.compose:compose-bom:2024.12.01 -> 2024.12.01 FAILED
+\--- androidx.compose.ui:ui-test-junit4 FAILED
+
+A web-based, searchable dependency report is available by adding the --scan option.
+
+BUILD SUCCESSFUL in 14s
+1 actionable task: 1 executed

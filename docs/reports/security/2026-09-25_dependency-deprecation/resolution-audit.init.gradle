@@ -1,0 +1,120 @@
+import groovy.json.JsonOutput
+import org.gradle.api.artifacts.component.ModuleComponentIdentifier
+import org.gradle.api.artifacts.ProjectDependency
+import org.gradle.api.artifacts.result.ResolvedDependencyResult
+import org.gradle.api.artifacts.result.UnresolvedDependencyResult
+import java.security.MessageDigest
+
+// Invocation-only inspection task: no dependency constraints or project sources are changed.
+gradle.projectsEvaluated {
+    def root = gradle.rootProject
+    root.tasks.register('reviewDependencyInventory') {
+        group = 'verification'
+        description = 'Export selected dependency graphs and external artifact hashes for review.'
+        doLast {
+            def output = new File(root.projectDir, '.gradle/dependency-review/resolved-inventory.json')
+            def scrub = { Object value ->
+                String text = String.valueOf(value)
+                [root.projectDir.absolutePath, root.projectDir.absolutePath.replace('\\', '/')].each {
+                    text = text.replace(it, '<workspace>')
+                }
+                text.replaceAll(/(?i)[A-Z]:[\\\/]Users[\\\/][^\\\/\s]+/, '<user-home>')
+            }
+            def shaCache = [:]
+            def sha256 = { File file ->
+                shaCache.computeIfAbsent(file.absolutePath) {
+                    def digest = MessageDigest.getInstance('SHA-256')
+                    file.withInputStream { stream ->
+                        byte[] buffer = new byte[65536]
+                        int length
+                        while ((length = stream.read(buffer)) != -1) digest.update(buffer, 0, length)
+                    }
+                    digest.digest().encodeHex().toString()
+                }
+            }
+            def document = [
+                generatedAtUtc: java.time.Instant.now().toString(),
+                gradleVersion: gradle.gradleVersion,
+                javaVersion: System.getProperty('java.version'),
+                javaVendor: System.getProperty('java.vendor'),
+                offline: gradle.startParameter.offline,
+                scope: 'All variant compile/runtime and annotation/KSP processor classpaths, Kotlin tooling, detekt, UTP and root/app buildscript classpaths. External raw artifacts only; no app compilation.',
+                configurationInventory: [], configurations: [], plugins: []
+            ]
+            root.allprojects.toList().sort { it.path }.each { project ->
+                project.plugins.each { plugin ->
+                    document.plugins << [project: project.path, implementationClass: plugin.class.name]
+                }
+                def configs = []
+                project.configurations.findAll { it.canBeResolved }.sort { it.name }.each { cfg ->
+                    def selected = cfg.name.endsWith('CompileClasspath') || cfg.name.endsWith('RuntimeClasspath') ||
+                        cfg.name.endsWith('AnnotationProcessorClasspath') ||
+                        (cfg.name.startsWith('ksp') && (cfg.name.endsWith('KotlinProcessorClasspath') || cfg.name in ['kspPluginClasspath', 'kspPluginClasspathNonEmbeddable'])) ||
+                        cfg.name.startsWith('kotlinCompiler') ||
+                        cfg.name.startsWith('_internal-unified-test-platform-') ||
+                        cfg.name in ['kotlinBuildToolsApiClasspath', 'detekt', 'detektPlugins', 'lintChecks', 'lintPublish']
+                    document.configurationInventory << [project: project.path, name: cfg.name, inspected: selected]
+                    if (selected) configs << [kind: 'project', configuration: cfg]
+                }
+                project.buildscript.configurations.findAll { it.canBeResolved && it.name == 'classpath' }.each {
+                    configs << [kind: 'buildscript', configuration: it]
+                }
+                configs.each { item ->
+                    def cfg = item.configuration
+                    def entry = [project: project.path, kind: item.kind, name: cfg.name,
+                        attributes: cfg.attributes.keySet().collectEntries { [(it.name): String.valueOf(cfg.attributes.getAttribute(it))] },
+                        components: [], edges: [], unresolved: [], artifacts: [], artifactFailures: []]
+                    println "REVIEW resolving ${project.path} ${item.kind}:${cfg.name}"
+                    try {
+                        def result = cfg.incoming.resolutionResult
+                        result.allComponents.each { component ->
+                            if (component.id instanceof ModuleComponentIdentifier) {
+                                def id = component.id
+                                entry.components << [group: id.group, artifact: id.module, version: id.version,
+                                    reasons: component.selectionReason.descriptions.collect { [cause: it.cause.toString(), description: scrub(it.description)] }]
+                            }
+                        }
+                        result.allDependencies.each { dependency ->
+                            if (dependency instanceof ResolvedDependencyResult) {
+                                entry.edges << [from: dependency.from.id.displayName, requested: dependency.requested.displayName,
+                                    selected: dependency.selected.id.displayName, constraint: dependency.constraint]
+                            } else if (dependency instanceof UnresolvedDependencyResult) {
+                                entry.unresolved << [requested: dependency.requested.displayName, failure: scrub(dependency.failure.message)]
+                            }
+                        }
+                        def lenient = cfg.resolvedConfiguration.lenientConfiguration
+                        lenient.getArtifacts({ dependency -> !(dependency instanceof ProjectDependency) } as org.gradle.api.specs.Spec).each { artifact ->
+                            if (artifact.id.componentIdentifier instanceof ModuleComponentIdentifier) {
+                                def id = artifact.id.componentIdentifier
+                                File file = artifact.file
+                                entry.artifacts << [group: id.group, artifact: id.module, version: id.version,
+                                    filename: file.name, type: artifact.type, classifier: artifact.classifier,
+                                    bytes: file.length(), sha256: sha256(file)]
+                            }
+                        }
+                        lenient.unresolvedModuleDependencies.each {
+                            entry.artifactFailures << [requested: it.selector.toString(), failure: scrub(it.problem.message)]
+                        }
+                    } catch (Exception failure) {
+                        def causes = []
+                        Throwable cause = failure
+                        while (cause != null && causes.size() < 8) {
+                            causes << scrub(cause.toString())
+                            cause = cause.cause
+                        }
+                        entry.artifactFailures << [failure: scrub(failure.toString()), causes: causes]
+                    }
+                    entry.components.sort { a, b -> "${a.group}:${a.artifact}:${a.version}" <=> "${b.group}:${b.artifact}:${b.version}" }
+                    document.configurations << entry
+                    output.text = JsonOutput.toJson(document)
+                    println "REVIEW done ${cfg.name}: ${entry.components.size()} components, ${entry.artifacts.size()} artifacts, ${entry.unresolved.size()} unresolved, ${entry.artifactFailures.size()} artifact failures"
+                }
+            }
+            document.completedAtUtc = java.time.Instant.now().toString()
+            output.text = JsonOutput.toJson(document)
+            int failures = document.configurations.sum { it.unresolved.size() + it.artifactFailures.size() } ?: 0
+            println "REVIEW COMPLETE: ${document.configurations.size()} configurations, ${failures} failures"
+            if (failures != 0) throw new GradleException("Dependency inventory contains ${failures} resolution/artifact failures; inspect JSON.")
+        }
+    }
+}

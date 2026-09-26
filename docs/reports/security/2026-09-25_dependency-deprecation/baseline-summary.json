@@ -1,0 +1,21 @@
+{
+  "commit": "e521026e2838c2bff592022046d6d0571d0e818f",
+  "recordedAtUtc": "2026-09-26T01:46:39.7070432Z",
+  "outputFileCreatedUtc": "2026-09-26T01:41:30.1019427Z",
+  "outputFileLastWriteUtc": "2026-09-26T01:45:13.6934964Z",
+  "exitCode": 0,
+  "terminalOutcome": "BUILD SUCCESSFUL in 3m 46s",
+  "taskSummary": "98 actionable tasks: 9 executed, 3 from cache, 86 up-to-date",
+  "flags": "--no-daemon --no-parallel --max-workers=2 --continue --warning-mode all --console=plain",
+  "tasks": [
+    ":app:assembleProdRelease",
+    ":app:lintProdDebug",
+    ":app:compileProdDebugAndroidTestKotlin",
+    ":app:generateLicenseReport"
+  ],
+  "previouslyCompleted": "397 JVM tests, detekt, devDebug APK; see baseline-paused-summary.json and retained test/analysis records",
+  "java": "JBR 21.0.10; Java/JVM target 17; CI JDK 17 parity not verified",
+  "licenseCoordinateCount": 133,
+  "licenseGraphDifference": [],
+  "limits": "Baseline only. No device test/install, migration, candidate upgrade, exploit PoC, signed release or app-bundle qualification. Continuation reused Gradle up-to-date outputs where reported."
+}
