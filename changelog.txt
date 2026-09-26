@@ -4,6 +4,21 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): Moto G report for the P1 device harness   (2026-09-26)
+-------------------------------------------------------------------------------
+This change adds the Moto G 2025 report for phase P1 of the R-007 test plan. The report is
+campaigns/2026-09-25_m7-wp2-f2h-p1-harness_moto-g-2025.md.
+- The report records a p1_validate.sh run on a clean rebuild at e521026. All 14 executed checks passed.
+- The Moto G lane stays incomplete in the report, because the run did not include the unknown-state case.
+- The test_lib_r007.sh script passed all 41 host tests.
+- A byte scan of the prodRelease dex found no fault-wrapper strings. The report includes the scan results.
+- After the run, four probes damaged the lockout, credentials, and database-key files. The report summarizes how
+  the app reacted to each probe.
+- Other sections of the report list the P1 exit evidence, the P2 observations, and the follow-up work.
+- Three appendices to the report hold the aborted attempts, the probe procedure and logs, and the full evidence file
+  of the run.
+
+
 M7/M8: security-crypto replacement and installed-user migration plan (proposal)   (2026-09-24)
 -----------------------------------------------------------------------------------------
 This change adds proposals/2026-09-24_SECURITY_CRYPTO_REPLACEMENT_PLAN.md. The proposal describes how
