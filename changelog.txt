@@ -4,6 +4,13 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/M8: ignore the .android folder from the dependency audit   (2026-09-26)
+--------------------------------------------------------------------------
+This change ignores the .android folder in the repository root. The reproduction commands in the 2026-09-25
+dependency review use this folder as the Android user home.
+- A new .android/ line below .gradle/ in .gitignore keeps the folder and its debug keystore out of git status.
+
+
 M7/M8: dependency and deprecation review with baseline evidence   (2026-09-26)
 ------------------------------------------------------------------------------
 This change adds a review of the project dependencies and deprecated APIs at commit e521026. The review is
