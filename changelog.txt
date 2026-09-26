@@ -4,6 +4,22 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P1 harness preconditions and unknown-state case   (2026-09-26)
+-------------------------------------------------------------------------------------
+This change extends the P1 device harness in scripts/r007. It fixes the two false V0 failures that the Moto G report
+recorded, and it adds a case for the unknown state of the P1 exit gate.
+- Three new functions in lib_r007.sh check the preconditions: r007_unlocked, r007_app_absent, and r007_stop_app.
+- V0 in p1_validate.sh uses them to end the run on a locked phone and to stop an app process that an earlier run
+  left.
+- A new case V8 in p1_validate.sh checks the unknown state with a tampered lockout store. V8 runs after V5.
+- Five new store-file functions in lib_r007.sh support V8: r007_store_hash, r007_store_save, r007_store_tamper,
+  r007_store_restore, and r007_restore_pending.
+- The r007_inspect_checked function adds a store-file hash check around each inspection.
+- The test_lib_r007.sh script adds 39 host tests, and all 80 host tests passed.
+- On the Moto G, the changed p1_validate.sh passed 17 of 17 checks with the APKs built at e521026. That run started
+  with a leftover app process, which V0 stopped.
+
+
 M7/WP2 (F2 hardening): Moto G report for the P1 device harness   (2026-09-26)
 -------------------------------------------------------------------------------
 This change adds the Moto G 2025 report for phase P1 of the R-007 test plan. The report is

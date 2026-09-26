@@ -4,7 +4,8 @@
 #
 # It controls the debug fault wrapper (FaultInjectingLockoutStorage) through files in the app's private directory,
 # written with `run-as`; reads the wrapper's evidence from logcat (tag R007Fault); kills the app with SIGKILL through
-# `run-as`; and runs the fresh-process inspector (LockoutStoreInspector) with `am instrument`.
+# `run-as`; and runs the fresh-process inspector (LockoutStoreInspector) with `am instrument`. For the unknown-state
+# case it also saves, tampers, and restores the lockout store file.
 #
 # Every check captures a command's output first and fails when the command fails. It then matches the captured
 # text, never a live pipe: lib.sh sets pipefail, so `producer | grep -q` can report a match as a failure when grep
@@ -22,6 +23,8 @@ source "$R007_HERE/../e2e/lib.sh"
 : "${R007_KILL_POLLS:=40}"   # r007_kill polls /proc this many times, 0.25 s apart
 R007_CONTROL="files/r007"
 R007_INSPECTOR="com.applock.r007.LockoutStoreInspector"
+R007_STORE="shared_prefs/applock_lockout.xml"   # the lockout store file, relative to the app's data directory
+R007_STORE_COPY="$R007_CONTROL/lockout.orig"      # the saved copy that r007_store_restore writes back
 
 # The script names that DeviceFaultScript accepts. FaultScriptHostListTest checks these lists against the enums.
 R007_READ_SCRIPTS="Normal Throw HoldThenRead HoldThenThrow ReadThenHold"
@@ -204,6 +207,39 @@ r007_pid() {
 
 r007_boot_id() { sh_ cat /proc/sys/kernel/random/boot_id; }
 
+# True when the device reports that its keyguard is not showing. It reads `mKeyguardShowing` in the KeyguardController
+# part of `dumpsys activity activities` (API 26 and later), otherwise `isKeyguardShowing` in `dumpsys window`. A
+# failed query or a missing field counts as locked, so an unknown state never passes.
+r007_unlocked() {
+  local out
+  out="$(sh_ dumpsys activity activities)" || return 1
+  if ! r007_has "$out" 'mKeyguardShowing=(true|false)'; then
+    out="$(sh_ dumpsys window)" || return 1
+  fi
+  r007_has "$out" '(mKeyguardShowing|isKeyguardShowing)=false' \
+    && ! r007_has "$out" '(mKeyguardShowing|isKeyguardShowing)=true'
+}
+
+# True when the device answers explicitly that no app process runs. A failed query or no answer is not an absence.
+r007_app_absent() {
+  local state
+  state="$(sh_ "if pidof $APP_ID >/dev/null; then echo present; else echo absent; fi")" || return 1
+  [ "$state" = absent ]
+}
+
+# Stops the app with `am force-stop` and waits for a confirmed absence of its process. Use it before a case starts or
+# to clean up, never between an action and its inspection: the cases need the abrupt kill of r007_kill. A later
+# launch must be explicit, because a force-stop leaves the app in the stopped state.
+r007_stop_app() {
+  local i
+  sh_ am force-stop "$APP_ID" >/dev/null || { fail "r007_stop_app: am force-stop failed"; return 1; }
+  for (( i=0; i<R007_KILL_POLLS; i++ )); do
+    r007_app_absent && return 0
+    sleep 0.25
+  done
+  fail "r007_stop_app: no confirmed absence of $APP_ID"; return 1
+}
+
 # Kills the app process with SIGKILL, as its own uid, and waits for an explicit "absent" answer for its /proc entry.
 # Prints the killed pid. A failed kill, a failed query, or no answer is a failure, never a confirmed death. This is
 # an abrupt death: no onDestroy, no flush. It is not `am force-stop`, which also changes later launches.
@@ -217,6 +253,87 @@ r007_kill() {
     sleep 0.25
   done
   fail "r007_kill: no confirmed absence of pid $pid (last answer: ${state:-none})"; return 1
+}
+
+# ---- store file --------------------------------------------------------------------------------
+# Prints the SHA-256 of the app-relative file PATH (default: the store). Fails when run-as fails, when the file is
+# missing, or when the answer is not one hash, so two failed reads never compare equal.
+r007_store_hash() { # [path]
+  local out hash
+  out="$(r007_run_as sha256sum "${1:-$R007_STORE}")" || return 1
+  hash="${out%% *}"
+  [[ "$hash" =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf '%s' "$hash"
+}
+
+# Saves a copy of the store in the control directory and prints the store hash. It refuses while an app process runs,
+# and when a backup file of the store exists, because SharedPreferences would load that backup instead of the store.
+r007_store_save() {
+  local hash copy bak
+  r007_app_absent || { fail "r007_store_save: $APP_ID runs"; return 1; }
+  bak="$(r007_run_as sh -c "'if [ -e $R007_STORE.bak ]; then echo present; else echo absent; fi'")" \
+    || { fail "r007_store_save: the backup-file query failed"; return 1; }
+  [ "$bak" = absent ] || { fail "r007_store_save: a backup file of the store exists (answer: ${bak:-none})"; return 1; }
+  hash="$(r007_store_hash)" || { fail "r007_store_save: the store could not be hashed"; return 1; }
+  r007_run_as sh -c "'mkdir -p $R007_CONTROL && cat $R007_STORE > $R007_STORE_COPY'" \
+    || { fail "r007_store_save: the copy could not be written"; return 1; }
+  copy="$(r007_store_hash "$R007_STORE_COPY")" || { fail "r007_store_save: the copy could not be hashed"; return 1; }
+  [ "$copy" = "$hash" ] || { fail "r007_store_save: the copy differs from the store"; return 1; }
+  printf '%s' "$hash"
+}
+
+# Changes one character in the middle of the first encrypted value of the store to another Base64 character. The XML
+# and the Base64 stay valid, so a read fails authentication, not parsing (a file that does not parse reads as an empty
+# store). Prints the new store hash. Use it only while no app process runs, after r007_store_save.
+r007_store_tamper() {
+  local content line value i new out="" done="" expected actual
+  local re='<string name="([^"]+)">([A-Za-z0-9+/]+=*)</string>'
+  r007_app_absent || { fail "r007_store_tamper: $APP_ID runs"; return 1; }
+  content="$(r007_run_as cat "$R007_STORE")" || { fail "r007_store_tamper: the store could not be read"; return 1; }
+  while IFS= read -r line; do
+    if [ -z "$done" ] && [[ "$line" =~ $re ]] \
+      && [[ "${BASH_REMATCH[1]}" != __androidx_security_crypto_encrypted_prefs_* ]]; then
+      value="${BASH_REMATCH[2]}"; i=$(( ${#value} / 2 ))
+      new=A; [ "${value:i:1}" = A ] && new=B
+      line="${line/"$value"/"${value:0:i}$new${value:i+1}"}"
+      done=1
+    fi
+    out+="$line"$'\n'
+  done <<< "$content"
+  [ -n "$done" ] || { fail "r007_store_tamper: the store has no encrypted value"; return 1; }
+  printf '%s' "$out" | adbx exec-in "run-as $APP_ID sh -c 'cat > $R007_STORE'" \
+    || { fail "r007_store_tamper: the tampered store could not be written"; return 1; }
+  expected="$(printf '%s' "$out" | sha256sum)"; expected="${expected%% *}"
+  actual="$(r007_store_hash)" || { fail "r007_store_tamper: the tampered store could not be hashed"; return 1; }
+  [ "$actual" = "$expected" ] \
+    || { fail "r007_store_tamper: the store on the device differs from the tampered text"; return 1; }
+  printf '%s' "$actual"
+}
+
+# Stops the app, writes the saved copy back over the store, and checks that the store hash equals HASH. The write
+# runs only when the copy exists, so a missing copy never empties the store.
+r007_store_restore() { # hash
+  local actual
+  r007_stop_app || return 1
+  r007_run_as sh -c "'[ -f $R007_STORE_COPY ] && cat $R007_STORE_COPY > $R007_STORE'" \
+    || { fail "r007_store_restore: the copy could not be written back"; return 1; }
+  actual="$(r007_store_hash)" || { fail "r007_store_restore: the restored store could not be hashed"; return 1; }
+  [ "$actual" = "$1" ] \
+    || { fail "r007_store_restore: the store hash $actual differs from the saved hash $1"; return 1; }
+}
+
+# The hash of the saved store while a restore is pending. The caller sets it from r007_store_save.
+R007_STORE_SAVED=""
+
+# Restores the saved store once, when a restore is pending. A failed restore keeps the copy in the control directory
+# and the pending hash, so the caller must not remove the control directory. Suits an EXIT trap.
+r007_restore_pending() {
+  [ -n "$R007_STORE_SAVED" ] || return 0
+  if r007_store_restore "$R007_STORE_SAVED"; then
+    R007_STORE_SAVED=""; pass "the saved store file is restored"
+  else
+    info "the store copy stays in $R007_STORE_COPY"; return 1   # r007_store_restore reported the failure
+  fi
 }
 
 # ---- inspector ---------------------------------------------------------------------------------
@@ -233,13 +350,18 @@ r007_field() { # inspection-output field
   sed -n "s/^$2=//p" <<< "$1" | head -1
 }
 
-# Runs the inspector and checks its evidence. It requires a completed inspection with a process id, the inspector's
-# begin and end markers for that process in logcat, and an end marker that repeats the reported count. It fails when
-# logcat cannot be read or when the wrapper logged any storage operation in the inspector process. Prints the
-# inspection.
+# Runs the inspector and checks its evidence. The store must be quiescent: no app process may run before the
+# inspection, so only the inspection can change the store file between the two hashes. It requires an unchanged store
+# file, a completed inspection with a process id, the inspector's begin and end markers for that process in logcat,
+# and an end marker that repeats the reported count. It fails when logcat cannot be read, when the wrapper logged any
+# storage operation in the inspector process, or when the store cannot be hashed. Prints the inspection.
 r007_inspect_checked() {
-  local out pid count
+  local out pid count before after
+  r007_app_absent || { fail "the store is not quiescent: $APP_ID runs before the inspection"; return 1; }
+  before="$(r007_store_hash)" || { fail "the store could not be hashed before the inspection"; return 1; }
   out="$(r007_inspect)" || { fail "the inspector did not complete (is $TEST_APP_ID installed?)"; return 1; }
+  after="$(r007_store_hash)" || { fail "the store could not be hashed after the inspection"; return 1; }
+  [ "$after" = "$before" ] || { fail "the inspection changed the store file"; return 1; }
   pid="$(r007_field "$out" r007_pid)"
   [[ "$pid" =~ ^[0-9]+$ ]] || { fail "the inspector reported no process id"; return 1; }
   r007_capture_log || { fail "logcat could not be read, so the inspection is unverified"; return 1; }
