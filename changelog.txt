@@ -4,6 +4,20 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): Moto G rerun report for the P1 device harness   (2026-09-26)
+-----------------------------------------------------------------------------------
+This change adds the Moto G 2025 report of the P1 harness rerun at f6d5883. The report is
+campaigns/2026-09-26_m7-wp2-f2h-p1-harness-rerun_moto-g-2025.md.
+- The recorded run passed all 17 checks, including the unknown-state case V8.
+- A first run at the same revision failed 10 of 21 checks, because the screen was in landscape. The report records
+  that run and its cause.
+- The clean rebuild at f6d5883 produced APKs that are byte-identical to the e521026 build.
+- The test_lib_r007.sh script passed all 80 host tests.
+- Two appendices to the report hold the evidence files of both runs.
+- The notes of the report correct the control-directory row of the 2026-09-25 report.
+- The Moto G row of the fleet table in reports/README.md now links to this report.
+
+
 M7/M8: ignore the .android folder from the dependency audit   (2026-09-26)
 --------------------------------------------------------------------------
 This change ignores the .android folder in the repository root. The reproduction commands in the 2026-09-25
