@@ -43,7 +43,7 @@ docs/
 ├── process/             How the project is run and evolves (ROADMAP, plans, RTM, risk register, setup)
 ├── security/            Secure Coding Standard (authored, living)
 ├── testing/             Test PLANS (what we intend to verify and how)
-├── reports/             EVIDENCE: dated, immutable records of what actually happened
+├── reports/             EVIDENCE: dated, fixed records of what actually happened
 │                        (fleet status, campaign results, gate reviews, benchmarks,
 │                        security reviews, release records — see reports/README.md)
 └── archive/             Superseded documents (do NOT use as current guidance)
@@ -77,7 +77,7 @@ stay one line. `scripts/` holds tooling (e.g. `extract_docx.py`). `app/` is the 
 | `process/` | **How the project is run and evolves**: Implementation Strategy, the roadmap (milestone status), migration assessment (frozen snapshot), phase plans (M0/M1…), the RTM, the risk register, environment setup, governance/gate records, **operational & machine/fleet status**. | Living working docs (`.md`); snapshots frozen per GOVERNANCE.md §5.1. | …it's a plan, a process/governance record, a tracked risk, a dev-environment or **fleet/machine status report**, or anything about *running the project* rather than the product spec. |
 | `security/` | The authored **Secure Coding Standard** (*how we write secure code*). Threat Models live with their baselines: active 1.0.0 TM in `v1.0.0/`, the 16-section v2 TM in `v2.0.0/tm/`. | SCS: living (`.md`). | …it's the SCS or a security governance note. Security *requirements* stay in the version SRS §8/§4.8, the risk register in `process/`. |
 | `testing/` | Test **plans** (`.md`, area root): what to verify, procedures, harness specs. (The client-received Test Specification volumes live at `v2.0.0/tsp/`.) | Plans: living (`.md`). | …it defines how something will be tested (plans at root; Test Spec revisions go to `v2.0.0/tsp/`). Results go to `reports/campaigns/`. |
-| `reports/` | **Evidence**: dated, immutable records — fleet/machine status, executed campaign results, gate reviews, benchmarks, security reviews, release records. | Append-only, never edited (`.md`). | …you are recording **what happened**: an observation, measurement, review, or test execution. See `reports/README.md` for categories + naming (`YYYY-MM-DD_topic_host.md`). |
+| `reports/` | **Evidence**: dated, fixed records — fleet/machine status, executed campaign results, gate reviews, benchmarks, security reviews, release records. | Fixed once committed; dated corrections only (`.md`). | …you are recording **what happened**: an observation, measurement, review, or test execution. See `reports/README.md` for categories + naming (`YYYY-MM-DD_topic_host.md`). |
 | `archive/` | Superseded docs, kept for history with supersession notes. | Frozen. | …never author new work here; only retire old docs (with a note). |
 
 ## Where does the NucBox status report go?
@@ -90,7 +90,7 @@ one-line fleet index table in `reports/README.md` to link it.
 
 Why a dated file and not a shared living document: fleet machines write reports concurrently
 and git is the only channel between them — per-host, append-only files cannot merge-conflict,
-and immutable dated records preserve the evidence trail (each later change of state = a new
+and fixed dated records preserve the evidence trail (each later change of state = a new
 report superseding the old).
 
 The general split: **plan** ("how we'll test/set up") → `process/` or `testing/`;

@@ -6,13 +6,22 @@ measured, reviewed, or executed. Reports differ from the rest of `docs/` in natu
 | | Specs (`srs/ nfr/ tas/ sds/`) | Plans (`process/ testing/`) | **Reports (here)** |
 |---|---|---|---|
 | Answers | what/how the product must be | what we intend to do | **what actually happened** |
-| Lifecycle | governed, versioned | living, edited | **immutable once committed** |
+| Lifecycle | governed, versioned | living, edited | **fixed once committed; dated corrections only** |
 | Referenced by | design & code | work execution | **RTM `verification` column, gate reviews** |
 
 ## Rules
 
-1. **Immutable.** A committed report is never edited except typo fixes. Corrections or new
-   observations = a **new** dated report that supersedes the old one (link it).
+1. **Evidence is fixed; corrections are dated.** After a report is committed:
+   - It **MAY** be fixed in place for typos, formatting, broken links, or a wrong date or commit hash, when the
+     fix changes no value a reader would act on.
+   - It **MAY** gain a dated entry in a **Corrections** section at its end, to correct a statement or to link a
+     later report. The original text stays as written. Each entry names what it corrects and why.
+   - Results, counts, verdicts, and evidence appendices **MUST NOT** change. A changed result, a rerun, or a new
+     observation needs a **new** dated report. The new report links the old one, and the old one gets a
+     Corrections entry that links forward.
+   - If it is unclear which case applies, write a new report.
+   - Only the host that produced the report, or the lead, adds a Corrections entry. This keeps rule 2's
+     one-writer-per-file guarantee.
 2. **Dated, host-tagged names:** `YYYY-MM-DD_<topic>[_<host>].md`
    — e.g. `2026-07-20_fleet-nucbox-g5.md`, `2026-07-25_gate-m1.md`,
    `2026-07-22_regression-baseline_nucbox.md`. Date prefix sorts chronologically; the host tag

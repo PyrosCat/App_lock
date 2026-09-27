@@ -316,3 +316,12 @@ D: I/AppLockDatabase(16848): Unreadable database preserved as applock.db.recover
          1790360373.734  8997  9014 I R007Inspect: pid=8997 phase=INSPECT_BEGIN
          1790360373.889  8997  9014 I R007Inspect: pid=8997 phase=INSPECT_END r007_boot_id=bdbc452a-f16e-4bd7-828c-bccd8035840d r007_count=0 r007_elapsed=252420405 r007_lockout_until=0 r007_pid=8997 r007_wall=1790360373734
 ```
+
+## Corrections
+
+- **2026-09-27, procedure table, row `files/r007` control directory.** The "During" column says "fault script and
+  release files". `p1_validate.sh` creates no release files, so during the run the directory held only the fault
+  script. No check or result depends on this row.
+- **2026-09-27, later report.** The
+  [2026-09-26 rerun report](2026-09-26_m7-wp2-f2h-p1-harness-rerun_moto-g-2025.md) includes the unknown-state case
+  V8 and completes the Moto G lane that this report left incomplete.

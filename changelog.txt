@@ -4,6 +4,16 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs: dated corrections for committed reports   (2026-09-27)
+------------------------------------------------------------
+This change replaces rule 1 in reports/README.md. The new rule defines in-place fixes and dated corrections for
+committed reports.
+- The lifecycle row of reports/README.md and the reports row and folder tree in docs/README.md now use the wording
+  of the new rule.
+- A new Corrections section in the 2026-09-25 Moto G report corrects the control-directory row and links the
+  2026-09-26 rerun report.
+
+
 M7/WP2 (F2 hardening): Moto G rerun report for the P1 device harness   (2026-09-26)
 -----------------------------------------------------------------------------------
 This change adds the Moto G 2025 report of the P1 harness rerun at f6d5883. The report is
