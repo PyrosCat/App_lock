@@ -4,6 +4,36 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P1 harness device settings record and restore   (2026-09-27)
+-----------------------------------------------------------------------------------
+This change makes the P1 device harness in scripts/r007 record the stay-awake and rotation settings of the device
+before it changes them. The harness writes the recorded values back at the end of each run, in one exit handler that
+also prints the summary.
+- A new device-settings section in lib_r007.sh adds nine functions: r007_settings_read,
+  r007_settings_record_state, r007_display_rotation, r007_settings_write_record, r007_settings_abort,
+  r007_settings_apply, r007_wake_screen, r007_settings_restore, and r007_settings_restore_owned.
+- Three functions in a new run-end section of lib_r007.sh handle the end of a run: r007_stop_run, r007_trap_finish,
+  and r007_finish. The r007_finish function runs the pending cleanups and then prints the only summary.
+- V0 in p1_validate.sh calls r007_settings_apply in place of screen_stayon, and then r007_wake_screen. These calls
+  keep the screen on, unlocked, and in portrait for the PIN entry.
+- The p1_validate.sh script sets r007_finish as its EXIT trap through r007_trap_finish. Each early stop in the script
+  calls r007_stop_run.
+- The new restore_settings.sh script restores the settings that an unfinished run left changed.
+- Two new sections in the evidence file of a run record the settings. The settings-before section holds the original
+  values, and the settings-restore section holds the comparison after the restore.
+- The r007_display_rotation function needs API 29 or later.
+- In test_lib_r007.sh, 89 new host tests cover the settings and run-end functions, and all 169 host tests passed.
+  The stub adb of that script now reads its stdin like the real adb.
+- On the Moto G, with the APKs built at f6d5883, two complete p1_validate.sh runs passed 18 of 18 checks each. Both
+  runs left the settings at their original values.
+- A simulated crash on the same phone left the settings record in place. The next p1_validate.sh run stopped in V0,
+  and restore_settings.sh restored the settings.
+- A SIGINT during V1 ended a further run with status 130. The r007_finish function reported the stop and restored
+  the settings.
+- Further device checks used a directory as the evidence path, once for the original values and once for the
+  comparison. Both checks failed as intended, and restore_settings.sh then removed the kept record.
+
+
 Docs: dated corrections for committed reports   (2026-09-27)
 ------------------------------------------------------------
 This change replaces rule 1 in reports/README.md. The new rule defines in-place fixes and dated corrections for

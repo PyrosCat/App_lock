@@ -5,7 +5,8 @@
 # It controls the debug fault wrapper (FaultInjectingLockoutStorage) through files in the app's private directory,
 # written with `run-as`; reads the wrapper's evidence from logcat (tag R007Fault); kills the app with SIGKILL through
 # `run-as`; and runs the fresh-process inspector (LockoutStoreInspector) with `am instrument`. For the unknown-state
-# case it also saves, tampers, and restores the lockout store file.
+# case it also saves, tampers, and restores the lockout store file. It records, changes, and restores the stay-awake
+# and rotation settings of the device.
 #
 # Every check captures a command's output first and fails when the command fails. It then matches the captured
 # text, never a live pipe: lib.sh sets pipefail, so `producer | grep -q` can report a match as a failure when grep
@@ -255,6 +256,178 @@ r007_kill() {
   fail "r007_kill: no confirmed absence of pid $pid (last answer: ${state:-none})"; return 1
 }
 
+# ---- device settings ---------------------------------------------------------------------------
+# A run keeps the screen on and locks the display rotation to 0 (portrait on a phone). The PIN entry taps the keys
+# that a UI dump reports, and a rotated PIN pad can hide keys. The original values are recorded on the device before
+# any change, so a later run from any host can see a cleanup that an earlier run did not finish.
+R007_SETTINGS="global:stay_on_while_plugged_in system:accelerometer_rotation system:user_rotation"
+# The values of a run, in the order of R007_SETTINGS: r007_settings_apply compares them with r007_settings_read.
+R007_SETTINGS_TARGET="global:stay_on_while_plugged_in=7 system:accelerometer_rotation=0 system:user_rotation=0"
+R007_SETTINGS_RECORD="/data/local/tmp/r007_settings.pending"
+: "${R007_ROTATION_POLLS:=20}"   # r007_settings_apply polls the display this many times, 0.25 s apart
+: "${R007_WAKE_POLLS:=8}"       # r007_wake_screen polls the power state this many times, 0.25 s apart
+R007_SETTINGS_OWNED=""          # set while this run owns the record, so that it restores only its own changes
+
+# Prints the current values, one "namespace:key=value" line each. A value is an integer, or "null" for an unset
+# setting. Fails when a read fails or returns anything else.
+r007_settings_read() {
+  local s v out=""
+  for s in $R007_SETTINGS; do
+    v="$(sh_ settings get "${s%%:*}" "${s#*:}")" || return 1
+    [[ "$v" =~ ^(-?[0-9]+|null)$ ]] || return 1
+    out+="$s=$v"$'\n'
+  done
+  printf '%s' "$out"
+}
+
+# Prints "present" or "absent" for the settings record. Fails when the query fails.
+r007_settings_record_state() {
+  local state
+  state="$(sh_ "if [ -e $R007_SETTINGS_RECORD ]; then echo present; else echo absent; fi")" || return 1
+  case "$state" in present|absent) printf '%s' "$state" ;; *) return 1 ;; esac
+}
+
+# Prints the rotation of the default display (0 to 3). It reads the `mRotation` field of the DisplayRotation part in
+# the display 0 section of `dumpsys window displays` (API 29 and later). Display sizes cannot show the rotation,
+# because a display at 180 degrees has its natural size. Fails when the field is missing or holds another value.
+r007_display_rotation() {
+  local out rot
+  out="$(sh_ dumpsys window displays)" || return 1
+  rot="$(awk '
+    /Display: mDisplayId=/ { display0 = ($0 ~ /Display: mDisplayId=0([^0-9]|$)/); inrotation = 0 }
+    display0 && /^ *DisplayRotation *$/ { inrotation = 1; next }
+    display0 && inrotation && match($0, /mRotation=[0-9]+/) { print substr($0, RSTART + 10, RLENGTH - 10); exit }
+  ' <<< "$out")"
+  [[ "$rot" =~ ^[0-3]$ ]] || return 1
+  printf '%s' "$rot"
+}
+
+# Writes the settings record atomically: a temporary file first, then a rename after its content is verified. The
+# record is then absent or complete. restore_settings.sh cannot use a partial record.
+r007_settings_write_record() { # content
+  local written
+  printf '%s' "$1" | adbx exec-in "sh -c 'cat > $R007_SETTINGS_RECORD.tmp'" || return 1
+  written="$(sh_ cat "$R007_SETTINGS_RECORD.tmp")" && [ "$written" = "$1" ] || return 1
+  sh_ mv -f "$R007_SETTINGS_RECORD.tmp" "$R007_SETTINGS_RECORD" >/dev/null || return 1
+  written="$(sh_ cat "$R007_SETTINGS_RECORD")" && [ "$written" = "$1" ]
+}
+
+# Ends an apply that changed no setting: removes the record and its temporary file, and reports CAUSE. The run gives
+# up its ownership only when the device confirms that the record is gone. Otherwise r007_finish writes the unchanged
+# values back and removes the record.
+r007_settings_abort() { # cause
+  sh_ rm -f "$R007_SETTINGS_RECORD" "$R007_SETTINGS_RECORD.tmp" >/dev/null
+  if [ "$(r007_settings_record_state)" = absent ]; then
+    R007_SETTINGS_OWNED=""; fail "$1; nothing was changed"
+  else
+    fail "$1; nothing was changed, but the settings record is not confirmed removed, so it stays for the exit cleanup"
+  fi
+}
+
+# Records the original settings on the device and in the evidence file, then keeps the screen on and locks the
+# rotation to 0. It changes nothing when no evidence file is open, when a record of an earlier run exists, or when
+# the capture, the record write, or the evidence write fails. It fails unless the settings read back as set and the
+# default display reaches rotation 0.
+r007_settings_apply() {
+  local state orig s k now rot="" i
+  [ -n "${R007_LOG_OUT:-}" ] \
+    || { fail "no evidence file (r007_evidence_init was not called); nothing was changed"; return 1; }
+  state="$(r007_settings_record_state)" \
+    || { fail "the settings record could not be queried; nothing was changed"; return 1; }
+  if [ "$state" = present ]; then
+    fail "an earlier run did not restore the device settings; run scripts/r007/restore_settings.sh first"
+    return 1
+  fi
+  orig="$(r007_settings_read)" || { fail "the device settings could not be read; nothing was changed"; return 1; }
+  R007_SETTINGS_OWNED=1
+  r007_settings_write_record "$orig" \
+    || { r007_settings_abort "the settings record could not be written"; return 1; }
+  printf '## settings-before\n%s\n' "$orig" >> "$R007_LOG_OUT" \
+    || { r007_settings_abort "the original settings could not be saved in the evidence file"; return 1; }
+  for s in $R007_SETTINGS_TARGET; do
+    k="${s%%=*}"
+    sh_ settings put "${k%%:*}" "${k#*:}" "${s#*=}" >/dev/null \
+      || { fail "the device settings could not be changed"; return 1; }
+  done
+  now="$(r007_settings_read)" || { fail "the changed settings could not be read back"; return 1; }
+  [ "$now" = "$(tr ' ' '\n' <<< "$R007_SETTINGS_TARGET")" ] \
+    || { fail "the device settings did not take the new values: $(tr '\n' ' ' <<< "$now")"; return 1; }
+  for (( i=0; i<R007_ROTATION_POLLS; i++ )); do
+    rot="$(r007_display_rotation)" || rot="unreadable"
+    [ "$rot" = 0 ] && return 0
+    sleep 0.25
+  done
+  fail "the default display did not reach rotation 0 (last value: $rot)"; return 1
+}
+
+# Wakes the screen and checks that it is on, that the stay-awake setting is in effect, and that the keyguard is not
+# showing. Call it after r007_settings_apply: the stay-awake setting keeps a screen on, but it does not turn on a
+# screen that went off before, and the keyguard locks a few seconds after the screen goes off. The wake key turns the
+# screen on without unlocking a keyguard.
+r007_wake_screen() {
+  local out awake="" i
+  sh_ input keyevent KEYCODE_WAKEUP >/dev/null || { fail "the wake key could not be sent"; return 1; }
+  for (( i=0; i<R007_WAKE_POLLS; i++ )); do
+    if out="$(sh_ dumpsys power)" && r007_has "$out" '^ *mWakefulness=Awake$'; then awake=1; break; fi
+    sleep 0.25
+  done
+  [ -n "$awake" ] || { fail "the screen did not turn on after the wake key"; return 1; }
+  r007_has "$out" '^ *mStayOn=true$' \
+    || { fail "the stay-awake setting has no effect (the device reports no power source)"; return 1; }
+  r007_unlocked || { fail "the device locked before the screen was kept on (unlock it and run again)"; return 1; }
+}
+
+# Writes the recorded settings back, reads them again, and appends the comparison to the evidence file. A "null"
+# value is restored with `settings delete`. The record is removed only when every value reads back as recorded and
+# the comparison is saved. When the comparison cannot be saved, the record stays, so that
+# scripts/r007/restore_settings.sh can produce the comparison again, and the restore fails.
+r007_settings_restore() {
+  local record line s v keys now report="" match=yes lost=""
+  record="$(sh_ cat "$R007_SETTINGS_RECORD")" || { fail "the settings record could not be read"; return 1; }
+  keys="$(sed 's/=.*//' <<< "$record" | sort | tr '\n' ' ')"
+  if [ "$keys" != "$(tr ' ' '\n' <<< "$R007_SETTINGS" | sort | tr '\n' ' ')" ] \
+    || grep -qvE '^[a-z]+:[a-z_]+=(-?[0-9]+|null)$' <<< "$record"; then
+    fail "the settings record is not valid, so nothing was restored; set the settings by hand, then remove" \
+      "$R007_SETTINGS_RECORD: $(tr '\n' ' ' <<< "$record")"
+    return 1
+  fi
+  # The loop reads the record on descriptor 3, because `adb shell` reads its stdin and would take the other lines.
+  while IFS= read -r line <&3; do
+    s="${line%%=*}"; v="${line#*=}"
+    if [ "$v" = null ]; then sh_ settings delete "${s%%:*}" "${s#*:}" >/dev/null || match=no
+    else sh_ settings put "${s%%:*}" "${s#*:}" "$v" >/dev/null || match=no; fi
+  done 3<<< "$record"
+  now="$(r007_settings_read)" || { fail "the restored settings could not be read back"; return 1; }
+  while IFS= read -r line; do
+    s="${line%%=*}"; v="$(sed -n "s/^$s=//p" <<< "$now")"
+    report+="$s recorded=${line#*=} now=${v:-none}"$'\n'
+    [ "${line#*=}" = "$v" ] || match=no
+  done <<< "$record"
+  if [ -z "${R007_LOG_OUT:-}" ]; then lost="no evidence file (r007_evidence_init was not called)"
+  elif ! printf '## settings-restore\n%smatch=%s\n' "$report" "$match" >> "$R007_LOG_OUT"; then
+    lost="the evidence file could not be written"
+  fi
+  report="${report%$'\n'}"; report="${report//$'\n'/; }"
+  [ -z "$lost" ] \
+    || fail "the comparison is not saved ($lost); the record stays for scripts/r007/restore_settings.sh: $report"
+  if [ "$match" != yes ]; then
+    fail "the device settings differ from the record, which stays on the device: $report"
+    return 1
+  fi
+  [ -z "$lost" ] || return 1
+  sh_ rm -f "$R007_SETTINGS_RECORD" >/dev/null
+  [ "$(r007_settings_record_state)" = absent ] \
+    || { fail "the settings are restored, but the record could not be removed"; return 1; }
+  pass "the device settings are restored: $report"
+}
+
+# Restores the settings when this run owns the record, and does nothing otherwise, so a record that an earlier run
+# left stays for scripts/r007/restore_settings.sh. r007_finish calls it.
+r007_settings_restore_owned() {
+  [ -n "$R007_SETTINGS_OWNED" ] || return 0
+  r007_settings_restore && R007_SETTINGS_OWNED=""
+}
+
 # ---- store file --------------------------------------------------------------------------------
 # Prints the SHA-256 of the app-relative file PATH (default: the store). Fails when run-as fails, when the file is
 # missing, or when the answer is not one hash, so two failed reads never compare equal.
@@ -326,7 +499,7 @@ r007_store_restore() { # hash
 R007_STORE_SAVED=""
 
 # Restores the saved store once, when a restore is pending. A failed restore keeps the copy in the control directory
-# and the pending hash, so the caller must not remove the control directory. Suits an EXIT trap.
+# and the pending hash, so the caller must not remove the control directory, and r007_finish tries the restore again.
 r007_restore_pending() {
   [ -n "$R007_STORE_SAVED" ] || return 0
   if r007_store_restore "$R007_STORE_SAVED"; then
@@ -334,6 +507,40 @@ r007_restore_pending() {
   else
     info "the store copy stays in $R007_STORE_COPY"; return 1   # r007_store_restore reported the failure
   fi
+}
+
+# ---- run end -----------------------------------------------------------------------------------
+R007_RUN_STOPPED=""   # set by r007_stop_run
+
+# Stops the run after a failure that the caller has counted. r007_finish then does the cleanup.
+r007_stop_run() { R007_RUN_STOPPED=1; exit 1; }
+
+# Makes r007_finish the EXIT trap. INT, TERM, and HUP become exits with status 128 plus the signal number. Without
+# this, r007_finish can see the status of the command before the signal, often 0.
+r007_trap_finish() { # summary-label
+  trap "r007_finish $(printf '%q' "$1")" EXIT
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  trap 'exit 129' HUP
+}
+
+# The EXIT trap of a run (see r007_trap_finish). The steps, in this order: capture the exit status and disable the
+# EXIT trap; report a nonzero exit that no counted failure explains (an unexpected stop or a signal); attempt both
+# pending cleanups, the saved store and the device settings, also when the first fails; print the evidence location
+# and the only summary. A nonzero exit status stays. Otherwise the status is 1 after any recorded or cleanup failure.
+r007_finish() { # summary-label
+  local rc=$? status=0
+  trap - EXIT
+  if [ "$rc" -ne 0 ] && { [ -z "$R007_RUN_STOPPED" ] || [ "$FAIL_COUNT" -eq 0 ]; }; then
+    fail "the run stopped with exit status $rc, and no counted failure explains it"
+  fi
+  r007_restore_pending || status=1
+  r007_settings_restore_owned || status=1
+  [ "$FAIL_COUNT" -eq 0 ] || status=1
+  [ "$rc" -eq 0 ] || status=$rc
+  info "evidence: ${R007_LOG_OUT:-none}"
+  summary "$1"
+  exit "$status"
 }
 
 # ---- inspector ---------------------------------------------------------------------------------

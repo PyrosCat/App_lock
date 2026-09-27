@@ -24,9 +24,15 @@ case "$cmd" in
     [ -n "${STUB_WRITE_FAIL:-}" ] && exit 1
     target="$(sed -E "s/.*cat > ([^' ]+)'.*/\1/" <<< "$*")"
     mkdir -p "$STUB_DEVICE/$(dirname "$target")"
+    # A write that the connection breaks: only the first line arrives.
+    [ -n "${STUB_WRITE_PARTIAL:-}" ] && { head -1 > "$STUB_DEVICE/$target"; exit 1; }
+    # A write that reports success but stores other content.
+    [ -n "${STUB_WRITE_CORRUPT:-}" ] && { cat > /dev/null; echo "corrupt" > "$STUB_DEVICE/$target"; exit 0; }
     cat > "$STUB_DEVICE/$target"
     echo "exec-in $target" >> "$STUB_DEVICE/ops" ;;
   shell)
+    # Like the real adb, a shell command reads the stdin that it inherits, so a `while read` loop around it loses input.
+    while read -t 0 2>/dev/null && IFS= read -r _; do :; done
     line="$*"
     case "$line" in
       "run-as "*" kill -9 "*) [ -n "${STUB_KILL_FAIL:-}" ] && exit 1; echo "kill" >> "$STUB_DEVICE/ops" ;;
@@ -60,6 +66,59 @@ case "$cmd" in
         [ -n "${STUB_INSPECT_WRITES:-}" ] \
           && echo "<!-- rewritten -->" >> "$STUB_DEVICE/shared_prefs/applock_lockout.xml"
         printf '%s\n' "${STUB_INSTRUMENT:-}" ;;
+      # Device settings live in $STUB_DEVICE/settings/<namespace>.<key>; a missing file is an unset setting.
+      "settings get "*)
+        [ -n "${STUB_SETTINGS_GET_FAIL:-}" ] && exit 1
+        set -- $line; [ "${STUB_SETTINGS_BAD:-}" = "$4" ] && { echo "garbage"; exit 0; }
+        if [ -f "$STUB_DEVICE/settings/$3.$4" ]; then cat "$STUB_DEVICE/settings/$3.$4"; else echo null; fi ;;
+      "settings put "*)
+        [ -n "${STUB_SETTINGS_PUT_FAIL:-}" ] && exit 1
+        set -- $line; mkdir -p "$STUB_DEVICE/settings"
+        [ "${STUB_SETTINGS_IGNORE:-}" = "$4" ] || echo "$5" > "$STUB_DEVICE/settings/$3.$4"
+        echo "put $3 $4 $5" >> "$STUB_DEVICE/ops" ;;
+      "settings delete "*)
+        set -- $line; rm -f "$STUB_DEVICE/settings/$3.$4"; echo "delete $3 $4" >> "$STUB_DEVICE/ops" ;;
+      *"r007_settings.pending ]; then echo present"*)
+        [ -n "${STUB_RECORD_QUERY_FAIL:-}" ] && exit 1
+        if [ -e "$STUB_DEVICE/data/local/tmp/r007_settings.pending" ]; then echo present; else echo absent; fi ;;
+      "cat /data/local/tmp/r007_settings.pending"*) cat "$STUB_DEVICE/${line#cat }" ;;
+      "mv -f /data/local/tmp/r007_settings.pending"*)
+        [ -n "${STUB_RECORD_MV_FAIL:-}" ] && exit 1
+        [ -n "${STUB_RECORD_MV_LOST:-}" ] && exit 0   # the rename reports success but does not happen
+        set -- $line; mv -f "$STUB_DEVICE/$3" "$STUB_DEVICE/$4"; echo "mv $3 $4" >> "$STUB_DEVICE/ops" ;;
+      "rm -f /data/local/tmp/r007_settings.pending"*)
+        [ -n "${STUB_RECORD_RM_FAIL:-}" ] && exit 1
+        set -- $line; shift 2; for f in "$@"; do rm -f "$STUB_DEVICE/$f"; done ;;
+      "dumpsys window displays")
+        # The display sizes stay natural, so only the rotation field shows a rotation (as at 180 degrees).
+        [ -n "${STUB_DISPLAYS_FAIL:-}" ] && exit 1
+        echo "WINDOW MANAGER DISPLAY CONTENTS (dumpsys window displays)"
+        echo "  Display: mDisplayId=0 rootTasks=3"
+        echo "    init=720x1604 280dpi cur=720x1604 app=720x1604 rng=720x720-1604x1604"
+        [ -n "${STUB_ROTATION_DECOY:-}" ] && echo "    mRotation=0 outside the DisplayRotation part"
+        echo "    winConfig={ mBounds=Rect(0, 0 - 720, 1604) mRotation=ROTATION_${STUB_ROTATION:-0} }"
+        if [ -z "${STUB_ROTATION_MISSING:-}" ]; then
+          echo "    DisplayRotation"
+          echo "      mCurrentAppOrientation=SCREEN_ORIENTATION_UNSPECIFIED"
+          echo "      mRotation=${STUB_ROTATION:-0} mDeferredRotationPauseCount=0"
+        fi
+        echo "  Display: mDisplayId=1 rootTasks=1"
+        echo "    DisplayRotation"
+        echo "      mRotation=0 mDeferredRotationPauseCount=0" ;;
+      "dumpsys power")
+        # The screen state is STUB_WAKEFULNESS (default Awake) until a wake key turns it on; with STUB_WAKE_IGNORED
+        # the key has no effect. mStayOn follows the stay-awake setting while the device is powered, as on a device.
+        [ -n "${STUB_POWER_FAIL:-}" ] && exit 1
+        wake="${STUB_WAKEFULNESS:-Awake}"
+        [ -e "$STUB_DEVICE/woken" ] && [ -z "${STUB_WAKE_IGNORED:-}" ] && wake=Awake
+        stay="$(cat "$STUB_DEVICE/settings/global.stay_on_while_plugged_in" 2>/dev/null || echo 0)"
+        echo "  mWakefulness=$wake"
+        if [ "$stay" != 0 ] && [ -z "${STUB_UNPOWERED:-}" ]; then echo "  mStayOn=true"
+        else echo "  mStayOn=false"; fi ;;
+      "input keyevent KEYCODE_WAKEUP")
+        [ -n "${STUB_WAKE_FAIL:-}" ] && exit 1
+        touch "$STUB_DEVICE/woken"; echo "wake" >> "$STUB_DEVICE/ops" ;;
+      "getprop sys.boot_completed") echo 1 ;;
       *) : ;;
     esac ;;
 esac
@@ -238,6 +297,296 @@ reset_device
 STUB_APP_PROC="" R007_KILL_POLLS=2 expect_fail "an empty answer is not a stop" r007_stop_app
 reset_device
 STUB_PIDOF_FAIL=1 R007_KILL_POLLS=2 expect_fail "a failed process query is not a stop" r007_stop_app
+
+echo "device settings"
+RECORD_PATH="/data/local/tmp/r007_settings.pending"
+RECORD="$STUB_DEVICE$RECORD_PATH"
+ORIG=$'global:stay_on_while_plugged_in=0\nsystem:accelerometer_rotation=1\nsystem:user_rotation=1'
+seed_settings() { # the Moto G values before a run: stay-awake off, auto-rotate on, rotation 1
+  mkdir -p "$STUB_DEVICE/settings"
+  echo 0 > "$STUB_DEVICE/settings/global.stay_on_while_plugged_in"
+  echo 1 > "$STUB_DEVICE/settings/system.accelerometer_rotation"
+  echo 1 > "$STUB_DEVICE/settings/system.user_rotation"
+}
+setting() { if [ -f "$STUB_DEVICE/settings/$1" ]; then cat "$STUB_DEVICE/settings/$1"; else echo null; fi; }
+settings_are() { # "stay-awake auto-rotate rotation"
+  local now
+  now="$(setting global.stay_on_while_plugged_in) $(setting system.accelerometer_rotation)"
+  [ "$now $(setting system.user_rotation)" = "$1" ]
+}
+untouched() { ! grep -q "^put " "$STUB_DEVICE/ops" && [ ! -e "$RECORD" ] && settings_are "0 1 1"; }
+# A real run opens its evidence file before it changes a setting. The settings cases share this one.
+export R007_LOG_OUT="$WORK/settings.log"
+mkdir -p "$WORK/unwritable.log"   # a directory: an append to it fails, also on Git Bash, where chmod is unreliable
+reset_device; seed_settings
+expect_ok "the settings are read" r007_settings_read
+[ "$(cat "$WORK/out")" = "$ORIG" ] && ok "each setting reads as namespace:key=value" \
+  || bad "unexpected settings: $(cat "$WORK/out")"
+reset_device; seed_settings; rm "$STUB_DEVICE/settings/system.user_rotation"
+lib r007_settings_read; grep -qx "system:user_rotation=null" "$WORK/out" \
+  && ok "an unset setting reads as null" || bad "an unset setting: $(cat "$WORK/out")"
+reset_device; seed_settings
+STUB_SETTINGS_GET_FAIL=1 expect_fail "a failed settings read is refused" r007_settings_read
+reset_device; seed_settings
+STUB_SETTINGS_BAD=user_rotation expect_fail "an unexpected settings value is refused" r007_settings_read
+reset_device
+expect_ok "the rotation of the default display is read" r007_display_rotation
+[ "$(cat "$WORK/out")" = 0 ] && ok "the default display reads rotation 0" || bad "rotation: $(cat "$WORK/out")"
+reset_device
+STUB_ROTATION=2 lib r007_display_rotation; [ "$(cat "$WORK/out")" = 2 ] \
+  && ok "a display at 180 degrees with its natural size reads rotation 2" || bad "rotation: $(cat "$WORK/out")"
+reset_device
+STUB_ROTATION=1 STUB_ROTATION_DECOY=1 lib r007_display_rotation; [ "$(cat "$WORK/out")" = 1 ] \
+  && ok "only the DisplayRotation field of display 0 counts" || bad "rotation: $(cat "$WORK/out")"
+reset_device
+STUB_ROTATION_MISSING=1 expect_fail "a missing rotation field is refused, even when display 1 has one" \
+  r007_display_rotation
+reset_device
+STUB_ROTATION=7 expect_fail "an unexpected rotation value is refused" r007_display_rotation
+reset_device
+STUB_DISPLAYS_FAIL=1 expect_fail "a failed display query is refused" r007_display_rotation
+stay_awake_set() { mkdir -p "$STUB_DEVICE/settings"; echo 7 > "$STUB_DEVICE/settings/global.stay_on_while_plugged_in"; }
+reset_device; stay_awake_set
+expect_ok "an awake, unlocked screen with stay-awake in effect passes" r007_wake_screen
+grep -qx "wake" "$STUB_DEVICE/ops" && ok "the wake key is sent" \
+  || bad "no wake key: $(tr '\n' ';' < "$STUB_DEVICE/ops")"
+reset_device; stay_awake_set
+STUB_WAKEFULNESS=Asleep expect_ok "a screen that went off before the lock is turned on again" r007_wake_screen
+reset_device; stay_awake_set
+STUB_WAKEFULNESS=Asleep STUB_WAKE_IGNORED=1 R007_WAKE_POLLS=2 expect_fail "a screen that stays off fails" \
+  r007_wake_screen
+reset_device; stay_awake_set
+STUB_WAKE_FAIL=1 expect_fail "a failed wake key fails" r007_wake_screen
+reset_device; stay_awake_set
+STUB_POWER_FAIL=1 R007_WAKE_POLLS=2 expect_fail "a failed power query fails" r007_wake_screen
+reset_device; seed_settings
+expect_fail "a screen without the stay-awake setting fails" r007_wake_screen
+reset_device; stay_awake_set
+STUB_UNPOWERED=1 expect_fail "stay-awake on an unpowered device fails" r007_wake_screen
+grep -q "no power source" "$WORK/out" && ok "the failure names the missing power" \
+  || bad "the failure: $(cat "$WORK/out")"
+reset_device; stay_awake_set
+STUB_ACTIVITIES="    mKeyguardShowing=true" expect_fail "a keyguard that locked before the wake fails" r007_wake_screen
+grep -q "unlock it" "$WORK/out" && ok "the failure asks for an unlock" || bad "the failure: $(cat "$WORK/out")"
+reset_device; seed_settings
+( source "$HERE/lib_r007.sh"; R007_LOG_OUT="$WORK/settings.log"; : > "$R007_LOG_OUT"; r007_settings_apply \
+  && echo "## next-section" >> "$R007_LOG_OUT" ) \
+  > "$WORK/out" 2>&1 && ok "the settings are recorded and changed" || bad "the apply failed: $(cat "$WORK/out")"
+[ "$(cat "$RECORD" 2>/dev/null)" = "$ORIG" ] && ok "the record holds the original values" \
+  || bad "unexpected record: $(cat "$RECORD" 2>/dev/null)"
+settings_are "7 0 0" && ok "the screen stays on and the rotation is locked to 0" || bad "the settings did not change"
+[ "$(head -2 "$STUB_DEVICE/ops" | tr '\n' ';')" = "exec-in $RECORD_PATH.tmp;mv $RECORD_PATH.tmp $RECORD_PATH;" ] \
+  && [ ! -e "$RECORD.tmp" ] && ok "the record is written to a temporary file and renamed before any setting changes" \
+  || bad "unexpected order: $(tr '\n' ';' < "$STUB_DEVICE/ops")"
+grep -qxF "## settings-before" "$WORK/settings.log" && grep -qxF "system:user_rotation=1" "$WORK/settings.log" \
+  && grep -qxF "## next-section" "$WORK/settings.log" \
+  && ok "the evidence holds the original values, and the next section starts on its own line" \
+  || bad "the evidence lines: $(tr '\n' ';' < "$WORK/settings.log")"
+reset_device; seed_settings; mkdir -p "$(dirname "$RECORD")"; echo "global:stay_on_while_plugged_in=5" > "$RECORD"
+expect_fail "a record of an earlier run stops the run" r007_settings_apply
+! grep -q "^put " "$STUB_DEVICE/ops" && [ "$(cat "$RECORD")" = "global:stay_on_while_plugged_in=5" ] \
+  && ok "the earlier record and the settings stay unchanged" || bad "the earlier record or the settings changed"
+reset_device; seed_settings
+STUB_RECORD_QUERY_FAIL=1 expect_fail "a failed record query stops the run" r007_settings_apply
+untouched && ok "no record and no setting change after the failed query" || bad "a change after the failed query"
+reset_device; seed_settings
+STUB_SETTINGS_GET_FAIL=1 expect_fail "a failed capture stops the run" r007_settings_apply
+untouched && ok "no record and no setting change after the failed capture" || bad "a change after the failed capture"
+reset_device; seed_settings
+STUB_WRITE_FAIL=1 expect_fail "a failed record write stops the run" r007_settings_apply
+untouched && ok "no record and no setting change after the failed record write" \
+  || bad "a change after the failed record write"
+reset_device; seed_settings
+( unset R007_LOG_OUT; source "$HERE/lib_r007.sh"; r007_settings_apply ) > "$WORK/out" 2>&1 \
+  && bad "an apply without an evidence file is refused" || ok "an apply without an evidence file is refused"
+untouched && ! grep -q "^exec-in " "$STUB_DEVICE/ops" && ok "no record and no setting change without an evidence file" \
+  || bad "a change without an evidence file"
+reset_device; seed_settings
+( source "$HERE/lib_r007.sh"; R007_LOG_OUT="$WORK/unwritable.log"; r007_settings_apply; rc=$?
+  r007_settings_restore_owned; echo "rc=$rc fails=$FAIL_COUNT" ) > "$WORK/out" 2>&1
+grep -qx "rc=1 fails=1" "$WORK/out" && ok "an unsaved settings-before section fails the apply" \
+  || bad "an unsaved settings-before section: $(tr '\n' ';' < "$WORK/out")"
+grep -qx "mv $RECORD_PATH.tmp $RECORD_PATH" "$STUB_DEVICE/ops" && untouched \
+  && ok "the record is removed and no setting changes after the unsaved settings-before section" \
+  || bad "a record or a setting change after the unsaved settings-before section"
+reset_device; seed_settings
+( source "$HERE/lib_r007.sh"; R007_LOG_OUT="$WORK/unwritable.log"; export STUB_RECORD_RM_FAIL=1
+  trap 'r007_settings_restore_owned; echo "fails=$FAIL_COUNT"' EXIT
+  r007_settings_apply; echo "rc=$? owned=$R007_SETTINGS_OWNED" ) > "$WORK/out" 2>&1
+grep -qx "rc=1 owned=1" "$WORK/out" && ok "a record that is not removed after an aborted apply stays owned by the run" \
+  || bad "a record that is not removed: $(tr '\n' ';' < "$WORK/out")"
+grep -qx "put global stay_on_while_plugged_in 0" "$STUB_DEVICE/ops" && settings_are "0 1 1" \
+  && [ "$(cat "$RECORD" 2>/dev/null)" = "$ORIG" ] && grep -qx "fails=2" "$WORK/out" \
+  && ok "the exit cleanup restores the unchanged values and keeps the unsaved record" \
+  || bad "the exit cleanup after the aborted apply: $(tr '\n' ';' < "$WORK/out")"
+rm -f "$WORK/recover.log"
+R007_LOG_OUT="$WORK/recover.log" bash "$HERE/restore_settings.sh" > "$WORK/out" 2>&1 && [ ! -e "$RECORD" ] \
+  && grep -qxF "match=yes" "$WORK/recover.log" && ok "restore_settings.sh removes the record of the aborted apply" \
+  || bad "restore_settings.sh after the aborted apply: $(cat "$WORK/out")"
+reset_device; seed_settings
+STUB_WRITE_PARTIAL=1 STUB_RECORD_RM_FAIL=1 expect_fail "a partly written record stops the run" r007_settings_apply
+untouched && ok "a partly written record is never published, even when its removal fails" \
+  || bad "a partly written record: $(cat "$RECORD" 2>/dev/null)"
+expect_ok "a temporary file of an aborted apply does not stop the next run" r007_settings_apply
+[ "$(cat "$RECORD" 2>/dev/null)" = "$ORIG" ] && ok "the next run records the complete original values" \
+  || bad "the record of the next run: $(cat "$RECORD" 2>/dev/null)"
+reset_device; seed_settings
+STUB_WRITE_CORRUPT=1 STUB_RECORD_RM_FAIL=1 expect_fail "a record that reads back wrong stops the run" \
+  r007_settings_apply
+untouched && ! grep -q "^mv " "$STUB_DEVICE/ops" \
+  && ok "a record that reads back wrong is never published, even when its removal fails" \
+  || bad "a record that reads back wrong: $(cat "$RECORD" 2>/dev/null)"
+reset_device; seed_settings
+STUB_RECORD_MV_FAIL=1 expect_fail "a failed record rename stops the run" r007_settings_apply
+untouched && [ ! -e "$RECORD.tmp" ] \
+  && ok "no record, no temporary file, and no setting change after the failed rename" \
+  || bad "a change after the failed rename"
+reset_device; seed_settings
+STUB_RECORD_MV_LOST=1 expect_fail "a rename that does not happen stops the run" r007_settings_apply
+untouched && ok "no setting changes without a record on the device" || bad "a setting changed without a record"
+reset_device; seed_settings
+STUB_ROTATION=1 R007_ROTATION_POLLS=2 expect_fail "a display that stays rotated fails the apply" r007_settings_apply
+[ -e "$RECORD" ] && ok "the record stays for the restore after the failed apply" || bad "the record is gone"
+reset_device; seed_settings
+STUB_ROTATION=2 R007_ROTATION_POLLS=2 expect_fail "a display at 180 degrees fails the apply" r007_settings_apply
+reset_device; seed_settings
+STUB_ROTATION_MISSING=1 R007_ROTATION_POLLS=2 expect_fail "a display without a rotation field fails the apply" \
+  r007_settings_apply
+reset_device; seed_settings
+STUB_SETTINGS_IGNORE=accelerometer_rotation expect_fail "a setting write that does not take effect fails the apply" \
+  r007_settings_apply
+[ -e "$RECORD" ] && [ "$(setting system.accelerometer_rotation)" = 1 ] \
+  && ok "the record stays for the restore after the ignored write" || bad "the record is gone after the ignored write"
+reset_device; seed_settings
+( source "$HERE/lib_r007.sh"; R007_LOG_OUT="$WORK/settings.log"; : > "$R007_LOG_OUT"
+  r007_settings_apply && r007_settings_restore ) > "$WORK/out" 2>&1 \
+  && ok "the settings are restored" || bad "the restore failed: $(cat "$WORK/out")"
+settings_are "0 1 1" && [ ! -e "$RECORD" ] && ok "the original values are back and the record is removed" \
+  || bad "the restore left $(setting global.stay_on_while_plugged_in) $(setting system.user_rotation) or a record"
+grep -qxF "system:user_rotation recorded=1 now=1" "$WORK/settings.log" && grep -qxF "match=yes" "$WORK/settings.log" \
+  && ok "the evidence holds the comparison" || bad "the evidence lacks the comparison"
+reset_device; seed_settings; rm "$STUB_DEVICE/settings/system.user_rotation"
+( source "$HERE/lib_r007.sh"; r007_settings_apply && r007_settings_restore ) > "$WORK/out" 2>&1 \
+  && settings_are "0 1 null" && grep -qx "delete system user_rotation" "$STUB_DEVICE/ops" \
+  && ok "an unset setting is deleted again" || bad "an unset setting was not deleted again"
+reset_device; seed_settings
+( source "$HERE/lib_r007.sh"; R007_LOG_OUT="$WORK/settings.log"; : > "$R007_LOG_OUT"; r007_settings_apply || exit 9
+  export STUB_SETTINGS_IGNORE=user_rotation; r007_settings_restore ) > "$WORK/out" 2>&1 \
+  && bad "a setting that does not read back as recorded fails the restore" \
+  || ok "a setting that does not read back as recorded fails the restore"
+[ -e "$RECORD" ] && grep -qxF "match=no" "$WORK/settings.log" \
+  && ok "the record stays and the evidence shows the mismatch" || bad "the mismatch was not kept"
+reset_device; seed_settings
+( source "$HERE/lib_r007.sh"; r007_settings_apply || exit 9
+  R007_LOG_OUT="$WORK/unwritable.log"; r007_settings_restore; echo "rc=$? fails=$FAIL_COUNT" ) > "$WORK/out" 2>&1
+grep -qx "rc=1 fails=1" "$WORK/out" && ! grep -q "PASS" "$WORK/out" \
+  && ok "an unsaved comparison fails the restore" || bad "an unsaved comparison: $(tr '\n' ';' < "$WORK/out")"
+settings_are "0 1 1" && [ "$(cat "$RECORD" 2>/dev/null)" = "$ORIG" ] \
+  && ok "the settings are restored, and the record stays after the unsaved comparison" \
+  || bad "after the unsaved comparison: $(setting global.stay_on_while_plugged_in) $(setting system.user_rotation)"
+rm -f "$WORK/recover.log"
+R007_LOG_OUT="$WORK/recover.log" bash "$HERE/restore_settings.sh" > "$WORK/out" 2>&1 && [ ! -e "$RECORD" ] \
+  && grep -qxF "match=yes" "$WORK/recover.log" \
+  && ok "restore_settings.sh saves the comparison and removes the kept record" \
+  || bad "restore_settings.sh after the unsaved comparison: $(cat "$WORK/out")"
+reset_device; seed_settings
+( source "$HERE/lib_r007.sh"; r007_settings_apply || exit 9
+  unset R007_LOG_OUT; r007_settings_restore; echo "rc=$? fails=$FAIL_COUNT" ) > "$WORK/out" 2>&1
+grep -qx "rc=1 fails=1" "$WORK/out" && settings_are "0 1 1" && [ -e "$RECORD" ] \
+  && ok "a restore without an evidence file restores the settings, keeps the record, and fails" \
+  || bad "a restore without an evidence file: $(tr '\n' ';' < "$WORK/out")"
+reset_device; seed_settings; mkdir -p "$(dirname "$RECORD")"; echo "garbage" > "$RECORD"
+expect_fail "an invalid record is not applied" r007_settings_restore
+grep -qF "remove $RECORD_PATH" "$WORK/out" && ok "the failure for an invalid record gives the manual recovery" \
+  || bad "the failure for an invalid record: $(cat "$WORK/out")"
+reset_device; seed_settings; mkdir -p "$(dirname "$RECORD")"; echo "global:stay_on_while_plugged_in=0" > "$RECORD"
+expect_fail "a record without every setting is not applied" r007_settings_restore
+! grep -q "^put " "$STUB_DEVICE/ops" && settings_are "0 1 1" && ok "an incomplete record changes nothing" \
+  || bad "an incomplete record changed a setting"
+reset_device; seed_settings; mkdir -p "$(dirname "$RECORD")"; printf '%s\n' "$ORIG" > "$RECORD"
+expect_ok "a restore that this run does not own does nothing" r007_settings_restore_owned
+[ -e "$RECORD" ] && ! grep -q "^put " "$STUB_DEVICE/ops" && ok "the earlier record stays for restore_settings.sh" \
+  || bad "the earlier record was used"
+reset_device; seed_settings
+( source "$HERE/lib_r007.sh"; trap r007_settings_restore_owned EXIT; r007_settings_apply || exit 9; exit 3 ) \
+  > "$WORK/out" 2>&1
+settings_are "0 1 1" && [ ! -e "$RECORD" ] && ok "an early exit restores the settings" \
+  || bad "an early exit left the settings changed"
+reset_device; seed_settings
+( source "$HERE/lib_r007.sh"; r007_settings_apply ) > /dev/null 2>&1   # a crashed run: changed settings, a record
+R007_LOG_OUT="$WORK/restore.log" bash "$HERE/restore_settings.sh" > "$WORK/out" 2>&1 \
+  && settings_are "0 1 1" && [ ! -e "$RECORD" ] \
+  && ok "restore_settings.sh restores the record of a crashed run" || bad "restore_settings.sh: $(cat "$WORK/out")"
+reset_device; seed_settings
+R007_LOG_OUT="$WORK/restore.log" bash "$HERE/restore_settings.sh" > "$WORK/out" 2>&1 && untouched \
+  && ok "restore_settings.sh without a record changes nothing" || bad "restore_settings.sh: $(cat "$WORK/out")"
+unset R007_LOG_OUT
+
+echo "run end"
+# Runs BODY in a subshell with the exit handling of p1_validate.sh. The output goes to $WORK/out, the exit status to
+# $WORK/rc, and the evidence to $WORK/end.log.
+run_end() { # body
+  rm -f "$WORK/end.log"
+  ( source "$HERE/lib_r007.sh"; R007_LOG_OUT="$WORK/end.log"; r007_trap_finish "stub run"; eval "$1" ) \
+    > "$WORK/out" 2>&1
+  echo "$?" > "$WORK/rc"
+}
+plain_out() { sed 's/\x1b\[[0-9;]*m//g' "$WORK/out"; }
+ended() { # status passed failed ; the exit status, and one summary with these counts on the last line
+  [ "$(cat "$WORK/rc")" = "$1" ] && [ "$(plain_out | tail -1)" = "stub run: $2 passed, $3 failed" ] \
+    && [ "$(plain_out | grep -c '^stub run: ')" = 1 ]
+}
+unexplained() { plain_out | grep -q "the run stopped with exit status"; }
+reset_device; seed_settings
+run_end 'r007_settings_apply || r007_stop_run; pass "a case"; exit 0'
+ended 0 2 0 && ! unexplained && settings_are "0 1 1" && [ ! -e "$RECORD" ] \
+  && ok "a clean run restores the settings and ends with status 0 and one summary" \
+  || bad "a clean run: $(plain_out | tr '\n' ';')"
+restored="$(plain_out | grep -n 'PASS the device settings are restored' | cut -d: -f1)"
+evidence="$(plain_out | grep -n '  evidence: ' | cut -d: -f1)"
+[ -n "$restored" ] && [ -n "$evidence" ] && [ "$restored" -lt "$evidence" ] \
+  && ok "the evidence location and the summary follow the cleanup" || bad "the order: $(plain_out | tr '\n' ';')"
+reset_device
+run_end 'fail "a case"; exit 0'
+ended 1 0 1 && ! unexplained && ok "a recorded failure gives status 1 after a normal end" \
+  || bad "a recorded failure: $(plain_out | tr '\n' ';')"
+reset_device
+run_end 'fail "a check"; r007_stop_run'
+ended 1 0 1 && ! unexplained && ok "a stop after a counted failure keeps status 1 and adds no failure" \
+  || bad "a counted stop: $(plain_out | tr '\n' ';')"
+reset_device
+run_end 'exit 3'
+ended 3 0 1 && unexplained && ok "an unexplained exit status is reported and kept" \
+  || bad "an unexplained exit: $(plain_out | tr '\n' ';')"
+reset_device
+run_end 'fail "a case"; exit 5'
+ended 5 0 2 && unexplained && ok "an unexplained exit after a counted failure is reported" \
+  || bad "an unexplained exit after a failure: $(plain_out | tr '\n' ';')"
+reset_device
+run_end 'r007_stop_run'
+ended 1 0 1 && unexplained && ok "a stop without a counted failure is reported" \
+  || bad "a stop without a failure: $(plain_out | tr '\n' ';')"
+reset_device; seed_settings
+run_end 'r007_settings_apply || r007_stop_run; kill -INT $BASHPID; sleep 5'
+ended 130 1 1 && unexplained && settings_are "0 1 1" && [ ! -e "$RECORD" ] \
+  && ok "an interrupt is reported, the settings are restored, and status 130 stays" \
+  || bad "an interrupt: rc $(cat "$WORK/rc"): $(plain_out | tr '\n' ';')"
+reset_device; seed_settings
+run_end 'r007_settings_apply || r007_stop_run; export STUB_SETTINGS_IGNORE=user_rotation; exit 0'
+ended 1 0 1 && [ "$(grep -c '^## settings-restore' "$WORK/end.log")" = 1 ] \
+  && [ "$(grep -cx 'put global stay_on_while_plugged_in 0' "$STUB_DEVICE/ops")" = 1 ] && [ -e "$RECORD" ] \
+  && ok "a failed settings restore runs once, gives status 1, and keeps the record" \
+  || bad "a failed settings restore: $(plain_out | tr '\n' ';')"
+reset_device; seed_settings
+run_end 'R007_STORE_SAVED="$(r007_store_save)" || r007_stop_run; r007_store_tamper >/dev/null
+  r007_settings_apply || r007_stop_run; export STUB_COPY_FAIL=1; exit 0'
+ended 1 1 1 && ! store_is "$STORE_XML" && settings_are "0 1 1" && [ ! -e "$RECORD" ] \
+  && ok "a failed store restore does not stop the settings restore" \
+  || bad "a failed store restore: $(plain_out | tr '\n' ';')"
+reset_device
+run_end 'R007_STORE_SAVED="$(r007_store_save)" || r007_stop_run; r007_store_tamper >/dev/null; exit 0'
+ended 0 1 0 && store_is "$STORE_XML" && ok "the exit cleanup restores a pending store copy" \
+  || bad "a pending store copy: $(plain_out | tr '\n' ';')"
 
 echo "fault rules"
 for rule in "READ * Throw" "READ 0 HoldThenThrow" "WRITE 3 HoldBeforeCommit" \

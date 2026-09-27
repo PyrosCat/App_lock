@@ -2,8 +2,10 @@
 # R-007 test plan phase P1, device part: validates the device harness itself, not the lockout candidates.
 #
 # Checks, on a disposable debug install (the script creates the PIN on the first run):
-#   V0  the build is debuggable, the androidTest APK is installed, the device is unlocked, no app process is left
-#       from an earlier run (the script stops one), and the wrapper is present;
+#   V0  the build is debuggable, the androidTest APK is installed, the device is unlocked, no settings record of an
+#       unfinished earlier run exists, the screen stays on with the rotation locked to 0 (portrait) and is on and
+#       unlocked after a wake key, no app process is left from an earlier run (the script stops one), and the
+#       wrapper is present;
 #   V1  fixture: a correct PIN resets the store, and a fresh-process inspection confirms count 0;
 #   V2  positive control: a healthy wrong-PIN commit survives an abrupt kill (count 1 after restart);
 #   V3  a write held before its commit and killed leaves the old durable state (count still 1);
@@ -19,6 +21,13 @@
 #   V7  cleanup: a correct PIN resets the store to count 0, and the control directory is removed.
 # The script never clears app data, reinstalls, or re-provisions the PIN between an action and its inspection. Only V8
 # edits the store file, and it restores the saved original.
+#
+# Device settings: V0 records the stay-awake and rotation settings on the device before it changes them. After a run
+# that did not finish its cleanup, run scripts/r007/restore_settings.sh before the next run.
+#
+# Exit: r007_finish (the EXIT trap) restores what is still pending, the V8 store copy and the device settings, and
+# saves the settings comparison in the evidence file. Then it prints the evidence location and the only summary. The
+# exit status is that of an early stop, or 1 after any failure.
 #
 # Evidence: every case's wrapper and inspector lines go to $R007_LOG_OUT, or by default to
 # build/r007-evidence/p1_validate-<serial>-<UTC time>.log. The run stops before V0 when that file cannot be written.
@@ -48,26 +57,28 @@ killed_cleanly() { # label ; kills the app and checks that the process is gone
   pass "$1: process $pid ended"
 }
 
-trap r007_restore_pending EXIT   # restores the V8 store copy when the script stops early
+r007_trap_finish "R-007 P1 device harness"
 
 step "V0 preconditions"
-r007_debuggable || { fail "run-as does not work for $APP_ID (not a debuggable build?)"; summary "P1"; exit 1; }
+r007_debuggable || { fail "run-as does not work for $APP_ID (not a debuggable build?)"; r007_stop_run; }
 r007_test_apk_installed \
-  || { fail "$TEST_APP_ID is not installed (gradlew installProdDebugAndroidTest)"; summary "P1"; exit 1; }
+  || { fail "$TEST_APP_ID is not installed (gradlew installProdDebugAndroidTest)"; r007_stop_run; }
 r007_unlocked \
-  || { fail "the device is locked, or its keyguard state is unknown (unlock it and run again)"; summary "P1"; exit 1; }
-screen_stayon
+  || { fail "the device is locked, or its keyguard state is unknown (unlock it and run again)"; r007_stop_run; }
+r007_settings_apply || r007_stop_run
+# The screen can go off between the keyguard check above and the stay-awake setting; the setting does not turn it on.
+r007_wake_screen || r007_stop_run
 # A process left by an earlier run logged the wrapper's creation before the log clear below, so V0 would not see it.
-r007_stop_app || { summary "P1"; exit 1; }
-r007_clear_faults || { summary "P1"; exit 1; }
-r007_clear_log "before-V0" || { summary "P1"; exit 1; }
+r007_stop_app || r007_stop_run
+r007_clear_faults || r007_stop_run
+r007_clear_log "before-V0" || r007_stop_run
 home; sleep 1; r007_launch_main; sleep 2; dismiss_anr
 if ui_has "$UI_PIN_SETUP_SIGNAL"; then
   _screen_wh; enter_pin "$PIN"; sleep 1; enter_pin "$PIN"; sleep 2   # first run: create and confirm the PIN
   info "PIN created ($PIN)"
   home; sleep 1; r007_launch_main; sleep 2; dismiss_anr
 fi
-ui_has "$UI_PIN_SIGNAL" || { fail "the self-gate PIN prompt did not show"; summary "P1"; exit 1; }
+ui_has "$UI_PIN_SIGNAL" || { fail "the self-gate PIN prompt did not show"; r007_stop_run; }
 _screen_wh
 created=""
 for (( i=0; i<20; i++ )); do
@@ -75,7 +86,7 @@ for (( i=0; i<20; i++ )); do
   sleep 0.25
 done
 [ -n "$created" ] \
-  || { fail "the fault wrapper did not log its creation (release build installed?)"; summary "P1"; exit 1; }
+  || { fail "the fault wrapper did not log its creation (release build installed?)"; r007_stop_run; }
 pass "the debug fault wrapper is present"
 
 step "V1 fixture: correct PIN, then a fresh-process inspection"
@@ -166,6 +177,6 @@ if [ -n "$R007_STORE_SAVED" ]; then
 else
   r007_remove_control   # the last inspection stopped the app, so no process reads the control directory now
 fi
-
-info "evidence: $R007_LOG_OUT"
-summary "R-007 P1 device harness"
+# The failure count holds the case results. r007_finish runs the cleanup, prints the summary, and sets the exit
+# status, so the status of the last command above must not reach it.
+exit 0
