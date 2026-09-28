@@ -8,7 +8,9 @@ import java.util.concurrent.Executor
  * like the manager's default single-thread executor.
  *
  * The harness can [pause] it between tasks, so work that an action enqueues starts only after the harness has logged
- * that action. This keeps the ledger order stable without changing the task order. [stop] drops every queued task,
+ * that action. This keeps the ledger order stable without changing the task order. [hold] also stops the executor
+ * between tasks, but over several actions, until [unhold]. Queued work then waits, as it does behind a busy writer. The
+ * harness counts a held executor with no running task as quiescent. [stop] drops every queued task,
  * as process death does; a task that is running (for example, parked at a storage hold) ends when the store wakes it.
  * A task submitted after [stop] is dropped silently: a rejection would make kotlinx.coroutines run it on another
  * dispatcher, which a dead process cannot do.
@@ -18,6 +20,7 @@ class ControlledIoExecutor(val threadName: String) : Executor {
     private val queue = ArrayDeque<Runnable>()
     private var running = false
     private var paused = false
+    private var held = false
     private var stopped = false
 
     /** Throwables that escaped a task. A coroutine task contains its own failures, so the harness expects none. */
@@ -41,7 +44,7 @@ class ControlledIoExecutor(val threadName: String) : Executor {
     private fun loop() {
         while (true) {
             val task = synchronized(lock) {
-                while (!stopped && (paused || queue.isEmpty())) lock.wait()
+                while (!stopped && mustWait()) lock.wait()
                 if (stopped) return
                 running = true
                 queue.removeFirst()
@@ -59,6 +62,9 @@ class ControlledIoExecutor(val threadName: String) : Executor {
         }
     }
 
+    // True when no task may start now. The caller holds [lock].
+    private fun mustWait(): Boolean = paused || held || queue.isEmpty()
+
     fun pause() = synchronized(lock) { paused = true }
 
     fun resume() = synchronized(lock) {
@@ -66,8 +72,18 @@ class ControlledIoExecutor(val threadName: String) : Executor {
         lock.notifyAll()
     }
 
+    fun hold() = synchronized(lock) { held = true }
+
+    fun unhold() = synchronized(lock) {
+        held = false
+        lock.notifyAll()
+    }
+
     /** True when no task runs and none is queued. */
     fun isIdle(): Boolean = synchronized(lock) { !running && queue.isEmpty() }
+
+    /** True when the executor is held and no task runs, so no queued task can start. */
+    fun isHeldBetweenTasks(): Boolean = synchronized(lock) { held && !running }
 
     /** Waits up to [timeoutMs] for a change of executor state. A spurious or timed-out wake is harmless to callers. */
     fun awaitChange(timeoutMs: Long) = synchronized(lock) { lock.wait(timeoutMs) }

@@ -12,6 +12,8 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.FutureTask
 import java.util.concurrent.TimeUnit
 
@@ -21,12 +23,13 @@ import java.util.concurrent.TimeUnit
  *
  * Each process is a generation with its own storage view, its own [ControlledIoExecutor], and its own manager. The
  * manager receives the virtual clocks and the harness executor through its constructor; its code is not changed.
- * Every step leaves the process quiescent: the executor is idle, or its worker is parked at a storage hold. The
- * harness then feeds the new ledger events of the live process to the model, in ledger order.
+ * Every step leaves the process quiescent: the executor is idle, it is held between tasks ([holdIo]), or its worker is
+ * parked at a storage hold or in a [parkedCallback]. The harness then feeds the new ledger events of the live process
+ * to the model, in ledger order.
  *
  * [kill] simulates process death: the store fences the generation first, so the dead manager cannot change the store
- * afterwards; the executor drops its queued writes; then the parked operations wake and end. `shutdown()` is called
- * on the dead manager only to silence its callbacks.
+ * afterwards; the executor drops its queued writes; a parked callback wakes and ends; then the parked storage
+ * operations wake and end. `shutdown()` is called on the dead manager only to silence its callbacks.
  *
  * [check] compares the model with the durable state, the process cache, the public manager API, the resolved
  * operation outcomes, the read count, and the one-writer maximum. While a re-seed is requested, [check] does not call
@@ -41,6 +44,31 @@ class LockoutHarness(
 
     /** An admitted operation of the live process and its result: a FailureOutcome or a reset commit Boolean. */
     private class LiveOp(val writeIndex: Int, val resolved: Deferred<Any>)
+
+    /** The hold of one completion callback from [parkedCallback]. */
+    private class CallbackHold {
+        val parked = CountDownLatch(1)
+        val release = CountDownLatch(1)
+
+        @Volatile
+        var thread: String? = null
+
+        // Set before the countdown, as in the store holds, so a released callback stops counting as parked at once.
+        @Volatile
+        var released = false
+
+        @Volatile
+        var killed = false
+
+        fun open() {
+            released = true
+            release.countDown()
+        }
+
+        fun isParked(): Boolean = parked.count == 0L && !released
+    }
+
+    private val callbackHolds = ConcurrentHashMap<Pair<Int, String>, CallbackHold>()
 
     val ledger = Ledger()
     val store = SimulatedLockoutStore(initial, clocks, faults, ledger)
@@ -99,6 +127,11 @@ class LockoutHarness(
         store.fence(generation)
         val dropped = io.stop()
         ledger.action(generation, "DROPPED", "$dropped queued task(s)", clocks)
+        // A parked callback holds the manager lock, so it must end before shutdown() can take that lock.
+        callbackHolds.filterKeys { it.first == generation }.values.forEach { hold ->
+            hold.killed = true
+            hold.open()
+        }
         managerOrNull?.shutdown() // silences the dead manager's callbacks; the fence above is the crash
         store.wakeKilled(generation)
         check(io.awaitTermination(TIMEOUT_MS)) { "the persistence worker of g$generation did not end" }
@@ -148,11 +181,16 @@ class LockoutHarness(
 
     // ---- Actions ---------------------------------------------------------------------------------
 
-    /** Admits one failure at manager level and checks the immediate state against the model. */
-    fun fail(): LockoutManager.Pending<LockoutManager.FailureOutcome> {
+    /**
+     * Admits one failure at manager level and checks the immediate state against the model. [onResolved] goes to the
+     * manager as the completion callback of a synchronous caller.
+     */
+    fun fail(
+        onResolved: ((LockoutManager.FailureOutcome) -> Unit)? = null,
+    ): LockoutManager.Pending<LockoutManager.FailureOutcome> {
         val writeIndex = model.writesAdmitted
         val pending = paused {
-            val pending = manager.submitFailure()
+            val pending = manager.submitFailure(onResolved)
             val expected = model.admitFailure()
             ledger.action(generation, "ADMIT_FAILURE", "write#$writeIndex", clocks)
             assertEquals("S2/S8: immediate state after failure write#$writeIndex", expected, pending.immediate)
@@ -163,11 +201,11 @@ class LockoutHarness(
         return pending
     }
 
-    /** Admits one reset at manager level (an accepted success). */
-    fun succeed(): LockoutManager.Pending<Boolean> {
+    /** Admits one reset at manager level (an accepted success). [onResolved] goes to the manager as with [fail]. */
+    fun succeed(onResolved: ((Boolean) -> Unit)? = null): LockoutManager.Pending<Boolean> {
         val writeIndex = model.writesAdmitted
         val pending = paused {
-            val pending = manager.submitSuccess()
+            val pending = manager.submitSuccess(onResolved)
             val expected = model.admitReset()
             ledger.action(generation, "ADMIT_RESET", "write#$writeIndex", clocks)
             assertEquals("S3: immediate state after reset write#$writeIndex", expected, pending.immediate)
@@ -202,6 +240,66 @@ class LockoutHarness(
     }
 
     fun awaitHeld(op: StorageOp, index: Int) = store.awaitHeld(generation, op, index)
+
+    /**
+     * Holds the persistence executor of the live process between tasks, so the work that later actions enqueue waits
+     * in the queue until [resumeIo]. A kill during the hold drops that work before it starts.
+     */
+    fun holdIo() {
+        checkNotNull(executor).hold()
+        ledger.action(generation, "HOLD_IO", "", clocks)
+        awaitQuiescent()
+    }
+
+    fun resumeIo() {
+        ledger.action(generation, "RESUME_IO", "", clocks)
+        checkNotNull(executor).unhold()
+        settle()
+    }
+
+    /**
+     * Returns a completion callback for [fail] or [succeed] that runs [before], then parks at a hold named [label]
+     * until [releaseCallback]. After a release it runs [after]. A kill wakes the hold instead: the callback then throws
+     * [ProcessKilledException] and [after] never runs, as the callback of a dead process never finishes. The manager
+     * runs the callback on its writer thread with its lock held, and the harness counts a parked callback as quiescent.
+     * A hold with no release or kill within [CALLBACK_LIMIT_MS] ends with an error. So a test that blocks on the
+     * manager lock fails instead of hanging.
+     */
+    fun <T> parkedCallback(label: String, before: (T) -> Unit = {}, after: (T) -> Unit = {}): (T) -> Unit {
+        val owner = generation
+        val hold = CallbackHold()
+        check(callbackHolds.putIfAbsent(owner to label, hold) == null) { "callback $label already exists in g$owner" }
+        return { value ->
+            before(value)
+            hold.thread = stableThreadName()
+            ledger.action(owner, "CALLBACK_HELD", label, clocks)
+            hold.parked.countDown()
+            if (!hold.release.await(CALLBACK_LIMIT_MS, TimeUnit.MILLISECONDS)) {
+                ledger.action(owner, "CALLBACK_TIMEOUT", label, clocks)
+                error("g$owner callback $label: no release or kill within $CALLBACK_LIMIT_MS ms")
+            }
+            if (hold.killed) {
+                ledger.action(owner, "CALLBACK_KILLED", label, clocks)
+                throw ProcessKilledException("g$owner callback $label: the process died in the callback")
+            }
+            after(value)
+        }
+    }
+
+    fun releaseCallback(label: String) {
+        ledger.action(generation, "RELEASE", "callback $label", clocks)
+        checkNotNull(callbackHolds[generation to label]) { "no callback $label in g$generation" }.open()
+        settle()
+    }
+
+    /**
+     * Calls `shutdown()` on the live manager, as its owner does. The model has no rule for a stopped manager, so a test
+     * checks the later results directly.
+     */
+    fun shutdown() {
+        ledger.action(generation, "SHUTDOWN", "", clocks)
+        manager.shutdown()
+    }
 
     /**
      * Drops the queued persistence work of the live process without killing it. Only the negative control uses it,
@@ -285,15 +383,21 @@ class LockoutHarness(
         sync()
     }
 
-    /** Waits until the executor is idle or its worker is parked at a storage hold. */
+    /**
+     * Waits until the executor is idle, is held between tasks, or has its worker parked at a storage hold or in a
+     * parked callback.
+     */
     fun awaitQuiescent() {
         val io = executor ?: return
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(TIMEOUT_MS)
-        while (!io.isIdle() && !store.isParked(io.threadName)) {
+        while (!io.isIdle() && !io.isHeldBetweenTasks() && !isParked(io.threadName)) {
             check(System.nanoTime() < deadline) { "the persistence executor of g$generation did not settle" }
             io.awaitChange(1L)
         }
     }
+
+    private fun isParked(thread: String): Boolean =
+        store.isParked(thread) || callbackHolds.values.any { it.thread == thread && it.isParked() }
 
     private fun sync() {
         val events = ledger.snapshot()
@@ -306,5 +410,8 @@ class LockoutHarness(
 
     private companion object {
         const val TIMEOUT_MS = 5_000L
+
+        // Far longer than a test needs between a park and its release or kill.
+        const val CALLBACK_LIMIT_MS = 30_000L
     }
 }

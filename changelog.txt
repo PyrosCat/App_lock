@@ -4,6 +4,34 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 JVM baseline characterization tests   (2026-09-28)
+----------------------------------------------------------------------------
+This change adds the JVM tests of phase P2 of the R-007 test plan. The tests characterize the baseline lockout
+manager and are in the new security/r007 test package.
+- Six new test classes hold 70 tests for the cases H01 to H06, R1.1 to R4.4, X03 to X06, X08, X13, and X14.
+- The names of the classes follow the case groups: HealthyControlsTest, ColdReadTest, DegradedRestartTest,
+  UndurableDeathTest, FailedResetTest, and CrossCuttingTest.
+- The shared BaselineCase class holds the plan fixtures and a JUnit rule. The rule saves the evidence file of each
+  test after the harness cleanup. The verdict in that file also counts a failed cleanup.
+- The new EvidenceRun object gives each test run its own directory under app/build/r007-evidence/p2-jvm. EvidenceRun
+  also writes a snapshot of the tested source tree into that directory. A fingerprint in the snapshot covers the
+  commit, the diff, and the untracked files.
+- This change also adds GatedCaller to security/harness. The tests use it to count the verifier entries of a caller
+  that reads the lockout state before each PIN.
+- The FaultPlan class gets a ThrowCancellation script for reads and for writes. The HoldThenRead script of FaultPlan
+  takes a follow-on script in place of a Boolean.
+- The LockoutHarness class has four new actions: holdIo, resumeIo, shutdown, and releaseCallback. A new
+  parkedCallback function in the harness returns a completion callback that a test can hold, release, or end
+  with a kill.
+- The fail and succeed actions of the harness take an optional completion callback.
+- The ControlledIoExecutor class gets a hold that lasts over several harness actions.
+- A new test in LockoutHarnessTest covers the parked callback.
+- A mutation check made nine temporary changes to LockoutManager. For each change, at least one test of the matching
+  case failed.
+- The local gate ran 468 unit tests with no failures. In the same gate run, the detekt, assembleProdDebug, and
+  compileProdDebugAndroidTestKotlin tasks passed.
+
+
 M7/WP2 (F2 hardening): NucBox report for the P1 harness lane   (2026-09-28)
 ---------------------------------------------------------------------------
 This change adds the NucBox G5 report for the P1 harness lane on the matrix_api36 emulator. The report is

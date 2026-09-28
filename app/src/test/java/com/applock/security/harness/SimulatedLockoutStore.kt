@@ -2,6 +2,7 @@ package com.applock.security.harness
 
 import com.applock.security.LockoutSnapshot
 import com.applock.security.LockoutStorage
+import kotlinx.coroutines.CancellationException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -139,10 +140,14 @@ class SimulatedLockoutStore(
             return when (script) {
                 ReadScript.Normal -> returned(id, cache())
                 ReadScript.Throw -> threw(id)
+                ReadScript.ThrowCancellation -> cancelled(id)
                 is ReadScript.HoldThenRead -> {
                     park(id)
-                    if (script.thenThrow) threw(id)
-                    returned(id, cache())
+                    when (script.then) {
+                        ReadScript.Throw -> threw(id)
+                        ReadScript.ThrowCancellation -> cancelled(id)
+                        else -> returned(id, cache())
+                    }
                 }
                 ReadScript.ReadThenHold -> {
                     val value = cache()
@@ -177,6 +182,7 @@ class SimulatedLockoutStore(
                         writeReturned(id, false)
                     }
                     WriteScript.Throw -> threw(id)
+                    WriteScript.ThrowCancellation -> cancelled(id)
                     WriteScript.CommitThenHold -> {
                         commit(id, snapshot)
                         park(id)
@@ -249,6 +255,11 @@ class SimulatedLockoutStore(
         private fun threw(id: OpId): Nothing {
             record(id, Phase.THREW)
             throw StorageFaultException("$id: injected storage fault")
+        }
+
+        private fun cancelled(id: OpId): Nothing {
+            record(id, Phase.THREW)
+            throw CancellationException("$id: injected cancellation")
         }
 
         private fun record(id: OpId, phase: Phase, value: LockoutSnapshot? = null, result: Boolean? = null) =

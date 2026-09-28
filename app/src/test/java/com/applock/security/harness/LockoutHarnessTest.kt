@@ -10,6 +10,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Validation of the R-007 lockout harness (test plan phase P1). These tests show that the harness separates old,
@@ -201,6 +202,28 @@ class LockoutHarnessTest {
         harness.releaseSeed()
         harness.check()
         assertEquals(LockoutModel.THRESHOLD, harness.manager.failureCount())
+    }
+
+    @Test
+    fun `a parked callback runs its after part on release and never after a kill`() {
+        val afterRuns = AtomicInteger()
+        val harness = harness()
+        harness.start()
+        fun counting(label: String) =
+            harness.parkedCallback<LockoutManager.FailureOutcome>(label, after = { afterRuns.incrementAndGet() })
+
+        harness.fail(counting("first"))
+        harness.check()
+        assertEquals("parked", 0, afterRuns.get())
+        harness.releaseCallback("first")
+        harness.check()
+        assertEquals("released", 1, afterRuns.get())
+
+        harness.fail(counting("second"))
+        harness.restart()
+        harness.check()
+        assertEquals("killed", 1, afterRuns.get())
+        assertEquals(LockoutSnapshot(2, 0L), harness.store.durableState())
     }
 
     // ---- Controls ------------------------------------------------------------------------------

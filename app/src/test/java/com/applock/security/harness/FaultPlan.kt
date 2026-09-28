@@ -13,8 +13,20 @@ sealed interface ReadScript : StorageScript {
     /** Throws a storage fault, as a decryption or keystore failure does. */
     data object Throw : ReadScript
 
-    /** Parks before it reads. After release it reads the cache at that time, or throws when [thenThrow]. */
-    data class HoldThenRead(val thenThrow: Boolean = false) : ReadScript
+    /**
+     * Throws a `CancellationException`. The manager and kotlinx.coroutines treat it as a cancellation, not as a storage
+     * fault. The model rules do not cover it, so a test that uses it checks the result directly.
+     */
+    data object ThrowCancellation : ReadScript
+
+    /** Parks before it reads. After release it continues as [then]: it reads the cache at that time, or throws. */
+    data class HoldThenRead(val then: ReadScript = Normal) : ReadScript {
+        init {
+            require(then is Normal || then is Throw || then is ThrowCancellation) {
+                "a hold continues with a script that does not hold again"
+            }
+        }
+    }
 
     /** Reads the cache, then parks before it returns, so the caller receives the value from before the park. */
     data object ReadThenHold : ReadScript
@@ -36,12 +48,19 @@ sealed interface WriteScript : StorageScript {
     data object Throw : WriteScript
 
     /**
+     * Throws a `CancellationException` before any change. The manager and kotlinx.coroutines treat it as a
+     * cancellation, not as a storage fault. The model rules do not cover it, so a test that uses it checks the result
+     * directly.
+     */
+    data object ThrowCancellation : WriteScript
+
+    /**
      * Parks before any change. After release it continues as [then]. A hold that is never released is a write that
      * never returns.
      */
     data class HoldBeforeCommit(val then: WriteScript = Normal) : WriteScript {
         init {
-            require(then is Normal || then is ReturnFalse || then is Throw || then is CommitThenReportFalse) {
+            require(then !is HoldBeforeCommit && then !is CommitThenHold) {
                 "a hold continues with a script that does not hold again"
             }
         }
@@ -60,7 +79,7 @@ sealed interface WriteScript : StorageScript {
 /** True when the script makes a durable change. */
 fun WriteScript.commits(): Boolean = when (this) {
     WriteScript.Normal, WriteScript.CommitThenHold, WriteScript.CommitThenReportFalse -> true
-    WriteScript.ReturnFalse, WriteScript.Throw -> false
+    WriteScript.ReturnFalse, WriteScript.Throw, WriteScript.ThrowCancellation -> false
     is WriteScript.HoldBeforeCommit -> then.commits()
 }
 
@@ -68,13 +87,13 @@ fun WriteScript.commits(): Boolean = when (this) {
 fun WriteScript.returnValue(): Boolean? = when (this) {
     WriteScript.Normal, WriteScript.CommitThenHold -> true
     WriteScript.ReturnFalse, WriteScript.CommitThenReportFalse -> false
-    WriteScript.Throw -> null
+    WriteScript.Throw, WriteScript.ThrowCancellation -> null
     is WriteScript.HoldBeforeCommit -> then.returnValue()
 }
 
 /** True when the script changes the process cache. A throwing write fails before the editor changes anything. */
 fun WriteScript.updatesCache(): Boolean = when (this) {
-    WriteScript.Throw -> false
+    WriteScript.Throw, WriteScript.ThrowCancellation -> false
     is WriteScript.HoldBeforeCommit -> then.updatesCache()
     else -> true
 }
