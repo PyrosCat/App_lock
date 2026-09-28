@@ -4,6 +4,23 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): NucBox report for the P1 harness lane   (2026-09-28)
+---------------------------------------------------------------------------
+This change adds the NucBox G5 report for the P1 harness lane on the matrix_api36 emulator. The report is
+campaigns/2026-09-28_m7-wp2-f2h-p1-harness_nucbox-g5.md.
+- The recorded run passed all 18 checks on a clean tree at 0785782.
+- This run is also the first recorded run in which V0 created the PIN.
+- The settings sections of the evidence file show the original stay-awake and rotation values. They also show that
+  the restore set the same values again.
+- The optional settings-recovery check of the plan passed. After a simulated crash, the next run stopped in V0.
+  Then restore_settings.sh restored the settings.
+- The test_lib_r007.sh script passed all 169 host tests.
+- The AVD held an installation of com.applock and com.applock.test from 2026-09-16. Before the install commands of
+  the plan, the operator uninstalled both packages. The run then started from a new installation.
+- Appendices to the report hold the evidence files.
+- The NucBox row of the fleet table in reports/README.md now links to the new report.
+
+
 M7/WP2 (F2 hardening): NucBox plan for the P1 harness lane   (2026-09-27)
 -------------------------------------------------------------------------
 This change adds a test plan for the NucBox emulator lane of phase P1. The plan is
