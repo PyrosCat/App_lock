@@ -4,6 +4,21 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): NucBox plan for the P1 harness lane   (2026-09-27)
+-------------------------------------------------------------------------
+This change adds a test plan for the NucBox emulator lane of phase P1. The plan is
+testing/M7_WP2_F2H_P1_NUCBOX_PLAN.md.
+- The plan covers one recorded p1_validate.sh run on the matrix_api36 emulator, at d1887f8 or a later revision.
+- A table in the plan maps the P1 exit criteria to the cases of p1_validate.sh.
+- The setup sections give the boot, build, install, and screen-lock steps for the emulator.
+- A preflight section lists read-only checks of the harness on API 36.
+- Other sections of the plan give the pass criteria, the known causes of a failed run, and an optional
+  settings-recovery check.
+- The report section names the report file of the NucBox and lists the contents of that report.
+- A test on the Moto G ran the preflight and post-run commands of the plan, with the phone attached and with no
+  device attached.
+
+
 M7/WP2 (F2 hardening): Moto G report for the P1 harness at d1887f8   (2026-09-27)
 ---------------------------------------------------------------------------------
 This change adds the Moto G 2025 report of a P1 harness run at d1887f8. The report is
