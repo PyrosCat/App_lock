@@ -297,3 +297,10 @@ The evidence file of the failed run is in Appendix B.
          1790450108.185  9488  9502 I R007Inspect: pid=9488 phase=INSPECT_BEGIN
          1790450108.356  9488  9502 I R007Inspect: pid=9488 phase=INSPECT_END r007_boot_id=bdbc452a-f16e-4bd7-828c-bccd8035840d r007_count=0 r007_elapsed=342154856 r007_lockout_until=0 r007_pid=9488 r007_wall=1790450108185
 ```
+
+## Corrections
+
+- **2026-09-27, later report.** The
+  [2026-09-27 report](2026-09-27_m7-wp2-f2h-p1-harness-settings_moto-g-2025.md) records a run of the harness at
+  `d1887f8`. That revision does the first follow-up of this report: the harness locks the screen to portrait for a
+  run and restores the original device settings afterwards.

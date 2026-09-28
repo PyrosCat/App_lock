@@ -4,6 +4,20 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): Moto G report for the P1 harness at d1887f8   (2026-09-27)
+---------------------------------------------------------------------------------
+This change adds the Moto G 2025 report of a P1 harness run at d1887f8. The report is
+campaigns/2026-09-27_m7-wp2-f2h-p1-harness-settings_moto-g-2025.md.
+- The recorded run passed all 18 checks on a clean tree at d1887f8.
+- The settings sections of the evidence file show the original stay-awake and rotation values and a matching
+  restore.
+- The installed APKs are the f6d5883 build of the 2026-09-26 report, because no app code changed after f6d5883.
+- The test_lib_r007.sh script passed all 169 host tests.
+- An appendix to the report holds the evidence file of the run.
+- A new Corrections section in the 2026-09-26 report links the new report.
+- The Moto G row of the fleet table in reports/README.md now links to the new report.
+
+
 M7/WP2 (F2 hardening): P1 harness device settings record and restore   (2026-09-27)
 -----------------------------------------------------------------------------------
 This change makes the P1 device harness in scripts/r007 record the stay-awake and rotation settings of the device
