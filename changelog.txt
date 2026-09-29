@@ -4,6 +4,15 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P1 exit record   (2026-09-28)
+----------------------------------------------------
+This change records the exit of phase P1 of the F2 hardening work in M7_PLAN.md.
+- A new P1 exit section in the F2 hardening entry lists the result of each P1 lane and the evidence for each exit
+  criterion.
+- The same section links the NucBox plan of P1 and names the limits that P2 carries.
+- The step list of M7_PLAN marks the P1 exit and the finished P2 JVM lane.
+
+
 M7/WP2 (F2 hardening): 2012 i7 report for the P2 JVM lane   (2026-09-28)
 ------------------------------------------------------------------------
 This change adds the 2012 i7 report for the JVM lane of phase P2. The report is

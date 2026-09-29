@@ -936,7 +936,8 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     2. **F2** R-007 degraded-storage lockout enforcement: done (`b9e7c53`; residuals `dbfb86b`; report `520f15d`).
     3. **F3** HomeResolver tri-state and episode revalidation: done (`30529e2`; device check `8ad3b4c`; R-008).
     4. **F4** observational adapters: done (`f828a71`; not wired).
-    5. **F2 hardening** R-007 residual treatment: in progress (P0 decisions recorded; no mechanism selected).
+    5. **F2 hardening** R-007 residual treatment: in progress (P0 decisions and P1 exit recorded; P2 JVM lane done
+       at `1c38037`, report `d6a0b80`; no mechanism selected).
     6. **F5** graph wiring, not visible, with a fleet checkpoint: pending.
     7. **F6** activation and RTM flip: pending.
     8. **Fleet close-out**: pending.
@@ -1097,6 +1098,21 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         `prodDebug` install.
       - `LockoutStoreInspector` (androidTest, `@R007DeviceTool`, excluded in CI) reads the stored pair in a fresh
         process. The host controller is bash in `scripts/r007/`, on top of `scripts/e2e/lib.sh`.
+    - **P1 exit (lead, 2026-09-28).** P1 is complete. All three P1 lanes passed, and no P1 case was skipped.
+      - JVM: the `security/harness` tests of `4ee10d2` passed. They show that a healthy commit survives a restart,
+        that a restart from an unexpected stored state is detected, and that the model catches a stale write.
+      - Moto G 2025: the Moto G report of 2026-09-27 shows 18 of 18 checks passed at `d1887f8`.
+      - NucBox: the NucBox report of 2026-09-28 shows 18 of 18 checks passed on the emulator `matrix_api36` (API 36)
+        at `0785782`, with the harness and the app of `d1887f8`. The lane followed
+        `docs/testing/M7_WP2_F2H_P1_NUCBOX_PLAN.md`.
+      - Exit criteria: the device cases V3, V4, and V8 separate the old, the new, and an unknown stored state. Every
+        kill ended the target process. No harness step clears data or reinstalls between an action and its
+        inspection. A byte scan in the Moto G report of 2026-09-25 found none of the log tag, script names, or class
+        names of the fault wrapper in the release dex.
+      - Production code: the only production change of P1 makes `AppModule` call `lockoutStorage()`, and the
+        release version of that function returns `EncryptedPrefsLockoutStorage` (`59535f7`).
+      - Limits that P2 carries: the wrapper faults stop before or after the real commit, not inside the platform
+        commit. The runs had no reboot, and only the self-gate caller ran.
     - **Exit:** the selected work passes the local gate and a fleet gate (NucBox, Moto G: fault injection, restart,
       and inspection of the persisted state) with a host-tagged report. The lead records a decision for each
       residual in the risk register. FR-174 cites re-verification evidence in the same commit. If Option A is
