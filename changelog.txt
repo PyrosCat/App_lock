@@ -4,6 +4,19 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): 2012 i7 report for the P2 JVM lane   (2026-09-28)
+------------------------------------------------------------------------
+This change adds the 2012 i7 report for the JVM lane of phase P2. The report is
+campaigns/2026-09-28_m7-wp2-f2h-p2-jvm-baseline_2012-i7.md.
+- Both recorded runs used a clean tree at 1c38037.
+- The first recorded run passed all 468 unit tests. The second run passed the 70 P2 tests and the detekt task.
+- A comparison of the evidence files found all 72 files byte-identical between the two runs.
+- Tables in the report give the observed baseline and the two verdicts for each case.
+- A findings section of the report lists nine new baseline behaviours under their case IDs.
+- An appendix to the report lists the SHA-256 of each evidence file.
+- The 2012 i7 row of the fleet table in reports/README.md links to the new report.
+
+
 Docs: writing rules document   (2026-09-28)
 -------------------------------------------
 This change adds the new living document process/WRITING_RULES.md. The document holds the writing rules for
