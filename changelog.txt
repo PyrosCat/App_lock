@@ -4,6 +4,23 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 JVM test follow-up   (2026-09-28)
+-----------------------------------------------------------
+This change makes the three restart tests of the P2 JVM lane run 20 full restart cycles. The change also renames
+and extends one X14 test.
+- The BaselineCase class gets the entriesAcrossRestarts function and the RestartEntries class. The function counts
+  the verifier entries of the first process and of each of 20 restart cycles.
+- The restart tests of R1.2 and R2.4 use the new function, so each of them runs 20 restarts after the first process.
+- The R4.4 test runs 20 restart cycles after the first process. Each cycle checks that the stale count 5 comes back,
+  then enters the correct PIN.
+- The X14 deadline test has a new name that states the observed countdown. A new sample at 100 min checks that
+  20 min remain.
+- The comment on the CYCLES constant defines one cycle as one restart and the attempts after it.
+- The local gate ran 468 unit tests with no failures. In the same gate run, Gradle found the detekt,
+  assembleProdDebug, and compileProdDebugAndroidTestKotlin tasks up to date from earlier successful runs with the
+  same inputs.
+
+
 M7/WP2 (F2 hardening): P1 exit record   (2026-09-28)
 ----------------------------------------------------
 This change records the exit of phase P1 of the F2 hardening work in M7_PLAN.md.

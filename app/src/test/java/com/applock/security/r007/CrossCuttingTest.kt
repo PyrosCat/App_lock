@@ -401,7 +401,7 @@ class CrossCuttingTest : BaselineCase() {
     }
 
     @Test
-    fun `X14 - a stored deadline past the cap shows the cap and does not count down until the wall reaches it`() {
+    fun `X14 - a stored deadline past the cap shows the cap until less than the cap remains`() {
         val maxDeadlineHarness = harness(LockoutSnapshot(5, Long.MAX_VALUE))
         maxDeadlineHarness.start()
         maxDeadlineHarness.advance(HOUR_MS)
@@ -416,7 +416,9 @@ class CrossCuttingTest : BaselineCase() {
         twoHourHarness.start()
         twoHourHarness.advance(HOUR_MS + HOUR_MS / 2)
         assertEquals("still the cap after 90 min", LockedOut(MAX, degraded = false), twoHourHarness.poll())
-        twoHourHarness.advance(HOUR_MS / 2)
+        twoHourHarness.advance(TEN_MIN_MS)
+        assertEquals("20 min left after 100 min", LockedOut(2 * TEN_MIN_MS, degraded = false), twoHourHarness.poll())
+        twoHourHarness.advance(2 * TEN_MIN_MS)
         assertEquals(Available, twoHourHarness.poll())
         twoHourHarness.check()
         twoHourHarness.record("X14-deadline-2h", "denial_ms" to 2 * HOUR_MS)
@@ -476,6 +478,7 @@ class CrossCuttingTest : BaselineCase() {
         const val POLL_BURST = 1_000
         const val POLLS_60_S = 240
         const val OVERFLOW_TRIES = 100
+        const val TEN_MIN_MS = 600_000L
         const val WAIT_S = 5L
         const val HOLD_LIMIT_S = 60L
         const val REALISTIC_WALL_MS = 1_790_000_000_000L

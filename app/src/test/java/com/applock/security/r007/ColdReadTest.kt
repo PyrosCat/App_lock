@@ -180,17 +180,17 @@ class ColdReadTest : BaselineCase() {
         val faultyHarness = harness(Z, FaultPlan().read(ReadScript.Throw))
         faultyHarness.start()
         val caller = GatedCaller(faultyHarness)
-        val perCycle = caller.entriesPerRestartCycle(faultyHarness)
+        val faultyEntries = caller.entriesAcrossRestarts(faultyHarness)
         faultyHarness.check()
-        assertEquals(List(CYCLES) { 5 }, perCycle)
-        assertEquals(5 * CYCLES, caller.verifierEntries)
+        assertEquals(RestartEntries(5, List(CYCLES) { 5 }), faultyEntries)
+        assertEquals(faultyEntries.total, caller.verifierEntries)
 
         val healthyHarness = harness(Z)
         healthyHarness.start()
-        val healthyPerCycle = GatedCaller(healthyHarness).entriesPerRestartCycle(healthyHarness)
+        val healthyEntries = GatedCaller(healthyHarness).entriesAcrossRestarts(healthyHarness)
         healthyHarness.check()
-        assertEquals("healthy control: a restart gives nothing", listOf(5) + List(CYCLES - 1) { 0 }, healthyPerCycle)
-        faultyHarness.record("R1.2-restart-cycles", "entries_per_cycle" to perCycle, "control" to healthyPerCycle)
+        assertEquals("healthy control: a restart gives nothing", RestartEntries(5, List(CYCLES) { 0 }), healthyEntries)
+        faultyHarness.record("R1.2-restart-cycles", "entries" to faultyEntries, "control" to healthyEntries)
     }
 
     // ---- R1.3 old recovery read races a local mutation -----------------------------------------

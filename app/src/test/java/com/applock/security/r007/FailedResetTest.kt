@@ -5,6 +5,7 @@ import com.applock.security.LockoutState.Available
 import com.applock.security.LockoutState.LockedOut
 import com.applock.security.harness.FaultPlan
 import com.applock.security.harness.GatedCaller
+import com.applock.security.harness.LockoutHarness
 import com.applock.security.harness.StorageOp
 import com.applock.security.harness.WriteScript
 import kotlinx.coroutines.runBlocking
@@ -150,16 +151,15 @@ class FailedResetTest : BaselineCase() {
             val harness = harness(L5, FaultPlan().write(script))
             harness.start()
             val caller = GatedCaller(harness)
-            val denials = (1..CYCLES).map { cycle ->
-                if (cycle > 1) harness.restart()
-                val waitMs = (harness.poll() as? LockedOut)?.remainingMs ?: 0L
-                harness.advance(waitMs)
-                assertTrue("$script cycle $cycle", caller.correctPin())
-                assertEquals(0, harness.manager.failureCount())
-                waitMs
+            val firstWaitMs = harness.waitThenCorrectPin(caller, "$script first process")
+            val restartWaitsMs = (1..CYCLES).map { cycle ->
+                harness.restart()
+                assertEquals("$script cycle $cycle: the stale count returns", 5, harness.manager.failureCount())
+                harness.waitThenCorrectPin(caller, "$script cycle $cycle")
             }
             harness.check()
-            assertEquals("$script: only the first window denies", listOf(T) + List(CYCLES - 1) { 0L }, denials)
+            assertEquals("$script: the first process waits for the stale window", T, firstWaitMs)
+            assertEquals("$script: the expired stale window denies nothing", List(CYCLES) { 0L }, restartWaitsMs)
             assertEquals(L5, harness.store.durableState())
 
             harness.restart()
@@ -167,8 +167,24 @@ class FailedResetTest : BaselineCase() {
             assertEquals("$script: one wrong PIN locks", 1, caller.wrongPinsUntilBlocked())
             harness.check()
             assertEquals(LockedOut(60_000L, degraded = true), harness.manager.currentState())
-            harness.record("R4.4-$script", "denials_ms" to denials, "stale_count_restarts" to CYCLES + 1)
+            harness.record(
+                "R4.4-$script",
+                "first_wait_ms" to firstWaitMs,
+                "restart_waits_ms" to restartWaitsMs,
+                "restarts_with_stale_count" to CYCLES + 1,
+            )
         }
+    }
+
+    // ---- Helpers -------------------------------------------------------------------------------
+
+    // Waits until the lockout ends, then enters the correct PIN, whose clear fails. Returns the wait.
+    private fun LockoutHarness.waitThenCorrectPin(caller: GatedCaller, label: String): Long {
+        val waitMs = (poll() as? LockedOut)?.remainingMs ?: 0L
+        advance(waitMs)
+        assertTrue(label, caller.correctPin())
+        assertEquals(label, 0, manager.failureCount())
+        return waitMs
     }
 
     private companion object {

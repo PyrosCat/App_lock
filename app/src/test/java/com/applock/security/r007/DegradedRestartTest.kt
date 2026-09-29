@@ -131,16 +131,13 @@ class DegradedRestartTest : BaselineCase() {
             val harness = harness(Z, FaultPlan().write(script))
             harness.start()
             val caller = GatedCaller(harness)
-            val perCycle = caller.entriesPerRestartCycle(harness)
+            val entries = caller.entriesAcrossRestarts(harness)
             harness.check()
-            assertEquals("$script", List(CYCLES) { 1 }, perCycle)
+            assertEquals("$script", RestartEntries(1, List(CYCLES) { 1 }), entries)
+            assertEquals("$script", entries.total, caller.verifierEntries)
             assertEquals("$script", Z, harness.store.durableState())
             assertEquals("$script", 1, harness.manager.failureCount())
-            harness.record(
-                "R2.4-restart-cycles-$script",
-                "entries_per_cycle" to perCycle,
-                "total" to caller.verifierEntries,
-            )
+            harness.record("R2.4-restart-cycles-$script", "entries" to entries, "total" to entries.total)
         }
     }
 

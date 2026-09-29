@@ -67,15 +67,23 @@ abstract class BaselineCase {
         measured.forEach { (name, value) -> notes += "# $name=$value" }
     }
 
+    /** The verifier entries of the first process and of each restart cycle after it. */
+    protected data class RestartEntries(val firstProcess: Int, val perRestart: List<Int>) {
+        val total: Int get() = firstProcess + perRestart.sum()
+    }
+
     /**
-     * Runs [cycles] restart cycles: each cycle starts a new process (the first cycle uses the live one) and tries wrong
-     * PINs until the gate blocks one. Returns the verifier entries of each cycle.
+     * Tries wrong PINs until the gate blocks one, first in the live process and then in each of [cycles] restart
+     * cycles. A restart cycle starts a new process, then tries wrong PINs until the gate blocks one.
      */
-    protected fun GatedCaller.entriesPerRestartCycle(harness: LockoutHarness, cycles: Int = CYCLES): List<Int> =
-        (1..cycles).map { cycle ->
-            if (cycle > 1) harness.restart()
+    protected fun GatedCaller.entriesAcrossRestarts(harness: LockoutHarness, cycles: Int = CYCLES): RestartEntries {
+        val firstProcess = wrongPinsUntilBlocked()
+        val perRestart = (1..cycles).map {
+            harness.restart()
             wrongPinsUntilBlocked()
         }
+        return RestartEntries(firstProcess, perRestart)
+    }
 
     private fun save(
         description: Description,
@@ -124,7 +132,7 @@ abstract class BaselineCase {
         /** The stall of the plan's held operations: 40 s, longer than the base window. */
         const val STALL_MS = 40_000L
 
-        /** The deliberate restart cycles of the plan (R2.4, R4.4). */
+        /** The deliberate restart cycles of the plan (R2.4, R4.4). A cycle is one restart and the attempts after it. */
         const val CYCLES = 20
 
         /** The poll burst of the plan (R1.1). */
