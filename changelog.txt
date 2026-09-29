@@ -4,6 +4,15 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs: writing rules update   (2026-09-29)
+-----------------------------------------
+This change adds two rules to the living document process/WRITING_RULES.md.
+- A new item in the rules for all text asks for references to other documents by name and topic. The same item
+  gives "section 3.3" as the form of a reference inside a document.
+- The changelog sentence rules get a limit of 20 words for each sentence.
+- The header of the document refers to the date rules of GOVERNANCE.md by topic.
+
+
 M7/WP2 (F2 hardening): P2 device plan and decisions   (2026-09-29)
 ------------------------------------------------------------------
 This change adds the plan for the P2 device lanes and records the lead's decisions for them. The plan is

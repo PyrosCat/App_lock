@@ -6,7 +6,7 @@ fleet machine.
 
 - **Class:** living document. The lead approves each change, and each change gets a changelog entry.
 - **Related rules:** report evidence (immutability, host tags, corrections) is in
-  [`docs/reports/README.md`](../reports/README.md). Dates follow GOVERNANCE.md §4.
+  [`docs/reports/README.md`](../reports/README.md). Dates follow the date rules of GOVERNANCE.md.
 
 ## 1. All text
 
@@ -24,6 +24,9 @@ fleet machine.
    governance requires: RTM evidence pointers, SSOT references, the related requirements of an ADR, and the
    RTM and ADR links of the same commit.
 8. Use ISO dates. Committed text does not use relative terms such as "this session" or "yesterday".
+9. Refer to another document by its name and the topic, not by a section number. Write "the latency
+   distributions of the test plan", not "test plan §12". Use a section number only when the reader must find one
+   exact passage. Inside a document, write "section 3.3", not "§3.3".
 
 ## 2. Code comments and KDoc
 
@@ -101,6 +104,7 @@ fleet machine.
    factory for Y, does Z".
 4. Start a sentence about a file with "The <name> script", "The <name> class", or "The <name> report", not with
    a bare file name.
+5. Keep each sentence to 20 words or fewer.
 
 ### 5.4 Variety
 
