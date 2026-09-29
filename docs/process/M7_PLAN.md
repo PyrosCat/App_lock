@@ -937,7 +937,7 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     3. **F3** HomeResolver tri-state and episode revalidation: done (`30529e2`; device check `8ad3b4c`; R-008).
     4. **F4** observational adapters: done (`f828a71`; not wired).
     5. **F2 hardening** R-007 residual treatment: in progress (P0 decisions and P1 exit recorded; P2 JVM lane done
-       at `1c38037`, report `d6a0b80`; no mechanism selected).
+       at `1c38037`, report `d6a0b80`; P2 device decisions recorded; no mechanism selected).
     6. **F5** graph wiring, not visible, with a fleet checkpoint: pending.
     7. **F6** activation and RTM flip: pending.
     8. **Fleet close-out**: pending.
@@ -1113,6 +1113,20 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         release version of that function returns `EncryptedPrefsLockoutStorage` (`59535f7`).
       - Limits that P2 carries: the wrapper faults stop before or after the real commit, not inside the platform
         commit. The runs had no reboot, and only the self-gate caller ran.
+    - **P2 device decisions (lead, 2026-09-28).** The device lanes follow
+      `docs/testing/M7_WP2_F2H_P2_DEVICE_PLAN.md`.
+      - Depth: every device-only case runs on the Moto G and on the NucBox emulators at API 36 and API 30. Each
+        critical kill cut runs 10 times per caller. Each residual gets 3 reboots where a reboot can change the
+        result. X16 (the damaged store file of probe A) and the R3.1c mid-commit sweep are in scope.
+      - Approved skip: the latency distributions of the test plan move to the start of P3, as the baseline arm of
+        the comparison, because both arms need the same build and hooks. P2 records only the construction-read cost
+        and the storage operation times from the fault wrapper.
+      - Callers: the self-gate and the legacy lock screen run on both hosts. The legacy lock screen needs a
+        protected app and the accessibility detector, which the harness grants through adb.
+      - Biometrics: on the Moto G only, with the lead present. The NucBox biometric cases are a recorded gap,
+        because the AVDs have no screen lock.
+      - Verifier entries: the app does not change. The count is exact from the wrapper write lines while no write is
+        held. Otherwise it is inferred from the gate state in a UI dump. The evidence labels each count.
     - **Exit:** the selected work passes the local gate and a fleet gate (NucBox, Moto G: fault injection, restart,
       and inspection of the persisted state) with a host-tagged report. The lead records a decision for each
       residual in the risk register. FR-174 cites re-verification evidence in the same commit. If Option A is

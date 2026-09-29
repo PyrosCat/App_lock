@@ -4,6 +4,19 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 device plan and decisions   (2026-09-29)
+------------------------------------------------------------------
+This change adds the plan for the P2 device lanes and records the lead's decisions for them. The plan is
+testing/M7_WP2_F2H_P2_DEVICE_PLAN.md.
+- Sections of the plan define the harness additions and the case matrix with repeat counts.
+- Another section of the plan lists the cases that the device lanes do not run.
+- A probe table in the plan gives the Moto G probe results of 2026-09-28. The table also names the effect of each
+  result on the harness.
+- A new section of the F2 hardening entry in M7_PLAN.md records the four P2 device decisions. The decisions cover
+  depth, callers, biometrics, and the count of verifier entries. The section also records the move of the latency
+  distributions to the start of P3.
+
+
 M7/WP2 (F2 hardening): P2 JVM test follow-up   (2026-09-28)
 -----------------------------------------------------------
 This change makes the three restart tests of the P2 JVM lane run 20 full restart cycles. The change also renames
