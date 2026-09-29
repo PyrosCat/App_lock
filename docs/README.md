@@ -19,6 +19,9 @@ The **git repository is the only shared state** between them. Therefore:
   [`process/GOVERNANCE.md`](process/GOVERNANCE.md)** — mandatory reading before editing
   `rtm.csv`, any ADR, or starting a work session (the fetch/compare protocol in
   GOVERNANCE.md §3.2).
+- **Binding writing rules** for comments, test code, documents, changelog entries, and commit
+  subjects live in [`process/WRITING_RULES.md`](process/WRITING_RULES.md). Read them before
+  writing any of these.
 
 ## The layout
 

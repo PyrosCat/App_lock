@@ -13,6 +13,10 @@ documented where the deviation occurs. **MAY** = optional.
 docs; on discovering a conflict, correct the other doc in the next docs commit. Changes to
 this document itself require explicit user approval and a changelog entry.
 
+**Writing rules:** code comments, test code, repository documents, changelog entries, and
+commit subjects follow [`WRITING_RULES.md`](WRITING_RULES.md). Those rules bind the same
+contributors as this document.
+
 ---
 
 ## 1. Requirements Traceability Matrix (`docs/process/rtm/rtm.csv`)

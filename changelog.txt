@@ -4,6 +4,16 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs: writing rules document   (2026-09-28)
+-------------------------------------------
+This change adds the new living document process/WRITING_RULES.md. The document holds the writing rules for
+code comments, test code, repository documents, changelog entries, and commit subjects.
+- Tables in the document show rejected wording next to its rewrite, for local names in tests and for changelog
+  sentences.
+- A new paragraph in the header of GOVERNANCE.md points to the document.
+- The binding-rules list in docs/README.md has a new item for the document.
+
+
 M7/WP2 (F2 hardening): P2 JVM baseline characterization tests   (2026-09-28)
 ----------------------------------------------------------------------------
 This change adds the JVM tests of phase P2 of the R-007 test plan. The tests characterize the baseline lockout
