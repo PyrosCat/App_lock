@@ -4,6 +4,57 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 device harness   (2026-09-30)
+-------------------------------------------------------
+This change adds the harness of the P2 device lanes. The plan is testing/M7_WP2_F2H_P2_DEVICE_PLAN.md.
+- The new androidTest tool LockoutStoreFixture writes one stored lockout pair and reports the commit() result.
+- The new lib_p2.sh library adds the functions of the device lanes on top of lib_r007.sh.
+- The functions of lib_p2.sh cover the fixture writer, the detector grant, the gate state, and the count of verifier
+  entries.
+- Further functions of lib_p2.sh cover the mid-commit kill, reboots, the damaged store, and the biometric setting.
+- The new p2_device.sh driver runs one segment of the case matrix with a preflight and an exit cleanup.
+- Eight segment files in scripts/r007/p2/ hold the cases of the eight segments of the plan.
+- The device settings record of lib_r007.sh also holds the two accessibility settings as string values.
+- The exit handler of lib_r007.sh removes the fault script of the run and runs a cleanup of the caller.
+- A new r007_inspect_evidence function of lib_r007.sh holds the evidence checks for inspections that may change the
+  store file.
+- The log capture of lib_r007.sh also reads the lines of the fixture writer.
+- Marker files in files/r007/pending/ record each app-data change that a run must undo after a crash.
+- The V0 step of p1_validate.sh refuses to start while a marker of an earlier run exists.
+- The restore_settings.sh script first undoes the app-data changes of the markers, then restores the device settings.
+- The settings restore writes the service list back only when the list differs or names a service of the app.
+- New helpers of lib_r007.sh query a process and wait for its death or absence.
+- Other new helpers of lib_r007.sh parse instrumentation fields and wait for a display rotation.
+- The r007_boot_id function of lib_r007.sh fails when the device gives no boot id.
+- The ui_has function of scripts/e2e/lib.sh greps a captured UI dump, because a pipe under pipefail missed matches.
+- The ui_xml function of scripts/e2e/lib.sh removes the dump file before each dump.
+- A failed UI dump therefore gives no output, not the dump of an earlier screen.
+- A new _pin_digit_xy function of scripts/e2e/lib.sh gives the geometry position of a PIN key.
+- The inspection of lib_r007.sh stops a running app process that has not used the store, and records the stop.
+- The V5 step of p1_validate.sh uses the new functions for the read-only preferences directory.
+- The header comments of p1_validate.sh and restore_settings.sh name the recorded accessibility settings.
+- The P2 device plan gets the Moto G probe results of 2026-09-29 and 2026-09-30. The plan also gets the operator
+  option for screen-off steps.
+- A new bullet of the plan explains why the legacy caller needs the accessibility detector.
+- A second new bullet of the plan describes the markers and the recovery of an unfinished run.
+- The R1.3 row of the plan uses the 10 min window and the check of the live gate.
+- The R3.1a row of the plan describes a kill during the PIN check, with the objective verdict na. A new row lists
+  the JVM cut of R3.1a as a gap of the device lanes.
+- In the R3.1a row, a trial counts only when main-thread CPU ticks show that the PIN check has started.
+- A new row of the plan lists the double submit of one PIN entry (X09a) as a device gap.
+- The evidence bullets of the plan define the objective verdict of residual repeats and of controls.
+- The H06, R1.4, R2.1, and R2.4 rows of the plan name the evidence that their records need.
+- The protected-app bullet of the plan names the evidence that the harness needs before a tap on the Clock switch.
+- The test_lib_r007.sh script gets 265 new host tests. A host run of the script passed all 434 tests.
+- The local gate ran 468 unit tests with no failures.
+- In the same gate run, the detekt, assembleProdDebug, and assembleProdDebugAndroidTest tasks passed.
+- A trial run of the healthy segment on the Moto G ended with no failures. The run used earlier versions of the
+  H03 and H06 checks.
+- Probes on the Moto G killed the app five times during the PIN check.Two inspections after a watchdog restart 
+  stopped the watchdog process and read the stored pair Z.
+- A Moto G probe read 61 main-thread CPU ticks in the PIN check and 3 in a digit tap.
+
+
 Docs: writing rules update   (2026-09-29)
 -----------------------------------------
 This change adds two rules to the living document process/WRITING_RULES.md.

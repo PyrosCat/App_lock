@@ -6,7 +6,8 @@
 # written with `run-as`; reads the wrapper's evidence from logcat (tag R007Fault); kills the app with SIGKILL through
 # `run-as`; and runs the fresh-process inspector (LockoutStoreInspector) with `am instrument`. For the unknown-state
 # case it also saves, tampers, and restores the lockout store file. It records, changes, and restores the stay-awake
-# and rotation settings of the device.
+# and rotation settings of the device, and it records and restores the accessibility settings that the phase P2
+# library (lib_p2.sh) changes.
 #
 # Every check captures a command's output first and fails when the command fails. It then matches the captured
 # text, never a live pipe: lib.sh sets pipefail, so `producer | grep -q` can report a match as a failure when grep
@@ -91,11 +92,11 @@ r007_apk_sha256() { # package
   printf '%s' "${hash%% *}"
 }
 
-# Reads the wrapper and inspector lines, with epoch timestamps, into R007_CAPTURE. Returns 1 when logcat cannot be
-# read, so a failed read is never taken for an empty log.
+# Reads the wrapper, inspector, and fixture-writer lines, with epoch timestamps, into R007_CAPTURE. Returns 1 when
+# logcat cannot be read, so a failed read is never taken for an empty log.
 r007_capture_log() {
   local out
-  out="$(adbx logcat -d -v epoch -s R007Fault:I R007Inspect:I)" || { R007_CAPTURE=""; return 1; }
+  out="$(adbx logcat -d -v epoch -s R007Fault:I R007Inspect:I R007Fixture:I)" || { R007_CAPTURE=""; return 1; }
   R007_CAPTURE="$(tr -d '\r' <<< "$out" | sed '/^-----/d')"
 }
 
@@ -173,11 +174,30 @@ r007_set_faults() { # rule...
   actual="$(r007_run_as cat "$R007_CONTROL/faults.tmp")" \
     || { fail "the fault script could not be read back"; return 1; }
   [ "$actual" = "$expected" ] || { fail "the fault script on the device differs from the rules"; return 1; }
+  R007_FAULTS_OWNED=1
   r007_run_as mv -f "$R007_CONTROL/faults.tmp" "$R007_CONTROL/faults" \
     || { fail "the fault script could not be published"; return 1; }
   actual="$(r007_run_as cat "$R007_CONTROL/faults")" \
     || { fail "the published fault script could not be read"; return 1; }
   [ "$actual" = "$expected" ] || { fail "the published fault script differs from the rules"; return 1; }
+}
+
+R007_FAULTS_OWNED=""   # set when this run published a fault script
+
+# Removes the fault script, its temporary file, and the release files, and checks that the script is gone. Use it
+# while no app process runs: without a script, every storage operation passes through.
+r007_faults_remove() {
+  r007_run_as rm -rf "$R007_CONTROL/faults" "$R007_CONTROL/faults.tmp" "$R007_CONTROL/release" \
+    || { fail "the fault script could not be removed"; return 1; }
+  [ "$(r007_file_state "$R007_CONTROL/faults")" = absent ] || { fail "the fault script is not removed"; return 1; }
+  R007_FAULTS_OWNED=""
+}
+
+# Stops the app and removes the fault script when this run published one, so that no later start of the app meets a
+# fault of this run. r007_finish calls it.
+r007_faults_restore_owned() {
+  [ -n "$R007_FAULTS_OWNED" ] || return 0
+  r007_stop_app && r007_faults_remove
 }
 
 # Publishes an empty script and removes stale release files. Use while the app can run.
@@ -186,9 +206,15 @@ r007_clear_faults() {
   r007_run_as rm -rf "$R007_CONTROL/release" || { fail "the release files could not be removed"; return 1; }
 }
 
-# Removes the whole control directory. Use only while no app process runs, at the end of a run.
+# Removes the whole control directory. Use only while no app process runs, at the end of a run. The directory stays
+# while a marker of a pending change exists, because it holds the copies that the undo needs.
 r007_remove_control() {
+  local pending
+  pending="$(r007_pending_list)" \
+    || { fail "the pending markers could not be queried, so the control directory stays"; return 1; }
+  [ -z "$pending" ] || { fail "the control directory stays, because changes are pending: $pending"; return 1; }
   r007_run_as rm -rf "$R007_CONTROL" || { fail "the control directory could not be removed"; return 1; }
+  R007_FAULTS_OWNED=""
 }
 
 # Lets the operation that holds at OP#INDEX in process PID continue.
@@ -206,7 +232,12 @@ r007_pid() {
   printf '%s' "$out"
 }
 
-r007_boot_id() { sh_ cat /proc/sys/kernel/random/boot_id; }
+# Prints the boot id of the device. Fails when the read fails or the answer is not one id.
+r007_boot_id() {
+  local id
+  id="$(sh_ cat /proc/sys/kernel/random/boot_id)" && [[ "$id" =~ ^[A-Za-z0-9-]+$ ]] || return 1
+  printf '%s' "$id"
+}
 
 # True when the device reports that its keyguard is not showing. It reads `mKeyguardShowing` in the KeyguardController
 # part of `dumpsys activity activities` (API 26 and later), otherwise `isKeyguardShowing` in `dumpsys window`. A
@@ -228,53 +259,97 @@ r007_app_absent() {
   [ "$state" = absent ]
 }
 
-# Stops the app with `am force-stop` and waits for a confirmed absence of its process. Use it before a case starts or
-# to clean up, never between an action and its inspection: the cases need the abrupt kill of r007_kill. A later
-# launch must be explicit, because a force-stop leaves the app in the stopped state.
-r007_stop_app() {
+# Waits for a confirmed absence of the app process. A failed query or no answer is not an absence.
+r007_wait_absent() {
   local i
-  sh_ am force-stop "$APP_ID" >/dev/null || { fail "r007_stop_app: am force-stop failed"; return 1; }
   for (( i=0; i<R007_KILL_POLLS; i++ )); do
     r007_app_absent && return 0
     sleep 0.25
   done
-  fail "r007_stop_app: no confirmed absence of $APP_ID"; return 1
+  return 1
+}
+
+# Stops the app with `am force-stop` and waits for a confirmed absence of its process. Use it before a case starts, to
+# clean up, or after the abrupt death of a case (r007_quiesce). Never use it instead of r007_kill between an action
+# and its inspection: the cases need the abrupt kill. A later launch must be explicit, because a force-stop leaves the
+# app in the stopped state.
+r007_stop_app() {
+  sh_ am force-stop "$APP_ID" >/dev/null || { fail "r007_stop_app: am force-stop failed"; return 1; }
+  r007_wait_absent || { fail "r007_stop_app: no confirmed absence of $APP_ID"; return 1; }
+}
+
+R007_PROC_STATE=""   # the last /proc answer of r007_wait_dead
+
+# Prints the /proc answer for process PID: "present", "absent", or "query-failed".
+r007_proc_state() { # pid
+  local out
+  out="$(sh_ "if [ -d /proc/$1 ]; then echo present; else echo absent; fi")" || out="query-failed"
+  printf '%s' "$out"
+}
+
+# Waits until /proc answers that process PID is gone. A failed query or no answer is not an absence. Sets
+# R007_PROC_STATE to the last answer.
+r007_wait_dead() { # pid
+  local i
+  R007_PROC_STATE=""
+  for (( i=0; i<R007_KILL_POLLS; i++ )); do
+    R007_PROC_STATE="$(r007_proc_state "$1")"
+    [ "$R007_PROC_STATE" = absent ] && return 0
+    sleep 0.25
+  done
+  return 1
 }
 
 # Kills the app process with SIGKILL, as its own uid, and waits for an explicit "absent" answer for its /proc entry.
 # Prints the killed pid. A failed kill, a failed query, or no answer is a failure, never a confirmed death. This is
 # an abrupt death: no onDestroy, no flush. It is not `am force-stop`, which also changes later launches.
 r007_kill() {
-  local pid i state=""
+  local pid
   pid="$(r007_pid)" || { fail "r007_kill: $APP_ID does not run as exactly one process"; return 1; }
   r007_run_as kill -9 "$pid" || { fail "r007_kill: kill -9 $pid failed"; return 1; }
-  for (( i=0; i<R007_KILL_POLLS; i++ )); do
-    state="$(sh_ "if [ -d /proc/$pid ]; then echo present; else echo absent; fi")" || state="query-failed"
-    if [ "$state" = absent ]; then printf '%s' "$pid"; return 0; fi
-    sleep 0.25
-  done
-  fail "r007_kill: no confirmed absence of pid $pid (last answer: ${state:-none})"; return 1
+  r007_wait_dead "$pid" \
+    || { fail "r007_kill: no confirmed absence of pid $pid (last answer: ${R007_PROC_STATE:-none})"; return 1; }
+  printf '%s' "$pid"
 }
 
 # ---- device settings ---------------------------------------------------------------------------
 # A run keeps the screen on and locks the display rotation to 0 (portrait on a phone). The PIN entry taps the keys
 # that a UI dump reports, and a rotated PIN pad can hide keys. The original values are recorded on the device before
-# any change, so a later run from any host can see a cleanup that an earlier run did not finish.
+# any change, so a later run from any host can see a cleanup that an earlier run did not finish. The record also
+# holds the two accessibility settings, which the P2 legacy-caller cases change to grant the detector.
 R007_SETTINGS="global:stay_on_while_plugged_in system:accelerometer_rotation system:user_rotation"
-# The values of a run, in the order of R007_SETTINGS: r007_settings_apply compares them with r007_settings_read.
+R007_SETTINGS+=" secure:enabled_accessibility_services secure:accessibility_enabled"
+# The values that r007_settings_apply sets and then checks. The accessibility settings are not in this list.
 R007_SETTINGS_TARGET="global:stay_on_while_plugged_in=7 system:accelerometer_rotation=0 system:user_rotation=0"
 R007_SETTINGS_RECORD="/data/local/tmp/r007_settings.pending"
-: "${R007_ROTATION_POLLS:=20}"   # r007_settings_apply polls the display this many times, 0.25 s apart
+: "${R007_ROTATION_POLLS:=20}"   # r007_wait_rotation polls the display this many times, 0.25 s apart
 : "${R007_WAKE_POLLS:=8}"       # r007_wake_screen polls the power state this many times, 0.25 s apart
 R007_SETTINGS_OWNED=""          # set while this run owns the record, so that it restores only its own changes
 
-# Prints the current values, one "namespace:key=value" line each. A value is an integer, or "null" for an unset
-# setting. Fails when a read fails or returns anything else.
+# True when VALUE is a valid value of SETTING: "null" for an unset setting, otherwise an integer. The list of enabled
+# accessibility services is a colon-separated list of component names instead, and it can be an empty string.
+r007_setting_value_ok() { # setting value
+  local services='^(null|[A-Za-z0-9._/:$]*)$'
+  case "$1" in
+    secure:enabled_accessibility_services) [[ "$2" =~ $services ]] ;;
+    *) [[ "$2" =~ ^(-?[0-9]+|null)$ ]] ;;
+  esac
+}
+
+# Writes VALUE to SETTING: `settings delete` for "null", otherwise `settings put`. The single quotes reach the device
+# shell, so an empty string stays one argument.
+r007_setting_write() { # setting value
+  if [ "$2" = null ]; then sh_ settings delete "${1%%:*}" "${1#*:}" >/dev/null
+  else sh_ settings put "${1%%:*}" "${1#*:}" "'$2'" >/dev/null; fi
+}
+
+# Prints the current values, one "namespace:key=value" line each (see r007_setting_value_ok). Fails when a read fails
+# or returns anything else.
 r007_settings_read() {
   local s v out=""
   for s in $R007_SETTINGS; do
     v="$(sh_ settings get "${s%%:*}" "${s#*:}")" || return 1
-    [[ "$v" =~ ^(-?[0-9]+|null)$ ]] || return 1
+    r007_setting_value_ok "$s" "$v" || return 1
     out+="$s=$v"$'\n'
   done
   printf '%s' "$out"
@@ -300,6 +375,18 @@ r007_display_rotation() {
   ' <<< "$out")"
   [[ "$rot" =~ ^[0-3]$ ]] || return 1
   printf '%s' "$rot"
+}
+
+# Waits until the default display has ROTATION (0 to 3). Fails when the display does not reach it within
+# R007_ROTATION_POLLS polls.
+r007_wait_rotation() { # rotation
+  local i rot=""
+  for (( i=0; i<R007_ROTATION_POLLS; i++ )); do
+    rot="$(r007_display_rotation)" || rot="unreadable"
+    [ "$rot" = "$1" ] && return 0
+    sleep 0.25
+  done
+  fail "the default display did not reach rotation $1 (last value: $rot)"; return 1
 }
 
 # Writes the settings record atomically: a temporary file first, then a rename after its content is verified. The
@@ -329,7 +416,7 @@ r007_settings_abort() { # cause
 # the capture, the record write, or the evidence write fails. It fails unless the settings read back as set and the
 # default display reaches rotation 0.
 r007_settings_apply() {
-  local state orig s k now rot="" i
+  local state orig s k now
   [ -n "${R007_LOG_OUT:-}" ] \
     || { fail "no evidence file (r007_evidence_init was not called); nothing was changed"; return 1; }
   state="$(r007_settings_record_state)" \
@@ -350,14 +437,11 @@ r007_settings_apply() {
       || { fail "the device settings could not be changed"; return 1; }
   done
   now="$(r007_settings_read)" || { fail "the changed settings could not be read back"; return 1; }
-  [ "$now" = "$(tr ' ' '\n' <<< "$R007_SETTINGS_TARGET")" ] \
-    || { fail "the device settings did not take the new values: $(tr '\n' ' ' <<< "$now")"; return 1; }
-  for (( i=0; i<R007_ROTATION_POLLS; i++ )); do
-    rot="$(r007_display_rotation)" || rot="unreadable"
-    [ "$rot" = 0 ] && return 0
-    sleep 0.25
+  for s in $R007_SETTINGS_TARGET; do
+    grep -qxF -- "$s" <<< "$now" \
+      || { fail "the device settings did not take the new values: $(tr '\n' ' ' <<< "$now")"; return 1; }
   done
-  fail "the default display did not reach rotation 0 (last value: $rot)"; return 1
+  r007_wait_rotation 0
 }
 
 # Wakes the screen and checks that it is on, that the stay-awake setting is in effect, and that the keyguard is not
@@ -377,32 +461,61 @@ r007_wake_screen() {
   r007_unlocked || { fail "the device locked before the screen was kept on (unlock it and run again)"; return 1; }
 }
 
+# True when RECORD holds exactly one valid line for each setting of R007_SETTINGS.
+r007_settings_record_ok() { # record
+  local line valid=yes
+  [ "$(sed 's/=.*//' <<< "$1" | sort | tr '\n' ' ')" = "$(tr ' ' '\n' <<< "$R007_SETTINGS" | sort | tr '\n' ' ')" ] \
+    || return 1
+  while IFS= read -r line; do
+    [[ "$line" =~ ^[a-z]+:[a-z_]+= ]] && r007_setting_value_ok "${line%%=*}" "${line#*=}" || valid=no
+  done <<< "$1"
+  [ "$valid" = yes ]
+}
+
+# Writes the recorded list LIST of enabled accessibility services back. A list that differs from the current one is
+# written. An equal list is written only when it names a service of the app: after a force-stop, an identical write
+# does not bind that service again, so the list is deleted first and written again. The delete unbinds every listed
+# service, so an equal list without a service of the app stays untouched. A list that cannot be read counts as
+# different.
+r007_services_restore() { # list
+  local now
+  now="$(sh_ settings get secure enabled_accessibility_services)" || now="unreadable"
+  if [ "$now" = "$1" ]; then
+    [[ ":$1:" == *":$APP_ID/"* ]] || return 0
+    sh_ settings delete secure enabled_accessibility_services >/dev/null || return 1
+  fi
+  r007_setting_write secure:enabled_accessibility_services "$1"
+}
+
 # Writes the recorded settings back, reads them again, and appends the comparison to the evidence file. A "null"
 # value is restored with `settings delete`. The record is removed only when every value reads back as recorded and
 # the comparison is saved. When the comparison cannot be saved, the record stays, so that
 # scripts/r007/restore_settings.sh can produce the comparison again, and the restore fails.
 r007_settings_restore() {
-  local record line s v keys now report="" match=yes lost=""
+  local record line s v now report="" match=yes lost=""
   record="$(sh_ cat "$R007_SETTINGS_RECORD")" || { fail "the settings record could not be read"; return 1; }
-  keys="$(sed 's/=.*//' <<< "$record" | sort | tr '\n' ' ')"
-  if [ "$keys" != "$(tr ' ' '\n' <<< "$R007_SETTINGS" | sort | tr '\n' ' ')" ] \
-    || grep -qvE '^[a-z]+:[a-z_]+=(-?[0-9]+|null)$' <<< "$record"; then
+  if ! r007_settings_record_ok "$record"; then
     fail "the settings record is not valid, so nothing was restored; set the settings by hand, then remove" \
       "$R007_SETTINGS_RECORD: $(tr '\n' ' ' <<< "$record")"
     return 1
   fi
   # The loop reads the record on descriptor 3, because `adb shell` reads its stdin and would take the other lines.
   while IFS= read -r line <&3; do
-    s="${line%%=*}"; v="${line#*=}"
-    if [ "$v" = null ]; then sh_ settings delete "${s%%:*}" "${s#*:}" >/dev/null || match=no
-    else sh_ settings put "${s%%:*}" "${s#*:}" "$v" >/dev/null || match=no; fi
+    if [ "${line%%=*}" = secure:enabled_accessibility_services ]; then
+      r007_services_restore "${line#*=}" || match=no
+    else
+      r007_setting_write "${line%%=*}" "${line#*=}" || match=no
+    fi
   done 3<<< "$record"
   now="$(r007_settings_read)" || { fail "the restored settings could not be read back"; return 1; }
+  # The keys hold only letters, colons, and underscores, so a key is a literal sed pattern. An empty string shows
+  # as ''.
   while IFS= read -r line; do
     s="${line%%=*}"; v="$(sed -n "s/^$s=//p" <<< "$now")"
-    report+="$s recorded=${line#*=} now=${v:-none}"$'\n'
+    report+="$s recorded=${line#*=} now=$v"$'\n'
     [ "${line#*=}" = "$v" ] || match=no
   done <<< "$record"
+  report="$(sed -E "s/(recorded|now)=( |$)/\1=''\2/g" <<< "$report")"$'\n'
   if [ -z "${R007_LOG_OUT:-}" ]; then lost="no evidence file (r007_evidence_init was not called)"
   elif ! printf '## settings-restore\n%smatch=%s\n' "$report" "$match" >> "$R007_LOG_OUT"; then
     lost="the evidence file could not be written"
@@ -428,6 +541,81 @@ r007_settings_restore_owned() {
   r007_settings_restore && R007_SETTINGS_OWNED=""
 }
 
+# ---- pending app-data changes ------------------------------------------------------------------
+# A run writes a marker for each change of app data that it must undo: "store" holds the hash of the saved store copy,
+# "app_settings" the state of the saved app settings file (lib_p2.sh), and "prefs_mode" marks a read-only preferences
+# directory. The markers are in the app's private directory, so they survive a crash of the host. A change does not
+# start while its marker exists, r007_remove_control keeps the control directory while any marker exists, and
+# scripts/r007/restore_settings.sh undoes the changes that an unfinished run left.
+R007_PENDING="$R007_CONTROL/pending"
+R007_PENDING_NAMES="store app_settings prefs_mode"
+
+# Prints the SHA-256 of the app-relative file PATH, or "absent" when the device answers that it does not exist.
+# Fails when the query fails or gives another answer.
+r007_file_state() { # path
+  local out
+  out="$(r007_run_as sh -c "'if [ -e $1 ]; then sha256sum $1; else echo absent; fi'")" || return 1
+  [ "$out" = absent ] && { printf absent; return 0; }
+  out="${out%% *}"
+  [[ "$out" =~ ^[0-9a-f]{64}$ ]] || return 1
+  printf '%s' "$out"
+}
+
+# Prints the value of the marker NAME, or "absent". Fails when a query fails.
+r007_pending_get() { # name
+  local state
+  state="$(r007_file_state "$R007_PENDING/$1")" || return 1
+  if [ "$state" = absent ]; then printf absent; else r007_run_as cat "$R007_PENDING/$1"; fi
+}
+
+# Writes the marker NAME with VALUE and checks it by a read.
+r007_pending_set() { # name value
+  local actual
+  printf '%s' "$2" | adbx exec-in "run-as $APP_ID sh -c 'mkdir -p $R007_PENDING && cat > $R007_PENDING/$1'" \
+    || return 1
+  actual="$(r007_run_as cat "$R007_PENDING/$1")" && [ "$actual" = "$2" ]
+}
+
+# Removes the marker NAME and checks that it is gone.
+r007_pending_clear() { # name
+  r007_run_as rm -f "$R007_PENDING/$1" || return 1
+  [ "$(r007_file_state "$R007_PENDING/$1")" = absent ]
+}
+
+# Prints the names of the existing markers, separated by spaces, or nothing. Fails when a query fails.
+r007_pending_list() {
+  local name state out=""
+  for name in $R007_PENDING_NAMES; do
+    state="$(r007_file_state "$R007_PENDING/$name")" || return 1
+    [ "$state" = absent ] || out+="${out:+ }$name"
+  done
+  printf '%s' "$out"
+}
+
+R007_PREFS_OWNED=""   # set while this run has made the preferences directory read-only
+
+# Makes the preferences directory read-only (mode 500), for a real platform write fault. The marker comes first, so
+# a crash never leaves a read-only directory without a marker.
+r007_prefs_readonly() {
+  r007_pending_set prefs_mode 500 || { fail "the prefs_mode marker could not be written"; return 1; }
+  R007_PREFS_OWNED=1
+  r007_run_as chmod 500 shared_prefs || { fail "the preferences directory could not be made read-only"; return 1; }
+}
+
+# Makes the preferences directory writable again (mode 771) and removes the marker.
+r007_prefs_writable() {
+  r007_run_as chmod 771 shared_prefs || { fail "the preferences directory could not be made writable"; return 1; }
+  r007_pending_clear prefs_mode || { fail "the prefs_mode marker could not be removed"; return 1; }
+  R007_PREFS_OWNED=""
+}
+
+# Makes the preferences directory writable when this run made it read-only. r007_finish calls it first, so that the
+# other cleanups can write.
+r007_prefs_restore_owned() {
+  [ -n "$R007_PREFS_OWNED" ] || return 0
+  r007_prefs_writable
+}
+
 # ---- store file --------------------------------------------------------------------------------
 # Prints the SHA-256 of the app-relative file PATH (default: the store). Fails when run-as fails, when the file is
 # missing, or when the answer is not one hash, so two failed reads never compare equal.
@@ -439,11 +627,15 @@ r007_store_hash() { # [path]
   printf '%s' "$hash"
 }
 
-# Saves a copy of the store in the control directory and prints the store hash. It refuses while an app process runs,
-# and when a backup file of the store exists, because SharedPreferences would load that backup instead of the store.
+# Saves a copy of the store in the control directory, writes the "store" marker, and prints the store hash. It refuses
+# while an app process runs, while a store copy of an earlier run is pending, and when a backup file of the store
+# exists, because SharedPreferences would load that backup instead of the store.
 r007_store_save() {
-  local hash copy bak
+  local hash copy bak pending
   r007_app_absent || { fail "r007_store_save: $APP_ID runs"; return 1; }
+  pending="$(r007_pending_get store)" || { fail "r007_store_save: the store marker could not be queried"; return 1; }
+  [ "$pending" = absent ] \
+    || { fail "r007_store_save: a store copy of an earlier run is pending (run restore_settings.sh)"; return 1; }
   bak="$(r007_run_as sh -c "'if [ -e $R007_STORE.bak ]; then echo present; else echo absent; fi'")" \
     || { fail "r007_store_save: the backup-file query failed"; return 1; }
   [ "$bak" = absent ] || { fail "r007_store_save: a backup file of the store exists (answer: ${bak:-none})"; return 1; }
@@ -452,6 +644,7 @@ r007_store_save() {
     || { fail "r007_store_save: the copy could not be written"; return 1; }
   copy="$(r007_store_hash "$R007_STORE_COPY")" || { fail "r007_store_save: the copy could not be hashed"; return 1; }
   [ "$copy" = "$hash" ] || { fail "r007_store_save: the copy differs from the store"; return 1; }
+  r007_pending_set store "$hash" || { fail "r007_store_save: the store marker could not be written"; return 1; }
   printf '%s' "$hash"
 }
 
@@ -483,8 +676,8 @@ r007_store_tamper() {
   printf '%s' "$actual"
 }
 
-# Stops the app, writes the saved copy back over the store, and checks that the store hash equals HASH. The write
-# runs only when the copy exists, so a missing copy never empties the store.
+# Stops the app, writes the saved copy back over the store, checks that the store hash equals HASH, and removes the
+# "store" marker. The write runs only when the copy exists, so a missing copy never empties the store.
 r007_store_restore() { # hash
   local actual
   r007_stop_app || return 1
@@ -493,6 +686,7 @@ r007_store_restore() { # hash
   actual="$(r007_store_hash)" || { fail "r007_store_restore: the restored store could not be hashed"; return 1; }
   [ "$actual" = "$1" ] \
     || { fail "r007_store_restore: the store hash $actual differs from the saved hash $1"; return 1; }
+  r007_pending_clear store || { fail "r007_store_restore: the store marker could not be removed"; return 1; }
 }
 
 # The hash of the saved store while a restore is pending. The caller sets it from r007_store_save.
@@ -524,16 +718,25 @@ r007_trap_finish() { # summary-label
   trap 'exit 129' HUP
 }
 
-# The EXIT trap of a run (see r007_trap_finish). The steps, in this order: capture the exit status and disable the
-# EXIT trap; report a nonzero exit that no counted failure explains (an unexpected stop or a signal); attempt both
-# pending cleanups, the saved store and the device settings, also when the first fails; print the evidence location
-# and the only summary. A nonzero exit status stays. Otherwise the status is 1 after any recorded or cleanup failure.
+# The EXIT trap of a run (see r007_trap_finish). The handler first captures the exit status and disables the EXIT
+# trap. It reports a nonzero exit that no counted failure explains, such as an unexpected stop or a signal. Then it
+# attempts each pending cleanup in this order, also when an earlier one fails:
+#   1. a read-only preferences directory of this run;
+#   2. a fault script of this run;
+#   3. the cleanup of the caller (r007_finish_extra, when the caller defines it);
+#   4. the saved store;
+#   5. the device settings.
+# Last, the handler prints the evidence location and the only summary. A nonzero exit status stays. Otherwise the
+# status is 1 after any recorded or cleanup failure.
 r007_finish() { # summary-label
   local rc=$? status=0
   trap - EXIT
   if [ "$rc" -ne 0 ] && { [ -z "$R007_RUN_STOPPED" ] || [ "$FAIL_COUNT" -eq 0 ]; }; then
     fail "the run stopped with exit status $rc, and no counted failure explains it"
   fi
+  r007_prefs_restore_owned || status=1
+  r007_faults_restore_owned || status=1
+  if declare -F r007_finish_extra >/dev/null; then r007_finish_extra || status=1; fi
   r007_restore_pending || status=1
   r007_settings_restore_owned || status=1
   [ "$FAIL_COUNT" -eq 0 ] || status=1
@@ -544,31 +747,63 @@ r007_finish() { # summary-label
 }
 
 # ---- inspector ---------------------------------------------------------------------------------
+# Prints the r007_* status fields of the raw `am instrument -r` output as key=value lines. Fails unless the run
+# completed.
+r007_instrument_fields() { # raw
+  r007_has "$1" '^INSTRUMENTATION_CODE: -1$' || return 1
+  sed -n -E 's/^INSTRUMENTATION_STATUS: (r007_[a-z_]+)=(.*)$/\1=\2/p' <<< "$1"
+}
+
 # Runs the fresh-process inspector (`am instrument` stops the app first). Prints the r007_* status fields as
 # key=value lines. Fails when am instrument fails or does not report a completed run.
 r007_inspect() {
   local raw
   raw="$(sh_ am instrument -w -r -e r007 inspect -e class "$R007_INSPECTOR" "$TEST_APP_ID/$R007_RUNNER")" || return 1
-  r007_has "$raw" '^INSTRUMENTATION_CODE: -1$' || return 1
-  sed -n -E 's/^INSTRUMENTATION_STATUS: (r007_[a-z_]+)=(.*)$/\1=\2/p' <<< "$raw"
+  r007_instrument_fields "$raw"
 }
 
 r007_field() { # inspection-output field
   sed -n "s/^$2=//p" <<< "$1" | head -1
 }
 
-# Runs the inspector and checks its evidence. The store must be quiescent: no app process may run before the
-# inspection, so only the inspection can change the store file between the two hashes. It requires an unchanged store
-# file, a completed inspection with a process id, the inspector's begin and end markers for that process in logcat,
-# and an end marker that repeats the reported count. It fails when logcat cannot be read, when the wrapper logged any
-# storage operation in the inspector process, or when the store cannot be hashed. Prints the inspection.
+# Makes sure that no app process can change the store before an inspection. A running app process that has logged no
+# wrapper line has not built the lockout store, so it is stopped: the system starts the sticky ProtectionWatchdogService
+# in a new process about 1 s after a kill (probe of 2026-09-30). A running process with a wrapper line fails the
+# check, because its load can have changed the store file. The stop goes to the evidence file.
+r007_quiesce() {
+  local pid
+  r007_app_absent && return 0
+  pid="$(r007_pid)" || { fail "the store is not quiescent: $APP_ID runs, but not as one process"; return 1; }
+  r007_capture_log \
+    || { fail "the store is not quiescent: the log of the running process $pid is unreadable"; return 1; }
+  ! r007_has "$R007_CAPTURE" "R007Fault: pid=$pid " \
+    || { fail "the store is not quiescent: the running app process $pid has used the store"; return 1; }
+  r007_stop_app || return 1
+  r007_capture_log \
+    || { fail "the store is not quiescent: the log of the stopped app process $pid is unreadable"; return 1; }
+  ! r007_has "$R007_CAPTURE" "R007Fault: pid=$pid " \
+    || { fail "the store is not quiescent: the app process $pid used the store before its stop"; return 1; }
+  printf '## quiesce stopped_pid=%s store_lines=0\n' "$pid" >> "${R007_LOG_OUT:-/dev/null}"
+}
+
+# Runs the inspector and checks its evidence. The store must be quiescent (see r007_quiesce), so only the inspection
+# can change the store file between the two hashes. It requires an unchanged store file and the evidence that
+# r007_inspect_evidence checks. It fails when the store cannot be hashed. Prints the inspection.
 r007_inspect_checked() {
-  local out pid count before after
-  r007_app_absent || { fail "the store is not quiescent: $APP_ID runs before the inspection"; return 1; }
+  local out before after
+  r007_quiesce || return 1
   before="$(r007_store_hash)" || { fail "the store could not be hashed before the inspection"; return 1; }
   out="$(r007_inspect)" || { fail "the inspector did not complete (is $TEST_APP_ID installed?)"; return 1; }
   after="$(r007_store_hash)" || { fail "the store could not be hashed after the inspection"; return 1; }
   [ "$after" = "$before" ] || { fail "the inspection changed the store file"; return 1; }
+  r007_inspect_evidence "$out"
+}
+
+# Checks the evidence of the inspection OUT: a completed inspection with a process id, the inspector's begin and end
+# markers for that process in logcat, and an end marker that repeats the reported count. It fails when logcat cannot
+# be read, or when the wrapper logged any storage operation in the inspector process. Prints the inspection.
+r007_inspect_evidence() { # inspection
+  local out="$1" pid count
   pid="$(r007_field "$out" r007_pid)"
   [[ "$pid" =~ ^[0-9]+$ ]] || { fail "the inspector reported no process id"; return 1; }
   r007_capture_log || { fail "logcat could not be read, so the inspection is unverified"; return 1; }

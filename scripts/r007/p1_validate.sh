@@ -2,10 +2,10 @@
 # R-007 test plan phase P1, device part: validates the device harness itself, not the lockout candidates.
 #
 # Checks, on a disposable debug install (the script creates the PIN on the first run):
-#   V0  the build is debuggable, the androidTest APK is installed, the device is unlocked, no settings record of an
-#       unfinished earlier run exists, the screen stays on with the rotation locked to 0 (portrait) and is on and
-#       unlocked after a wake key, no app process is left from an earlier run (the script stops one), and the
-#       wrapper is present;
+#   V0  the build is debuggable, the androidTest APK is installed, the device is unlocked, no settings record and no
+#       app-data marker of an unfinished earlier run exist, the screen stays on with the rotation locked to 0
+#       (portrait) and is on and unlocked after a wake key, no app process is left from an earlier run (the script
+#       stops one), and the wrapper is present;
 #   V1  fixture: a correct PIN resets the store, and a fresh-process inspection confirms count 0;
 #   V2  positive control: a healthy wrong-PIN commit survives an abrupt kill (count 1 after restart);
 #   V3  a write held before its commit and killed leaves the old durable state (count still 1);
@@ -22,12 +22,13 @@
 # The script never clears app data, reinstalls, or re-provisions the PIN between an action and its inspection. Only V8
 # edits the store file, and it restores the saved original.
 #
-# Device settings: V0 records the stay-awake and rotation settings on the device before it changes them. After a run
-# that did not finish its cleanup, run scripts/r007/restore_settings.sh before the next run.
+# Device settings: V0 records the stay-awake, rotation, and accessibility settings on the device before it changes the
+# stay-awake and rotation settings. After a run that did not finish its cleanup, run scripts/r007/restore_settings.sh
+# before the next run.
 #
-# Exit: r007_finish (the EXIT trap) restores what is still pending, the V8 store copy and the device settings, and
-# saves the settings comparison in the evidence file. Then it prints the evidence location and the only summary. The
-# exit status is that of an early stop, or 1 after any failure.
+# Exit: r007_finish (the EXIT trap) restores what is still pending, a read-only preferences directory of V5, the V8
+# store copy, and the device settings, and saves the settings comparison in the evidence file. Then it prints the
+# evidence location and the only summary. The exit status is that of an early stop, or 1 after any failure.
 #
 # Evidence: every case's wrapper and inspector lines go to $R007_LOG_OUT, or by default to
 # build/r007-evidence/p1_validate-<serial>-<UTC time>.log. The run stops before V0 when that file cannot be written.
@@ -65,6 +66,10 @@ r007_test_apk_installed \
   || { fail "$TEST_APP_ID is not installed (gradlew installProdDebugAndroidTest)"; r007_stop_run; }
 r007_unlocked \
   || { fail "the device is locked, or its keyguard state is unknown (unlock it and run again)"; r007_stop_run; }
+pending="$(r007_pending_list)" \
+  || { fail "the pending markers could not be queried; nothing was changed"; r007_stop_run; }
+[ -z "$pending" ] \
+  || { fail "an earlier run left app data changed ($pending); run scripts/r007/restore_settings.sh"; r007_stop_run; }
 r007_settings_apply || r007_stop_run
 # The screen can go off between the keyguard check above and the stay-awake setting; the setting does not turn it on.
 r007_wake_screen || r007_stop_run
@@ -125,7 +130,7 @@ step "V5 real platform fault: read-only preferences directory"
 r007_clear_faults
 r007_clear_log "V4"
 r007_open_self_gate
-r007_run_as chmod 500 shared_prefs || fail "V5: the preferences directory could not be made read-only"
+r007_prefs_readonly || fail "V5: the preferences directory could not be made read-only"
 r007_enter_wrong_pin
 if r007_wait_phase WRITE 0 REAL_RESULT >/dev/null \
   && r007_logged "op=WRITE index=0 phase=REAL_RESULT script=Normal result=false"; then
@@ -133,7 +138,7 @@ if r007_wait_phase WRITE 0 REAL_RESULT >/dev/null \
 else
   fail "V5: commit() did not return false: $(r007_log | grep -E 'op=WRITE index=0' | tail -2 | tr '\n' ' ')"
 fi
-r007_run_as chmod 771 shared_prefs || fail "V5: the preferences directory permissions could not be restored"
+r007_prefs_writable || fail "V5: the preferences directory permissions could not be restored"
 killed_cleanly "V5"
 inspected_count "V5" 2
 

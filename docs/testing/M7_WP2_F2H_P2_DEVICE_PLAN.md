@@ -1,7 +1,8 @@
 # M7 WP2 F2 hardening, phase P2: device lane plan
 
 **For:** the Moto G 2025 lane on the 2012 i7 box, and the NucBox G5 emulator lanes (API 36 and API 30).
-**Status:** draft for the lead's review, written 2026-09-28. No P2 device harness code exists yet.
+**Status:** draft for the lead's review, written 2026-09-28. The harness of section 3 exists since 2026-09-29
+(`scripts/r007/p2_device.sh`, `lib_p2.sh`, the segment files in `scripts/r007/p2/`, and `LockoutStoreFixture`).
 **Baseline:** `05c69b7`. The production classes under test are unchanged since `b9e7c53` (change F2).
 **SSOT:** `docs/process/M7_PLAN.md`, F2 hardening entry. The phase definition and the case IDs are in
 `docs/process/proposals/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md`. The JVM lane is
@@ -42,6 +43,29 @@ design inputs, not evidence of record. The device was returned to its earlier st
 | `logcat` through `run-as` | No output | A kill cannot be triggered from the app's own log lines. The mid-commit kill uses the preferences backup file instead |
 | Healthy write times in the P1 evidence (Moto) | 10 to 26 ms from the wrapper's `BEGIN` line to its `REAL_RESULT` line | The window of the mid-commit sweep |
 
+More probes ran on the Moto G on 2026-09-29, with the new harness functions, and with the same limits:
+
+| Probe | Result | Consequence for the harness |
+|---|---|---|
+| Removal of the grant while the lock screen shows | Unbound after 0.84 s. The process (same pid) and the lock screen stayed, and a wrong PIN after the removal wrote `(1,0)` | Confirms the order of section 3.3 |
+| Mid-commit loop, delay 0 | 3 of 3 trials were inside the platform write: backup file present, the old pair after the inspection, and once an empty store file | The class "inside the platform write" is reachable with delay 0 |
+| Mid-commit loop, delays 2, 5, and 10 ms | 3 of 3 trials were after the return. The `sleep` process of the loop takes a few ms | The classes between the file write and the return are rare with these delays. The report gives the counts |
+| Clock launches with the detector on | Once, the lock screen started, got a second start request 0.16 s later, and closed. `LockScreenActivity` finishes on a pause without an unlock | `r007_open_gate` launches again, up to 3 times, and records each retry |
+| Switch of the Clock row in the app list | The tap protected Clock, but the UI dump still showed `checked="false"` | The harness checks the protection by behaviour only |
+| Sleep key (`KEYCODE_SLEEP`) | The keyguard showed 0.13 s after the screen went off (the power key locks at once) | A screen-off step needs the operator on the Moto. It runs only with `-o`; otherwise the case records `screen_cycle=skipped` |
+| UI dump (`uiautomator dump`) | About 2 to 5 s for each dump | Gate samples are seconds apart. H03 bounds each sample by the device time before and after its dump |
+| Empty string in a secure setting | `settings put` with `''` stores an empty string, and `settings get` prints an empty line | The settings record accepts an empty service list and restores it as an empty string |
+
+Five more probes ran on the Moto G on 2026-09-30, with the same limits:
+
+| Probe | Result | Consequence for the harness |
+|---|---|---|
+| Timed `input tap` for each digit of a wrong PIN and a correct PIN on the self-gate | The first three digits took 68 to 106 ms each, and the last digit 630 ms (wrong PIN) and 577 ms (correct PIN). The `WRITE BEGIN` line came 26 ms and 19 ms before the last tap returned. The PIN check runs in the click handler on the main thread | A kill after the last tap comes after the write begins. R3.1a starts the last tap in the background and kills during it. The JVM cut of R3.1a (after the check, before the admission) is not reachable by a host kill (section 5) |
+| Clock launch with the detector bound | The lock engine logged `AppLockEngine: com.google.android.deskclock -> LockDecision(requiresAuthentication=true, reason=protected app, no session)` at debug level, three times for one launch | `r007_protect_clock` uses these lines as evidence of the protection when the lock screen does not show |
+| Kill of the self-gate process, with Clock protected | About 1.04 s after each of 3 kills, the system started a new app process for the sticky `ProtectionWatchdogService`. The new process logged no wrapper line, so it did not build the lockout store | Before an inspection, the harness stops a running app process that logged no wrapper line, and records the stop. A running process with a wrapper line still fails the inspection |
+| State and CPU ticks of the main thread (`/proc/<pid>/task/<pid>/stat`, read by the shell about every 55 ms) during the third and the last digit of a wrong PIN | The third digit used 3 ticks in all, and the thread slept from 77 ms after the tap start. During the last digit the thread ran from 73 ms to 640 ms and used 61 ticks. The `WRITE BEGIN` line came at 643 ms | The PIN check hashes on the main thread, so its CPU ticks show that the check has started. R3.1a counts a trial only with at least 8 ticks between the tap start and the kill |
+| `input tap` in the background, with the app killed 382 ms after the tap start | The tap returned 54 ms after the kill ended, with exit status 0. The process logged no `WRITE` line | The kill command waits for the tap and records its exit status. A trial with a failed tap does not count |
+
 ## 3. Harness additions
 
 All additions are host scripts in `scripts/r007/` and androidTest code with `@R007DeviceTool`. The app does not
@@ -62,11 +86,18 @@ clock. It reports the result of `commit()`. The host then checks the pair with t
 
 ### 3.2 Legacy caller driver
 
+- **Why accessibility.** In the baseline app, only the accessibility detector starts `LockScreenActivity`, and the
+  activity is not exported. The harness grants the detector only as a device setting of a run, for the legacy-caller
+  cases. The app does not change. The overlay caller stays inert until F6, so it cannot be the second caller at
+  baseline. When the overlay engine replaces the detector, these results describe a caller that is removed. The
+  results of the self-gate stay valid for the lockout manager.
 - **Grant.** The harness grants `AppDetectionService` (`settings delete`, then `put`, then `accessibility_enabled
   1`) and waits until `dumpsys accessibility` lists it as bound. The original values go into the device settings
   record and are restored at the end.
 - **Protected app.** The harness protects the Clock app once, through the app list, as `scripts/e2e/setup_device.sh`
-  does. It checks the protection by behaviour: opening Clock shows the lock screen. The Clock package is
+  does. It checks the protection by behaviour: opening Clock shows the lock screen, or the lock engine logs a lock
+  decision for Clock. A tap on the switch of a protected row removes the protection, so the harness taps only after
+  three launches in a row with no lock screen and only "not protected" decisions in the log. The Clock package is
   `com.google.android.deskclock` on the Moto and `com.android.deskclock` on the AOSP images.
 - **Open the gate.** HOME, launch Clock, then wait until the top activity is `LockScreenActivity` and the UI shows
   "Enter your PIN".
@@ -154,12 +185,21 @@ It then opens the gate, enters a wrong PIN, kills, inspects, and restores the sa
 - The harness sets the app setting `biometric_unlock` to false for the PIN cases, by writing
   `shared_prefs/applock_settings.xml` through `run-as` while no app process runs. It records the original file (or
   its absence) and restores it at the end. The biometric segment sets it to true.
-- The Moto locks about 4.3 s after the screen goes off. On the Moto, a screen-off step lasts at most 2 s.
+- Each change of app data that a run must undo (the saved app settings file, a saved store copy, a read-only
+  preferences directory) has a marker file in `files/r007/pending/`. A run does not start while a marker of an earlier
+  run exists. `scripts/r007/restore_settings.sh` undoes the changes that the markers name, and then restores the
+  device settings.
+- The Moto locks about 4.3 s after a screen timeout, but at once after the sleep key. So a screen-off step (H06,
+  R3.3) runs only when an operator is present (`-o`), who unlocks the phone after it. Without `-o`, the case records
+  `screen_cycle=skipped`. The NucBox AVDs have no screen lock, so their runs use `-o`.
 
 ### 3.9 Segments and evidence
 
 The run is split into segments. Each segment is one command, with its own evidence file, preconditions, settings
-record, and exit handler, as in P1. A failed segment does not stop the others.
+record, and exit handler, as in P1. A failed segment does not stop the others. The command is
+`scripts/r007/p2_device.sh [-s SERIAL] [-r MAX_REPEATS] [-c CALLERS] [-o] SEGMENT`. The option `-r` caps every repeat
+count (the smoke run uses `-r 1`), `-c` selects the callers (`"S L"` by default; one or both, each once), and `-o`
+says that an operator is present.
 
 | Segment | Cases | Operator present |
 |---|---|---|
@@ -175,7 +215,11 @@ record, and exit handler, as in P1. A failed segment does not stop the others.
 - Each case and each repeat writes a marker line to the evidence file. It records the case, the caller, the
   repeat, the fixture, the fault script, the pids, the boot id, the stored pair before and after, V with its label,
   and the two verdicts ("as predicted" and "objective met"), as in the JVM report.
-- A summary table at the end of each evidence file lists each case with its repeat count and verdicts.
+- In a residual case, a repeat as predicted shows the loss, so its objective is "no". A repeat that is not as
+  predicted does not establish an unmet objective, so its objective is "na", and the run counts it as a failure.
+  Controls that cannot lose a lock (R1.2 b to d over `Z`, the X10 kill from `Z`) also have the objective "na".
+- A summary table at the end of each evidence file lists each case with its repeat count and verdicts. The objective
+  column counts only the repeats with a "yes" or "no" objective and gives the number of "na" repeats apart.
 
 ### 3.10 Host tests
 
@@ -198,25 +242,25 @@ before an inspected kill (section 3.3). "Exact" and "inferred" are the V labels 
 | H03 | `L5`: gate state around the deadline, then a sixth wrong PIN (60 s window). Fixture `(11, expired)` and a wrong PIN: the window is the 30 min cap. | S, L | 3 | countdown values, no write during a countdown, window lengths |
 | H04 | `C4`. A correct PIN with the write held 5 s: the gate opens before the write returns. Kill after the return, inspect. | S, L | 3 | reset before the commit, stored `Z` |
 | H05 | Fixtures `(1,0)`, `(4,0)`, `(8, now + 10 min)`, `(8, expired)`. Kill and relaunch. Reboot with the active and the expired fixture. | S, L | 3 kills per fixture; reboots: 1 active, 1 expired per host | reloaded state, remaining time against the wall deadline, expired lockout not revived, boot id |
-| H06 | `Z`. The first write held for 1 s, 5 s, and 40 s. During the hold: HOME and back, a second wrong PIN, a UI dump every second, screen off and on. Also a threshold failure and a reset under a hold. | S, L | 3 | responsive gate (no ANR dialog), queue order, last admitted pair stored |
+| H06 | `Z`. The first write held for 1 s, 5 s, and 40 s. During the hold: HOME and back, a second wrong PIN, a UI dump every second, screen off and on. Also a threshold failure and a reset under a hold. | S, L | 3 | responsive gate (no ANR dialog in the UI dumps that show the gate; at least one such dump), queue order, last admitted pair stored |
 
 ### 4.2 R-007/1: cold-start read failure (R1)
 
 | Case | Device procedure at baseline | Callers | Repeats | Records |
 |---|---|---|---|---|
 | R1.1 | `L5`. (a) No poll: `READ 0 Throw`; the detector builds the manager with no lock screen; Clock opens after 10 s. (b) With polls: `READ * Throw`; the host publishes an empty script 1 s after the gate opens. | (a) L; (b) S, L | 3 | reads and their times, unenforced interval, count after the re-seed |
-| R1.2 | `READ * Throw` over `L8` and `Z`. (a) Read rate over 10 s. (b) A wrong PIN, kill, inspect: `(1,0)`. (c) A correct PIN: `Z`. (d) The fault ends after 10 s. (e) First process and 20 restart cycles, wrong PINs until the gate blocks, with a control run without the fault. | S, L | (a) to (d): 3; (e): 1 run of 21 processes | reads per second, exact V per process, stored pairs |
-| R1.3 | `L5`, `READ 0 Throw`, `READ 1 ReadThenHold`. While the old value is held: (a) a wrong PIN, (b) a correct PIN. Release the read. Also (a) with `WRITE 0 ReturnFalseBeforeCommit`. Kill, inspect. | S, L | 3 | old value not applied, stored pair (`(1,0)` or `Z`; `L5` when the write fails) |
-| R1.4 | (a) `READ 0 HoldThenRead` at a self-gate cold start, released at 40 s. (b) The same at the detector bind. (c) `READ 0 Throw`, `READ 1 HoldThenRead`: five wrong PINs while the re-seed read holds, released at 40 s. (d) Construction-read cost: 30 cold starts per caller path. | (a) S; (b) L; (c) S, L; (d) S, L | (a) to (c): 3; (d): 30 | ANR dialog and its time, main-thread read time, writes waiting behind the read; for (d) the first start after a boot is reported apart |
+| R1.2 | `READ * Throw` over `L8` and `Z`. (a) Read rate over 10 s. (b) A wrong PIN, kill, inspect: `(1,0)`. (c) A correct PIN: `Z`. (d) The fault ends after 10 s. (e) First process and 20 restart cycles, wrong PINs until the gate blocks, with a control run without the fault. Over `Z`, (b) to (d) are controls. | S, L | (a) to (d): 3; (e): 1 run of 21 processes | reads per second, exact V per process, stored pairs |
+| R1.3 | Count 5 with a 10 min window (so that an old lock that comes back still blocks at the check), `READ 0 Throw`, `READ 1 ReadThenHold`. While the old value is held: (a) a wrong PIN, (b) a correct PIN. Release the read. Also (a) with `WRITE 0 ReturnFalseBeforeCommit`. Check the live gate: open for (a) and (b), the 30 s degraded lock for the failed write. Kill, inspect. | S, L | 3 | old value not applied (live gate), stored pair (`(1,0)` or `Z`; the old pair when the write fails) |
+| R1.4 | (a) `READ 0 HoldThenRead` at a self-gate cold start, released at 40 s. (b) The same at the detector bind. (c) `READ 0 Throw`, `READ 1 HoldThenRead`: five wrong PINs while the re-seed read holds, released at 40 s. (d) Construction-read cost: 30 cold starts per caller path. | (a) S; (b) L; (c) S, L; (d) S, L | (a) to (c): 3; (d): 30 | ANR dialog and its time (unknown when no UI dump returned a screen), a process death during the hold and its time, main-thread read time, writes waiting behind the read; for (d) the first start after a boot is reported apart |
 
 ### 4.3 R-007/2: degraded enforcement lost on restart (R2)
 
 | Case | Device procedure at baseline | Callers | Repeats | Records |
 |---|---|---|---|---|
-| R2.1 | `Z`, `WRITE 0 ReturnFalseBeforeCommit` (and `Throw`). A wrong PIN arms the 30 s degraded lock. Kill 5 s after the write returned; relaunch. Also a kill at 25 s, and the real platform fault (read-only preferences directory). Reboot: `(8, expired)`, a wrong PIN with a failing write arms a 480 s degraded lock, then reboot. | S, L | kill at 5 s: 10; kill at 25 s and platform fault: 3; reboots: 3 per host | lost enforcement time, gate state after the restart, stored pair |
+| R2.1 | `Z`, `WRITE 0 ReturnFalseBeforeCommit` (and `Throw`). A wrong PIN arms the 30 s degraded lock. Kill 5 s after the write returned; relaunch. Also a kill at 25 s, and the real platform fault (read-only preferences directory). Reboot: `(8, expired)`, a wrong PIN with a failing write arms a 480 s degraded lock, then reboot. The kill time is the device time after the confirmed death, so the lost time is a lower bound. A kill after the end of the lock shows no loss and fails the repeat. | S, L | kill at 5 s: 10; kill at 25 s and platform fault: 3; reboots: 3 per host | lost enforcement time, gate state after the restart, stored pair |
 | R2.2 | `Z`, `WRITE 0 HoldBeforeCommit ReturnFalseBeforeCommit`. F1 held, F2 queued. Release: F1 fails, F2 commits `(2,0)`. Kill 10 s later. | S, L | 3 | degraded state before the kill, count 2 and Available after it |
 | R2.3 | `(3,0)`, `WRITE 0 HoldBeforeCommit ReturnFalseBeforeCommit`. F4 held, F5 locks. Wait 40 s, release, kill. | S, L | 3 | degraded window from the F4 completion, stored `L5` with a passed deadline, Available after the kill |
-| R2.4 | `WRITE * ReturnFalseBeforeCommit`, then `WRITE * Throw`. First process and 20 restart cycles, wrong PINs until the gate blocks. Also kills before and after the degraded deadline. | S, L | 1 run of 21 processes per script; deadline kills: 3 | exact V per process, stored `Z`, count never above 1 |
+| R2.4 | `WRITE * ReturnFalseBeforeCommit`, then `WRITE * Throw`. First process and 20 restart cycles, wrong PINs until the gate blocks. Also kills before and after the degraded deadline, timed as in R2.1. | S, L | 1 run of 21 processes per script; deadline kills: 3 | exact V per process, stored `Z`, count never above 1 |
 
 ### 4.4 R-007/3: death before admitted changes are durable (R3)
 
@@ -224,7 +268,7 @@ The critical cuts use the fixtures `Z` and `C4` in turn (5 repeats each).
 
 | Case | Device procedure at baseline | Callers | Repeats | Records |
 |---|---|---|---|---|
-| R3.1a | A kill during PIN verification, before the write begins. The host kills after the last tap. A trial counts only when the wrapper logged no `WRITE` line; the harness stops after 30 trials. | S, L | 10 | stored pair (old), verified failure lost, gate after the restart |
+| R3.1a | A kill during the PIN check, before the write begins. A timed control submission per caller measures the window from the time a tap reaches the app to the write. The host starts the last tap in the background and kills at the middle of the window. The kill command reads the CPU ticks of the main thread before the tap and at the kill. A trial counts only when the tap succeeded, the main thread used at least 8 ticks in that time (the PIN check hashes on the main thread, so the check has started), and the wrapper logged no `WRITE` line; the harness stops after 30 trials. A kill that reports an error stops R3.1a for that caller: the process then died by another cause, or not at all. The check gave no result before the kill, so the objective verdict is "na". | S, L | 10 | control window, kill time, tap status, main-thread ticks, stored pair (old), gate after the restart |
 | R3.1b | `WRITE 0 HoldBeforeCommit`: the first wrong PIN holds, the second waits in the queue. Kill. | S, L | 10 | stored pair (old), both failures lost; from `C4` the threshold lock is lost |
 | R3.1 held | `WRITE 0 HoldBeforeCommit`: one wrong PIN, kill. Reboot variant. | S, L | 10; reboots: 3 per host | stored pair (old), gate after the restart |
 | R3.1c | The mid-commit sweep (section 3.5), with no fault script. | S, L | at least 60 trials, 10 inside the platform write | class of each trial, stored pair (complete old or new), backup file |
@@ -251,7 +295,7 @@ other caller, and the evidence records it.
 
 | Case | Device procedure at baseline | Callers | Repeats | Records |
 |---|---|---|---|---|
-| X09 | `Z`, `WRITE 0 HoldBeforeCommit`. (a) Two taps on the last digit. (b) HOME and back during the hold. (c) A rotation during the hold (`user_rotation` 1, then 0). Release. | S, L | 3 | writes per completed PIN entry, count, no second unlock |
+| X09 | `Z`, `WRITE 0 HoldBeforeCommit`. (a) Two taps on the last digit; the second tap starts a new entry (section 5), so the objective of (a) is "na". (b) HOME and back during the hold. (c) A rotation during the hold (`user_rotation` 1, then 0). Release. | S, L | 3 | writes per completed PIN entry, count, no second unlock |
 | X10 | Both callers in one process. (a) A wrong PIN on L with the write held, then a correct PIN on S. Release. (b) The reverse order. (c) Both orders with a kill before the release. | S + L | 3 per order | write order, stored pair, which target unlocked |
 | X11 | Moto, L, biometric setting on, lead present. (a) A non-enrolled finger from `C4`. (b) Cancel with "Use PIN". (c) System biometric lockout after repeated mismatches. (d) An enrolled finger from `C4`. (e) An enrolled finger over an unreadable stored lockout (`(8, now + 10 min)`, `READ * Throw`). | L | (a), (d): 3; (b), (c), (e): 1 | writes, stored pair, prompt shown or not |
 | X16 | `(8, now + 10 min)`. The damaged store file (section 3.7). | S | 3 | inspected result, file change, gate state, stored pair after a wrong PIN |
@@ -261,7 +305,9 @@ other caller, and the evidence records it.
 | Case | Reason |
 |---|---|
 | R1.4 cancellation, X08 | The device wrapper throws only `InjectedStorageFault`. The JVM lane covers the cancellation cases. |
+| R3.1a cut of the JVM lane (a death after the PIN check and before the admission of the failure) | On the device, the check and the admission run one after the other in one click handler on the main thread, with no wait between them (probe of 2026-09-30). A host kill has a delay of tens of milliseconds, and the app logs nothing between the two steps. The device R3.1a kills during the check instead. The JVM lane covers the cut. |
 | R3.1e, X13 | No device hook holds or observes the completion callback. The JVM lane covers them. |
+| X09, a double submit of one PIN entry | `input tap` returns only after the app has handled the tap, and the click handler checks and clears the PIN on the main thread. A second tap therefore starts a new entry, and a host cannot submit one entry twice. X09a records the tap times and one write for each completed entry. |
 | R3.2 threshold write before a reset | The gate blocks a reset while a threshold lock is active, on both callers. The case is manager-only (JVM). |
 | R4.1 reset over an active lockout (direct) | Manager-only for the same reason. R4.1b reaches an active stale deadline through unknown storage instead. |
 | X04 | Setting the wall clock needs root on the Moto. The JVM lane covers it. |
@@ -318,9 +364,13 @@ other caller, and the evidence records it.
   the grant, the legacy cases on that device stop and become a recorded gap.
 - **Restarted process.** In the restart-cycle runs, the process that the system restarts loads the store before
   the harness acts. At baseline it only reads, and these runs inspect only at the end. Inspected kills remove the
-  grant first.
-- **Kill timing.** A host kill has a delay of tens of milliseconds, so R3.1a is classified by the wrapper lines, not
-  by the delay. The mid-commit class depends on the backup-file behaviour, which the smoke run confirms first.
+  grant first. The process that the watchdog service starts after a kill does not use the store, and the harness
+  stops it before an inspection.
+- **Kill timing.** A host kill has a delay of tens of milliseconds. R3.1a therefore kills in the middle of a window
+  of about 500 ms on the Moto G, and a trial counts only by the main-thread CPU ticks at the kill and the wrapper
+  lines. The window of the
+  NucBox AVDs can be narrower, and a window under 200 ms stops R3.1a on that host. The mid-commit class depends on
+  the backup-file behaviour, which the smoke run confirms first.
 - **Reboots on the Moto** need the lead to unlock the phone 11 times: 2 for H05, and 3 each for R2.1, R3.1,
   and R4.1a.
 - **Fault source.** Wrapper faults are injected. Only R2.1, R4.1c, and X16 use real platform file faults.

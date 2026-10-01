@@ -86,16 +86,19 @@ tap_frac() { # xfrac yfrac
   local x y; x=$(awk "BEGIN{printf \"%d\", $1*$SCREEN_W}"); y=$(awk "BEGIN{printf \"%d\", $2*$SCREEN_H}")
   sh_ input tap "$x" "$y"
 }
-_pin_digit() { # 0-9 -> col,row
-  local d="$1" col row
-  case "$d" in
+_pin_digit_xy() { # 0-9 -> "x y" by geometry (needs SCREEN_W/SCREEN_H)
+  local col row
+  case "$1" in
     1) col=0 row=0;; 2) col=1 row=0;; 3) col=2 row=0;;
     4) col=0 row=1;; 5) col=1 row=1;; 6) col=2 row=1;;
     7) col=0 row=2;; 8) col=1 row=2;; 9) col=2 row=2;;
     0) col=1 row=3;;
+    *) return 1;;
   esac
-  tap_frac "${PIN_COL_FRAC[$col]}" "${PIN_ROW_FRAC[$row]}"
+  awk -v w="$SCREEN_W" -v h="$SCREEN_H" -v x="${PIN_COL_FRAC[$col]}" -v y="${PIN_ROW_FRAC[$row]}" \
+    'BEGIN { printf "%d %d", x * w, y * h }'
 }
+_pin_digit() { local xy; xy="$(_pin_digit_xy "$1")" && sh_ input tap $xy; } # tap a digit by geometry
 # Center-of-node coords for a PIN digit, located by its Compose Text ("1".."0")
 # in the current uiautomator dump. Resolution-independent — works on any screen
 # where Compose exposes the button text (it does; PinKey renders Text(label)).
@@ -163,13 +166,17 @@ wait_foreground() { # pkg [timeout=$FG_WAIT]
 }
 
 # ---- UI hierarchy (for in-MainActivity self-gate vs app-list distinction) --
+# The file is removed before each dump: a failed dump (no idle state, no root node) writes no file, so the output is
+# then empty instead of the previous dump.
 ui_xml() { # dump the current window hierarchy to stdout (one retry)
-  sh_ uiautomator dump /sdcard/e2e_ui.xml >/dev/null
+  sh_ rm -f /sdcard/e2e_ui.xml; sh_ uiautomator dump /sdcard/e2e_ui.xml >/dev/null
   local x; x="$(sh_ cat /sdcard/e2e_ui.xml)"
   [ -n "$x" ] || { sh_ uiautomator dump /sdcard/e2e_ui.xml >/dev/null; x="$(sh_ cat /sdcard/e2e_ui.xml)"; }
   printf '%s' "$x"
 }
-ui_has() { ui_xml | grep -qF "$1"; }
+# A here-string, not a pipe: under pipefail, grep -q exiting early on a large dump would SIGPIPE the producer and
+# turn a match into a failure.
+ui_has() { local x; x="$(ui_xml)"; grep -qF -- "$1" <<< "$x"; }
 
 # ---- app control ----------------------------------------------------------
 launch_pkg() { # resolve the launcher activity and am-start it (more reliable than monkey)
