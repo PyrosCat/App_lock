@@ -4,6 +4,23 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 reboot wait and log reads without a device   (2026-10-02)
+-----------------------------------------------------------------------------------
+The device harness now handles a phone that connects adb only after its first unlock following a reboot. On the
+Moto G, such a reboot made the R2.1 reboot case fail in the smoke run.
+- The r007_reboot function of lib_p2.sh asks the operator to unlock right after the reboot command.
+- The boot wait and the unlock wait of that function share one deadline of 9 min.
+- Until the phone connects, the function asks adb only for the device state, which fails at once.
+- A new r007_logcat function of lib_r007.sh fails at once when adb cannot see the device.
+- Every log read of the harness uses the new function, because `adb logcat` waits for a missing device.
+- One log read of the smoke run waited about 25 min for the phone after the failed reboot.
+- The stub adb of test_lib_r007.sh can hide the device after a reboot and keep its keyguard shown.
+- Four new host tests in test_lib_r007.sh cover the shared deadline, the unlock request, and a missing device.
+- A run of the four new tests against the previous harness code failed all four.
+- The P2 device plan describes the new reboot wait and the log reads.
+- The test_lib_r007.sh script passed all 447 host tests.
+
+
 M7/WP2 (F2 hardening): P2 security verdict rule and proposed device skips   (2026-10-02)
 ----------------------------------------------------------------------------------------
 The P2 device plan gets a lead decision on the security verdict and a list of proposed test skips.

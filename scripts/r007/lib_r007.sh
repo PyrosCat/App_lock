@@ -92,11 +92,15 @@ r007_apk_sha256() { # package
   printf '%s' "${hash%% *}"
 }
 
+# Runs `adb logcat` with ARGS. For a device that is not connected, `adb logcat` waits until the device connects, so a
+# run that loses its device would block there. This function fails at once instead.
+r007_logcat() { adbx get-state >/dev/null 2>&1 || return 1; adbx logcat "$@"; }
+
 # Reads the wrapper, inspector, and fixture-writer lines, with epoch timestamps, into R007_CAPTURE. Returns 1 when
 # logcat cannot be read, so a failed read is never taken for an empty log.
 r007_capture_log() {
   local out
-  out="$(adbx logcat -d -v epoch -s R007Fault:I R007Inspect:I R007Fixture:I)" || { R007_CAPTURE=""; return 1; }
+  out="$(r007_logcat -d -v epoch -s R007Fault:I R007Inspect:I R007Fixture:I)" || { R007_CAPTURE=""; return 1; }
   R007_CAPTURE="$(tr -d '\r' <<< "$out" | sed '/^-----/d')"
 }
 
@@ -121,7 +125,7 @@ r007_save_log() { # case-label
 # Saves the lines of the case that ends, then clears logcat for the case that starts.
 r007_clear_log() { # label-of-the-case-that-ends
   r007_save_log "${1:-unlabelled}" || return 1
-  adbx logcat -c || { fail "logcat could not be cleared"; return 1; }
+  r007_logcat -c || { fail "logcat could not be cleared"; return 1; }
 }
 
 # Waits until the wrapper logs PHASE for OP#INDEX (optionally in process PID). Prints the pid of that line.

@@ -463,7 +463,7 @@ r007_phase_elapsed() { # text pid op index phase [thread]
 # buffer also holds older processes, and the pid selects the lines.
 r007_proc_events() { # pid
   local out
-  out="$(adbx logcat -b events -d -v epoch -s am_anr:I am_kill:I)" || return 1
+  out="$(r007_logcat -b events -d -v epoch -s am_anr:I am_kill:I)" || return 1
   tr -d '\r' <<< "$out" | sed -n -E \
     -e "s/^ *([0-9]+\.[0-9]+) +[0-9]+ +[0-9]+ I am_anr *: \[[0-9]+,$1,[^,]*,[^,]*,(.*)\]$/am_anr \1 \2/p" \
     -e "s/^ *([0-9]+\.[0-9]+) +[0-9]+ +[0-9]+ I am_kill *: \[[0-9]+,$1,[^,]*,[^,]*,([^,]*),.*$/am_kill \1 \2/p"
@@ -622,33 +622,42 @@ r007_sweep_class() { # text pid bak pair old new
 R007_BOOT_ID=""   # the boot id after the last reboot
 
 # Reboots the device and waits until it has booted with a new boot id and is unlocked, with the screen on and the
-# stay-awake setting in effect. The wait ends only on a new boot id: a phone that still shuts down after
-# R007_REBOOT_SETTLE answers as a booted device with the old boot id. A phone needs its credential for the first
-# unlock after a boot: the function prints a request and waits up to R007_UNLOCK_WAIT seconds for the operator. It
-# never enters a device credential. Sets R007_BOOT_ID.
+# stay-awake setting in effect. A phone needs its credential for the first unlock after a boot, and the Moto G
+# connects adb only after that unlock (smoke run of 2026-10-02). So the function prints the request to the operator
+# right after the reboot, and the boot and the unlock share one deadline of R007_BOOT_WAIT + R007_UNLOCK_WAIT
+# seconds. Until the device connects, the loop calls only `adb get-state`, which fails at once for a device that is
+# not connected. The wait ends only on a new boot id: a phone that still shuts down after R007_REBOOT_SETTLE answers
+# as a booted device with the old boot id. The function never enters a device credential. Sets R007_BOOT_ID.
 r007_reboot() {
-  local old state end id="" booted=no
+  local old state end id="" connected=no booted=no wait_s=$(( R007_BOOT_WAIT + R007_UNLOCK_WAIT ))
   R007_BOOT_ID=""
   old="$(r007_boot_id)" && [ -n "$old" ] || { fail "the boot id could not be read before the reboot"; return 1; }
   adbx reboot || { fail "adb reboot failed"; return 1; }
+  info "ACTION: unlock the device as soon as its lock screen shows (waiting up to $wait_s s)." \
+    "The harness never enters a credential."
   sleep "$R007_REBOOT_SETTLE"
-  end=$(( SECONDS + R007_BOOT_WAIT ))
+  end=$(( SECONDS + wait_s ))
   while :; do
     state="$(adbx get-state 2>/dev/null | tr -d '\r')" || state=""
-    if [ "$state" = device ] && [ "$(sh_ getprop sys.boot_completed)" = 1 ]; then
-      booted=yes; id="$(r007_boot_id)"
-      [ -n "$id" ] && [ "$id" != "$old" ] && break
+    if [ "$state" = device ]; then
+      connected=yes
+      if [ "$booted" = no ] && [ "$(sh_ getprop sys.boot_completed)" = 1 ]; then
+        id="$(r007_boot_id)"
+        # A device whose adb connects before the unlock (the NucBox AVD) gets its screen turned on once.
+        if [ -n "$id" ] && [ "$id" != "$old" ]; then booted=yes; sh_ input keyevent KEYCODE_WAKEUP >/dev/null; fi
+      fi
+      [ "$booted" = no ] || ! r007_unlocked || break
     fi
     if [ "$SECONDS" -ge "$end" ]; then
-      if [ "$booted" = no ]; then fail "the device did not boot in $R007_BOOT_WAIT s"
-      else fail "the boot id did not change in $R007_BOOT_WAIT s ($old, then ${id:-none})"; fi
+      if [ "$connected" = no ]; then
+        fail "the device did not connect in $wait_s s after the reboot (the Moto G connects only after the unlock)"
+      elif [ "$booted" = no ]; then fail "the boot id did not change in $wait_s s ($old, then ${id:-none})"
+      else fail "the device stayed locked for $wait_s s after the reboot"; fi
       return 1
     fi
     sleep 2
   done
   R007_BOOT_ID="$id"
-  sh_ input keyevent KEYCODE_WAKEUP >/dev/null
-  r007_wait_unlock || { fail "the device stayed locked for $R007_UNLOCK_WAIT s after the reboot"; return 1; }
   r007_wake_screen
 }
 
@@ -788,7 +797,7 @@ r007_p2_cleanup() {
 # under the tag AppLockEngine. Fails when logcat cannot be read.
 r007_clock_decisions() { # t0-ms
   local out
-  out="$(adbx logcat -d -v epoch -s AppLockEngine:D)" || return 1
+  out="$(r007_logcat -d -v epoch -s AppLockEngine:D)" || return 1
   tr -d '\r' <<< "$out" | awk -v t0="$1" -v prefix="AppLockEngine: $R007_CLOCK -> LockDecision(" '
     $1 * 1000 >= t0 && index($0, prefix) {
       if (index($0, "requiresAuthentication=false, reason=not protected)")) print "unprotected"; else print "protected"

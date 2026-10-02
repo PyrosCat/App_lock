@@ -18,15 +18,27 @@ cat > "$WORK/bin/adb" <<'STUB'
 [ "${1:-}" = -s ] && shift 2
 cmd="$1"; shift
 case "$cmd" in
-  get-state) echo device ;;
+  # With STUB_OFFLINE, adb cannot see the device. After a reboot, the first STUB_REBOOT_ABSENT state reads fail, as on a
+  # phone that connects adb only after the unlock.
+  get-state)
+    [ -n "${STUB_OFFLINE:-}" ] && { echo "error: device not found" >&2; exit 1; }
+    absent="$(cat "$STUB_DEVICE/absent" 2>/dev/null || echo 0)"
+    if [ "$absent" -gt 0 ]; then
+      echo $(( absent - 1 )) > "$STUB_DEVICE/absent"; echo "error: device not found" >&2; exit 1
+    fi
+    echo device ;;
   # A reboot gives a new boot id only with STUB_REBOOT_NEW_ID. With STUB_REBOOT_LAG, that many boot id reads after the
-  # reboot still give the old id, as a phone that still shuts down.
+  # reboot still give the old id, as a phone that still shuts down. The first STUB_REBOOT_LOCKED keyguard reads after
+  # the reboot show a locked device.
   reboot)
     if [ -n "${STUB_REBOOT_NEW_ID:-}" ]; then
       echo "$STUB_REBOOT_NEW_ID" > "$STUB_DEVICE/boot_id.next"; echo "${STUB_REBOOT_LAG:-0}" > "$STUB_DEVICE/boot_lag"
     fi
+    echo "${STUB_REBOOT_ABSENT:-0}" > "$STUB_DEVICE/absent"; echo "${STUB_REBOOT_LOCKED:-0}" > "$STUB_DEVICE/locked"
     echo "reboot" >> "$STUB_DEVICE/ops" ;;
   logcat)
+    # Like the real adb, logcat waits for a device that is not connected (here for 20 s).
+    [ -n "${STUB_OFFLINE:-}" ] && { echo "- waiting for device -" >&2; sleep 20; exit 1; }
     [ -n "${STUB_LOGCAT_FAIL:-}" ] && { echo "error: device offline" >&2; exit 1; }
     case " $* " in
       *" -c "*) : > "$STUB_DEVICE/logcat" ;;
@@ -106,7 +118,10 @@ case "$cmd" in
       "am force-stop "*) [ -n "${STUB_STOP_FAIL:-}" ] && exit 1; echo "force-stop" >> "$STUB_DEVICE/ops" ;;
       "dumpsys activity activities")
         [ -n "${STUB_DUMPSYS_FAIL:-}" ] && exit 1
-        printf '  KeyguardController:\n%s\n' "${STUB_ACTIVITIES-    mKeyguardShowing=false}" ;;
+        locked="$(cat "$STUB_DEVICE/locked" 2>/dev/null || echo 0)"
+        if [ "$locked" -gt 0 ]; then
+          echo $(( locked - 1 )) > "$STUB_DEVICE/locked"; printf '  KeyguardController:\n    mKeyguardShowing=true\n'
+        else printf '  KeyguardController:\n%s\n' "${STUB_ACTIVITIES-    mKeyguardShowing=false}"; fi ;;
       "dumpsys window") [ -n "${STUB_DUMPSYS_FAIL:-}" ] && exit 1; printf '%s\n' "${STUB_WINDOW-}" ;;
       *".bak ]; then echo present"*) [ -n "${STUB_QUERY_FAIL:-}" ] && exit 1; echo "${STUB_BAK-absent}" ;;
       "run-as "*"then sha256sum "*"else echo absent"*)
@@ -1123,9 +1138,35 @@ reset_device; stay_awake_set
 STUB_REBOOT_NEW_ID=boot-2 R007_REBOOT_SETTLE=0 R007_BOOT_WAIT=2 p2 'r007_reboot && echo "boot=$R007_BOOT_ID"'
 grep -qx "boot=boot-2" "$WORK/out" && ok "a reboot with a new boot id passes" || bad "the reboot: $(cat "$WORK/out")"
 reset_device; stay_awake_set
-R007_REBOOT_SETTLE=0 R007_BOOT_WAIT=2 p2 'r007_reboot'
+R007_REBOOT_SETTLE=0 R007_BOOT_WAIT=2 R007_UNLOCK_WAIT=0 p2 'r007_reboot'
 grep -q "boot id did not change" "$WORK/out" && ok "a reboot without a new boot id fails" \
   || bad "the same boot id: $(cat "$WORK/out")"
+# A phone that connects adb only after the unlock: 6 state reads fail, longer than R007_BOOT_WAIT alone, then 2
+# keyguard reads show it locked. Each sleep moves the clock 1 s on instead of waiting.
+reset_device; stay_awake_set
+STUB_REBOOT_NEW_ID=boot-2 STUB_REBOOT_ABSENT=6 STUB_REBOOT_LOCKED=2 R007_REBOOT_SETTLE=0 R007_BOOT_WAIT=2 \
+  R007_UNLOCK_WAIT=30 \
+  p2 'sleep() { SECONDS=$((SECONDS + 1)); }; r007_reboot && echo "boot=$R007_BOOT_ID fails=$FAIL_COUNT"'
+grep -qx "boot=boot-2 fails=0" "$WORK/out" && [ "$(grep -c "ACTION: unlock" "$WORK/out")" = 1 ] \
+  && ok "a reboot passes when adb connects only after the unlock, with one unlock request" \
+  || bad "the reboot with adb after the unlock: $(cat "$WORK/out")"
+reset_device; stay_awake_set
+STUB_REBOOT_NEW_ID=boot-2 STUB_REBOOT_ABSENT=999 R007_REBOOT_SETTLE=0 R007_BOOT_WAIT=4 R007_UNLOCK_WAIT=4 \
+  p2 'sleep() { SECONDS=$((SECONDS + 2)); }; r007_reboot; echo "rc=$?"'
+grep -q "did not connect in 8 s after the reboot" "$WORK/out" && grep -qx "rc=1" "$WORK/out" \
+  && ok "a device that does not connect after the reboot fails at the shared deadline" \
+  || bad "the device that does not connect: $(cat "$WORK/out")"
+reset_device; stay_awake_set
+STUB_REBOOT_NEW_ID=boot-2 STUB_REBOOT_LOCKED=999 R007_REBOOT_SETTLE=0 R007_BOOT_WAIT=4 R007_UNLOCK_WAIT=4 \
+  p2 'sleep() { SECONDS=$((SECONDS + 2)); }; r007_reboot; echo "rc=$?"'
+grep -q "stayed locked for 8 s after the reboot" "$WORK/out" && grep -qx "rc=1" "$WORK/out" \
+  && ok "a device that stays locked after the reboot fails at the shared deadline" \
+  || bad "the locked device: $(cat "$WORK/out")"
+# The stub logcat waits 20 s for a device that is not connected, as the real one does.
+reset_device
+begin=$(date +%s); STUB_OFFLINE=1 lib r007_capture_log; rc=$?; took=$(( $(date +%s) - begin ))
+[ "$rc" != 0 ] && [ "$took" -le 5 ] && ok "a log capture fails at once when adb cannot see the device" \
+  || bad "the log capture without a device: rc=$rc took=${took}s $(cat "$WORK/out")"
 reset_device; stay_awake_set
 STUB_REBOOT_NEW_ID=boot-2 STUB_REBOOT_LAG=1 R007_REBOOT_SETTLE=0 R007_BOOT_WAIT=10 \
   p2 'r007_reboot && echo "boot=$R007_BOOT_ID fails=$FAIL_COUNT"'

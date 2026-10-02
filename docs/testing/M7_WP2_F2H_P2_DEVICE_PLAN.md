@@ -166,8 +166,11 @@ The kill targets the platform commit, not a wrapper hold. The fault script is em
 ### 3.6 Reboots
 
 - The harness runs `adb reboot`, waits for `sys.boot_completed`, and checks that the boot id changed.
-- **Moto:** the first unlock after a boot needs the device credential. The harness prints a request and waits up
-  to 5 min for the lead to unlock the phone. It never enters a device credential.
+- **Moto:** the first unlock after a boot needs the device credential, and adb connects only after that unlock
+  (smoke run of 2026-10-02). The harness prints the unlock request right after `adb reboot`, and the boot and the
+  unlock share one deadline of 9 min. It never enters a device credential.
+- A log read fails at once when adb cannot see the device, because `adb logcat` waits for a device that is not
+  connected.
 - **NucBox:** the AVD has no screen lock. The harness wakes the screen and checks the keyguard.
 - The harness removes the grant before the reboot. After the boot, the boot receiver can start the app. The
   harness checks that the wrapper logged no `WRITE` line after the boot, stops the app, inspects, and then grants
