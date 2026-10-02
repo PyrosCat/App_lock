@@ -4,6 +4,16 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P0 to P5 time estimate   (2026-10-01)
+------------------------------------------------------------
+A new time estimate covers the phases P0 to P5 of the R-007 test plan.
+- The proposal 2026-10-01_R007_F2_HARDENING_TIME_ESTIMATE.md gives the measured and the estimated time of each
+  phase.
+- The completed phases use the commit dates as their measured times.
+- The P2 device times scale the case times of the Moto G smoke run of 2026-10-01.
+- A table of time savers lists options that add no test cases.
+
+
 M7/WP2 (F2 hardening): P2 harness fixes from the Moto smoke run   (2026-10-01)
 ------------------------------------------------------------------------------
 This change fixes the harness defects that the Moto smoke run of 2026-10-01 found in the cold-read segment. The
