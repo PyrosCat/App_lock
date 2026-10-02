@@ -140,11 +140,12 @@ h05() { # caller count deadline name
   done
 }
 
-# H06: the first write held for HOLD seconds. During a hold of 5 s or more: HOME and back, a second wrong PIN, and a
-# screen cycle (with -o); UI dumps back to back in all holds. The gate stays responsive, the queue keeps its order,
-# and the last admitted pair is stored. Only a dump that shows a gate state is a sample of responsiveness: a failed
-# dump, or a dump of another screen, gives "none". Without a sample the repeat is not as predicted, and the
-# objective is "na" unless the stored pair alone shows a loss.
+# H06: the first write held for at least HOLD seconds. During a hold of 5 s or more: HOME and back, a second wrong PIN,
+# and a screen cycle (with -o); UI dumps back to back in all holds. The gate stays responsive, the queue keeps its
+# order, and the last admitted pair is stored. The time runs from the moment the host sees the hold, and the release
+# follows the last dump, so a hold lasts longer than HOLD; the marker records the measured hold (held_ms). Only a dump
+# that shows a gate state is a sample of responsiveness: a failed dump, or a dump of another screen, gives "none".
+# Without a sample the repeat is not as predicted, and the objective is "na" unless the stored pair alone shows a loss.
 h06() { # caller repeat hold-s
   local caller="$1" repeat="$2" hold="$3" start anr=no dumps=0 samples=0 second=no state p0 p1="" expected=1,0
   local held released held_ms objective

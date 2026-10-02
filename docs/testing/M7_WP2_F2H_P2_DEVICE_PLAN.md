@@ -13,7 +13,7 @@ level. The device lanes add what the JVM cannot show: the two live callers and t
 real process death, death inside the platform commit, reboots, biometrics, and the cost of the construction read on
 the main thread.
 
-## 1. Lead decisions (2026-09-28)
+## 1. Lead decisions (2026-09-28 and 2026-10-01)
 
 1. **Depth.** Every device-only case runs on each host. Each critical kill cut runs 10 times per caller. Each
    residual gets 3 reboots where a reboot can change the result. X16 and the R3.1c mid-commit sweep are in scope.
@@ -26,6 +26,11 @@ the main thread.
 4. **Verifier entries (V).** The app does not change. V is exact from the wrapper write lines while no write is held.
    Otherwise V is inferred from the gate state in a UI dump before each submission. The evidence labels each count
    as exact or inferred.
+5. **R1.4b death (2026-10-01).** In the Moto smoke run, the detector process died about 40 s into the held
+   construction read, before the release, and the system started it again. For R1.4b, a death during the hold is
+   as predicted when an `am_anr` event of the case process at the start of the hold or later shows it. Any other
+   death is not as predicted. The objective verdict of a death is "no" when the main thread held for 5 s or more
+   before it.
 
 ## 2. Probe results that shape the harness
 
@@ -242,16 +247,16 @@ before an inspected kill (section 3.3). "Exact" and "inferred" are the V labels 
 | H03 | `L5`: gate state around the deadline, then a sixth wrong PIN (60 s window). Fixture `(11, expired)` and a wrong PIN: the window is the 30 min cap. | S, L | 3 | countdown values, no write during a countdown, window lengths |
 | H04 | `C4`. A correct PIN with the write held 5 s: the gate opens before the write returns. Kill after the return, inspect. | S, L | 3 | reset before the commit, stored `Z` |
 | H05 | Fixtures `(1,0)`, `(4,0)`, `(8, now + 10 min)`, `(8, expired)`. Kill and relaunch. Reboot with the active and the expired fixture. | S, L | 3 kills per fixture; reboots: 1 active, 1 expired per host | reloaded state, remaining time against the wall deadline, expired lockout not revived, boot id |
-| H06 | `Z`. The first write held for 1 s, 5 s, and 40 s. During the hold: HOME and back, a second wrong PIN, a UI dump every second, screen off and on. Also a threshold failure and a reset under a hold. | S, L | 3 | responsive gate (no ANR dialog in the UI dumps that show the gate; at least one such dump), queue order, last admitted pair stored |
+| H06 | `Z`. The first write held for at least 1 s, 5 s, and 40 s. The host sees the hold and releases it, so each hold lasts longer, and the marker records the measured hold (`held_ms`). During the hold: HOME and back, a second wrong PIN, a UI dump every second, screen off and on. Also a threshold failure and a reset under a hold. | S, L | 3 | responsive gate (no ANR dialog in the UI dumps that show the gate; at least one such dump), queue order, last admitted pair stored |
 
 ### 4.2 R-007/1: cold-start read failure (R1)
 
 | Case | Device procedure at baseline | Callers | Repeats | Records |
 |---|---|---|---|---|
-| R1.1 | `L5`. (a) No poll: `READ 0 Throw`; the detector builds the manager with no lock screen; Clock opens after 10 s. (b) With polls: `READ * Throw`; the host publishes an empty script 1 s after the gate opens. | (a) L; (b) S, L | 3 | reads and their times, unenforced interval, count after the re-seed |
+| R1.1 | Count 5 with a 10 min window (a gate retry takes at least 20 s, and the lock must still be active when the re-seed read loads it). (a) No poll: `READ 0 Throw`; the detector builds the manager with no lock screen; Clock opens after 10 s. (b) With polls: `READ * Throw`; the host publishes an empty script 1 s after the gate opens. | (a) L; (b) S, L | 3 | reads and their times, unenforced interval, count after the re-seed |
 | R1.2 | `READ * Throw` over `L8` and `Z`. (a) Read rate over 10 s. (b) A wrong PIN, kill, inspect: `(1,0)`. (c) A correct PIN: `Z`. (d) The fault ends after 10 s. (e) First process and 20 restart cycles, wrong PINs until the gate blocks, with a control run without the fault. Over `Z`, (b) to (d) are controls. | S, L | (a) to (d): 3; (e): 1 run of 21 processes | reads per second, exact V per process, stored pairs |
 | R1.3 | Count 5 with a 10 min window (so that an old lock that comes back still blocks at the check), `READ 0 Throw`, `READ 1 ReadThenHold`. While the old value is held: (a) a wrong PIN, (b) a correct PIN. Release the read. Also (a) with `WRITE 0 ReturnFalseBeforeCommit`. Check the live gate: open for (a) and (b), the 30 s degraded lock for the failed write. Kill, inspect. | S, L | 3 | old value not applied (live gate), stored pair (`(1,0)` or `Z`; the old pair when the write fails) |
-| R1.4 | (a) `READ 0 HoldThenRead` at a self-gate cold start, released at 40 s. (b) The same at the detector bind. (c) `READ 0 Throw`, `READ 1 HoldThenRead`: five wrong PINs while the re-seed read holds, released at 40 s. (d) Construction-read cost: 30 cold starts per caller path. | (a) S; (b) L; (c) S, L; (d) S, L | (a) to (c): 3; (d): 30 | ANR dialog and its time (unknown when no UI dump returned a screen), a process death during the hold and its time, main-thread read time, writes waiting behind the read; for (d) the first start after a boot is reported apart |
+| R1.4 | (a) `READ 0 HoldThenRead` at a self-gate cold start, released at 40 s. (b) The same at the detector bind. In (b), the system can kill the process by an ANR before the release (lead decision 5). (c) `READ 0 Throw`, `READ 1 HoldThenRead`: five wrong PINs while the re-seed read holds, released at 40 s. (d) Construction-read cost: 30 cold starts per caller path. | (a) S; (b) L; (c) S, L; (d) S, L | (a) to (c): 3; (d): 30 | ANR dialog and its time (unknown when no UI dump returned a screen), the `am_anr` and `am_kill` events of the case process and their times, a process death during the hold and its time, main-thread read time, writes waiting behind the read; for (d) the first start after a boot is reported apart |
 
 ### 4.3 R-007/2: degraded enforcement lost on restart (R2)
 

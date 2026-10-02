@@ -8,11 +8,13 @@ reseed_pair() { # text pid
     | sed -n -E 's/.* count=([0-9]+) until=(-?[0-9]+).*/\1,\2/p'
 }
 
-# R1.1a (L): the construction read at the detector bind throws over L5, and no lock screen polls for 10 s. Then Clock
-# opens: the first poll answers from the empty memory and starts the re-seed read, which loads L5.
+# R1.1a (L): the construction read at the detector bind throws over a stored lock at count 5, and no lock screen polls
+# for 10 s. Then Clock opens: the first poll answers from the empty memory and starts the re-seed read, which loads
+# the lock. R1.1a and R1.1b use a 10 min window instead of the 30 s of L5: a gate retry takes at least 20 s, and the
+# lock must still be active when the re-seed read loads it.
 r11a() { # repeat
   local repeat="$1" states="" i threw reseed_at reseed unenforced pred
-  case_start "R1.1a L #$repeat" && case_prepare L 5 +30000 "READ 0 Throw" || return 1
+  case_start "R1.1a L #$repeat" && case_prepare L 5 +600000 "READ 0 Throw" || return 1
   R007_CASE_PID="$(r007_pid)" || { fail "R1.1a: no app process after the grant"; return 1; }
   r007_wait_phase READ 0 THREW 15 "$R007_CASE_PID" >/dev/null \
     || { fail "R1.1a: the construction read did not throw"; return 1; }
@@ -27,16 +29,16 @@ r11a() { # repeat
   case_kill_inspect || return 1
   pred="$(yn '[ "$reseed" = "$R007_FIXTURE_PAIR" ] && [[ "$states" == *blocked* ]] &&
     [ "$R007_PAIR" = "$R007_FIXTURE_PAIR" ]')"
-  r007_mark R1.1a L "$repeat" "$pred" "$(r007_residual "$pred")" fixture=L5 script=READ_0_Throw pid="$R007_CASE_PID" \
-    reads="$(r007_phase_count "$R007_CAPTURE" "$R007_CASE_PID" READ BEGIN)" \
+  r007_mark R1.1a L "$repeat" "$pred" "$(r007_residual "$pred")" fixture="(5,now+10min)" script=READ_0_Throw \
+    pid="$R007_CASE_PID" reads="$(r007_phase_count "$R007_CAPTURE" "$R007_CASE_PID" READ BEGIN)" \
     unenforced_ms="$unenforced" reseed_pair="${reseed:-none}" gate_states="$states" pair_after="$R007_PAIR"
 }
 
-# R1.1b: every read throws over L5 while the gate polls; the host publishes an empty script 1 s after the gate opens.
-# The next poll re-seeds L5.
+# R1.1b: every read throws over a stored lock at count 5 (10 min window) while the gate polls; the host publishes an
+# empty script 1 s after the gate opens. The next poll re-seeds the lock.
 r11b() { # caller repeat
   local caller="$1" repeat="$2" opened_at blocked_at="" state failed reseed i pred
-  case_start "R1.1b $caller #$repeat" && case_prepare "$caller" 5 +30000 "READ * Throw" \
+  case_start "R1.1b $caller #$repeat" && case_prepare "$caller" 5 +600000 "READ * Throw" \
     && case_open "$caller" "open incorrect blocked" || return 1
   opened_at=$SECONDS; state="$R007_GATE"
   sleep 1; r007_set_faults || return 1
@@ -49,8 +51,8 @@ r11b() { # caller repeat
   case_kill_inspect || return 1
   pred="$(yn '[ "$state" = open ] && [ -n "$blocked_at" ] && [ "${reseed%%,*}" = 5 ]')"
   r007_mark R1.1b "$caller" "$repeat" "$pred" "$(r007_residual "$pred")" \
-    fixture=L5 script="READ_*_Throw,cleared_at_1s" pid="$R007_CASE_PID" gate_at_open="$state" failed_reads="$failed" \
-    reseed_pair="${reseed:-none}" blocked_after_s="${blocked_at:-never}" pair_after="$R007_PAIR"
+    fixture="(5,now+10min)" script="READ_*_Throw,cleared_at_1s" pid="$R007_CASE_PID" gate_at_open="$state" \
+    failed_reads="$failed" reseed_pair="${reseed:-none}" blocked_after_s="${blocked_at:-never}" pair_after="$R007_PAIR"
 }
 
 # R1.2a to R1.2d: every read throws over FIXTURE (L8 or Z). (a) The read rate at the gate polls over 10 s. (b) A
@@ -161,15 +163,34 @@ r13() { # caller repeat variant
     pair_before="$R007_FIXTURE_PAIR" pair_after="$R007_PAIR"
 }
 
+# Prints the marker fields am_anr and am_kill for process PID (r007_proc_events). Each field is the first event of its
+# kind as "<n>s:<reason>" (n seconds after HELD-EPOCH), with "_" for each space of the reason, or "none". Both fields
+# are "unknown" when logcat cannot be read. Without HELD-EPOCH, the time is "unknown".
+r14_events() { # pid held-epoch
+  local events kind field out=""
+  events="$(r007_proc_events "$1")" || { printf 'am_anr=unknown am_kill=unknown'; return; }
+  for kind in am_anr am_kill; do
+    field="$(grep -m1 "^$kind " <<< "$events" | awk -v held="$2" '{
+      # Rounds to the nearest second; int() alone would round an event 1 s before the hold to 0 s.
+      offset = $2 - held
+      at = (held == "") ? "unknown" : sprintf("%ds", offset < 0 ? -int(-offset + 0.5) : int(offset + 0.5))
+      $1 = ""; $2 = ""; sub(/^ +/, ""); gsub(/ /, "_"); printf "%s:%s", at, $0 }')"
+    out+=" $kind=${field:-none}"
+  done
+  printf '%s' "${out# }"
+}
+
 # R1.4a (S) and R1.4b (L): the construction read holds on the main thread for 40 s at a cold start, then reads. The
 # harness taps the screen after 2 s (an input event for the ANR timer) and looks for an ANR dialog. `input tap` returns
 # only after the app has handled the tap, and the held main thread cannot handle it. So the tap runs as a background
 # job. The system can kill a process with a held main thread without a dialog (an ANR of a process in the background).
 # So the hold loop also checks the process, and a death goes into the marker with its time. A dump of the window of a
 # held app can fail, while an ANR dialog is a system window. So the marker counts the dumps that returned a screen.
-# Without one, the ANR record is "unknown", not "none".
+# Without one, the ANR record is "unknown", not "none". The marker also records the am_anr and am_kill events of the
+# case process (r14_events), which come from the events buffer and so do not depend on a dump.
 r14ab() { # caller repeat
   local caller="$1" repeat="$2" start anr_at="" died_at="" held_ms state tap_job="" insp xml dumps=0 usable=0 anr
+  local held_at events pred
   case_start "R1.4$([ "$caller" = S ] && echo a || echo b) $caller #$repeat" || return 1
   r007_stop_app && r007_fixture 5 +30000 && r007_set_faults "READ 0 HoldThenRead" || return 1
   # No wait for the launch or the bind: the main thread holds in the construction read.
@@ -177,6 +198,9 @@ r14ab() { # caller repeat
   else r007_grant_write || return 1; fi
   r007_wait_phase READ 0 HELD 20 >/dev/null || { fail "R1.4: the construction read did not hold"; return 1; }
   R007_CASE_PID="$(r007_pid)" || { fail "R1.4: no single app process"; return 1; }
+  # The epoch time of the HELD line, so that the event times are relative to the start of the hold.
+  held_at="$(grep -E "R007Fault: pid=$R007_CASE_PID .*op=READ index=0 phase=HELD( |$)" <<< "$R007_CAPTURE" \
+    | awk 'NR == 1 { print $1 }')"
   start=$SECONDS
   # A tap near the top, away from the PIN keys, gives the input event that starts the ANR timer.
   sleep 2; if _screen_wh; then tap_frac 0.5 0.1 >/dev/null & tap_job=$!; fi
@@ -190,18 +214,23 @@ r14ab() { # caller repeat
   done
   if [ -n "$anr_at" ]; then anr="$anr_at"; elif [ "$usable" -gt 0 ]; then anr=none; else anr=unknown; fi
   if [ -n "$died_at" ]; then
-    # The plan predicts a read that returns at 40 s, so a death is not as predicted. A main thread held for 5 s or
-    # more before the death shows the unmet objective. The fault script would also hold the read of a process that
-    # the grant restarts, so the grant goes first, then a stop of that process.
+    # The plan predicts a read that returns at 40 s. For L, it also predicts a death by an ANR: the system can kill a
+    # service process whose main thread holds past the service timeout. That death is as predicted only with an
+    # am_anr event of the process at the start of the hold or later. For S, the app is in the foreground, where an
+    # ANR shows a dialog, so a death is not as predicted. A main thread held for 5 s or more before the death shows
+    # the unmet objective. The fault script would also hold the read of a process that the grant restarts, so the
+    # grant goes first, then a stop of that process.
     [ -z "$tap_job" ] || wait "$tap_job"
+    events="$(r14_events "$R007_CASE_PID" "$held_at")"
+    pred=no; if [ "$caller" = L ] && [[ "$events" =~ ^am_anr=[0-9]+s: ]]; then pred=yes; fi
     if [ "$caller" = L ]; then r007_revoke_detector || return 1; fi
     r007_stop_app || return 1
     insp="$(r007_inspect_checked)" || { fail "R1.4: the inspection failed: $(r007_plain "$insp")"; return 1; }
     R007_PAIR="$(r007_pair "$insp")"
-    r007_mark "R1.4$([ "$caller" = S ] && echo a || echo b)" "$caller" "$repeat" no \
+    r007_mark "R1.4$([ "$caller" = S ] && echo a || echo b)" "$caller" "$repeat" "$pred" \
       "$([ "$died_at" -ge 5 ] && echo no || echo na)" fixture=L5 script=READ_0_HoldThenRead pid="$R007_CASE_PID" \
       process_died_after_s="$died_at" main_thread_read_ms=unknown anr_dialog_after_s="$anr" ui_dumps="$dumps" \
-      usable_dumps="$usable" pair_after="$R007_PAIR"
+      usable_dumps="$usable" "$events" pair_after="$R007_PAIR"
     return
   fi
   r007_release "$R007_CASE_PID" READ 0 || return 1
@@ -214,25 +243,26 @@ r14ab() { # caller repeat
   end="$(r007_phase_elapsed "$R007_CAPTURE" "$R007_CASE_PID" READ 0 RETURNED)"
   [ -n "$begin" ] && [ -n "$end" ] || { fail "R1.4: no BEGIN and RETURNED lines for the construction read"; return 1; }
   held_ms=$(( end - begin ))
+  events="$(r14_events "$R007_CASE_PID" "$held_at")"
   case_kill_inspect || return 1
   r007_mark "R1.4$([ "$caller" = S ] && echo a || echo b)" "$caller" "$repeat" \
     "$(yn '[ "$held_ms" -ge 39000 ] && [ "$R007_PAIR" = "$R007_FIXTURE_PAIR" ]')" \
     "$(yn '[ -z "$anr_at" ] && [ "$held_ms" -lt 5000 ]')" \
     fixture=L5 script=READ_0_HoldThenRead pid="$R007_CASE_PID" process_died_after_s=none \
-    main_thread_read_ms="$held_ms" anr_dialog_after_s="$anr" ui_dumps="$dumps" usable_dumps="$usable" \
+    main_thread_read_ms="$held_ms" anr_dialog_after_s="$anr" ui_dumps="$dumps" usable_dumps="$usable" "$events" \
     gate_after="$state" pair_after="$R007_PAIR"
 }
 
 # R1.4c: the construction read throws, and the re-seed read holds before it reads, on the writer thread. Five wrong
 # PINs while it holds: the gate enforces from memory, and no write begins until the release at 40 s.
 r14c() { # caller repeat
-  local caller="$1" repeat="$2" start begun_before entries last pred
+  local caller="$1" repeat="$2" start begun_before entries last pred attempt
   case_start "R1.4c $caller #$repeat" && case_prepare "$caller" 5 +30000 "READ 0 Throw" "READ 1 HoldThenRead" \
     && case_open "$caller" "open incorrect blocked" || return 1
   r007_wait_phase READ 1 HELD 15 "$R007_CASE_PID" >/dev/null \
     || { fail "R1.4c: the re-seed read did not hold"; return 1; }
   start=$SECONDS
-  local k; for attempt in 1 2 3 4 5; do r007_submit "$WRONG_PIN"; done
+  for attempt in 1 2 3 4 5; do r007_submit "$WRONG_PIN"; done
   r007_capture_log || { fail "R1.4c: logcat could not be read"; return 1; }
   begun_before="$(r007_v_exact "$R007_CAPTURE" "$R007_CASE_PID")"
   while [ $(( SECONDS - start )) -lt 40 ]; do sleep 1; done

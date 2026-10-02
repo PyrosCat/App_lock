@@ -4,6 +4,25 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 harness fixes from the Moto smoke run   (2026-10-01)
+------------------------------------------------------------------------------
+This change fixes the harness defects that the Moto smoke run of 2026-10-01 found in the cold-read segment. The
+change also sets the R1.4b prediction for a death during the hold.
+- The R1.1a and R1.1b cases of cold_read.sh use a lock with a 10 min window instead of L5.
+- A gate retry took 20 s of the 30 s window, so the lock had expired before the re-seed read.
+- A new r007_proc_events function of lib_p2.sh reads the am_anr and am_kill events of one process.
+- The case markers of R1.4a and R1.4b record these events with their times after the start of the hold.
+- UI dumps failed while the main thread was held, so the ANR record of R1.4a was unknown.
+- The R1.4b case of cold_read.sh counts a death as predicted when an am_anr event of the case process shows it.
+- The r14c function of cold_read.sh declares its loop variable as local and drops an unused local.
+- The H06 comment of healthy.sh calls each hold a minimum hold and names held_ms as the measured hold.
+- The P2 device plan gets the same H06 wording, the R1.1 window, and the new R1.4 records.
+- Lead decision 5 of the plan records the R1.4b prediction for a death during the hold.
+- The stub adb of test_lib_r007.sh serves the events buffer from a separate file.
+- Nine new host tests in test_lib_r007.sh cover the event parser, the R1.4 event fields, and the death verdicts.
+- The test_lib_r007.sh script passed all 443 host tests.
+
+
 M7/WP2 (F2 hardening): P2 device harness   (2026-09-30)
 -------------------------------------------------------
 This change adds the harness of the P2 device lanes. The plan is testing/M7_WP2_F2H_P2_DEVICE_PLAN.md.

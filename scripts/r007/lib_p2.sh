@@ -457,6 +457,18 @@ r007_phase_elapsed() { # text pid op index phase [thread]
     | sed -n -E 's/.* elapsed=([0-9]+).*/\1/p'
 }
 
+# Prints the am_anr and am_kill events of process PID from the events buffer, one per line: "<event> <epoch s>
+# <reason>". The reason of am_anr is its last field (the ANR subject, which can hold commas); the reason of am_kill
+# is its fifth field. Returns 1 when logcat cannot be read. `logcat -c` does not clear the events buffer, so the
+# buffer also holds older processes, and the pid selects the lines.
+r007_proc_events() { # pid
+  local out
+  out="$(adbx logcat -b events -d -v epoch -s am_anr:I am_kill:I)" || return 1
+  tr -d '\r' <<< "$out" | sed -n -E \
+    -e "s/^ *([0-9]+\.[0-9]+) +[0-9]+ +[0-9]+ I am_anr *: \[[0-9]+,$1,[^,]*,[^,]*,(.*)\]$/am_anr \1 \2/p" \
+    -e "s/^ *([0-9]+\.[0-9]+) +[0-9]+ +[0-9]+ I am_kill *: \[[0-9]+,$1,[^,]*,[^,]*,([^,]*),.*$/am_kill \1 \2/p"
+}
+
 # Prints the number of writes that process PID began in the log TEXT (its WRITE BEGIN lines). This is the exact V when
 # no write was held or waiting in the queue at the end of the process (see r007_v_label).
 r007_v_exact() { # text pid

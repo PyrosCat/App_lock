@@ -11,7 +11,8 @@ trap 'rm -rf "$WORK"' EXIT
 mkdir -p "$WORK/bin"
 export STUB_DEVICE="$WORK/device"
 
-# The stub adb. The app's private directory is $STUB_DEVICE; logcat reads $STUB_DEVICE/logcat.
+# The stub adb. The app's private directory is $STUB_DEVICE; logcat reads $STUB_DEVICE/logcat, and the events buffer
+# is $STUB_DEVICE/events.
 cat > "$WORK/bin/adb" <<'STUB'
 #!/usr/bin/env bash
 [ "${1:-}" = -s ] && shift 2
@@ -27,7 +28,11 @@ case "$cmd" in
     echo "reboot" >> "$STUB_DEVICE/ops" ;;
   logcat)
     [ -n "${STUB_LOGCAT_FAIL:-}" ] && { echo "error: device offline" >&2; exit 1; }
-    case " $* " in *" -c "*) : > "$STUB_DEVICE/logcat" ;; *) cat "$STUB_DEVICE/logcat" ;; esac ;;
+    case " $* " in
+      *" -c "*) : > "$STUB_DEVICE/logcat" ;;
+      *" -b events "*) cat "$STUB_DEVICE/events" ;;
+      *) cat "$STUB_DEVICE/logcat" ;;
+    esac ;;
   exec-in)
     [ -n "${STUB_WRITE_FAIL:-}" ] && exit 1
     target="$(sed -E "s/.*cat > ([^' ]+)'.*/\1/" <<< "$*")"
@@ -234,7 +239,7 @@ STORE="shared_prefs/applock_lockout.xml"
 
 reset_device() {
   rm -rf "$STUB_DEVICE"; mkdir -p "$STUB_DEVICE/shared_prefs"
-  : > "$STUB_DEVICE/logcat"; : > "$STUB_DEVICE/ops"
+  : > "$STUB_DEVICE/logcat"; : > "$STUB_DEVICE/events"; : > "$STUB_DEVICE/ops"
   printf '%s\n' "$STORE_XML" > "$STUB_DEVICE/$STORE"
 }
 store_is() { [ "$(cat "$STUB_DEVICE/$STORE" 2>/dev/null)" = "$1" ]; }
@@ -1600,6 +1605,11 @@ R14_LOG="$(printf '%s\n' "1.0 4242 4242 $R14_LINE=BEGIN script=HoldThenRead wall
   "1.2 4242 4242 $R14_LINE=RETURNED count=5 until=1 wall=2 elapsed=40100")"
 R14_STUBS='r007_stop_app() { :; }; r007_fixture() { R007_FIXTURE_PAIR=5,1; }; r007_set_faults() { :; }
   r007_proc_state() { printf present; }; sleep() { SECONDS=$((SECONDS + 15)); }; r14ab S 1'
+# The events buffer of the working case has an am_anr line of the case process 40 s after the HELD line (epoch 1.1),
+# and an am_kill line of another process.
+R14_EVENTS="$(printf '%s\n' "--------- beginning of events" \
+  "          41.100  1871  2950 I am_anr  : [0,4242,com.applock,952745540,executing service com.applock/.Detector]" \
+  "          41.500  1871  2950 I am_kill : [0,14242,com.applock,0,bg anr,121920]")"
 for dumps in failing working; do
   reset_device; printf '%s\n' "$R14_LOG" > "$STUB_DEVICE/logcat"
   if [ "$dumps" = failing ]; then
@@ -1607,13 +1617,61 @@ for dumps in failing working; do
     grep -q "main_thread_read_ms=40000 anr_dialog_after_s=unknown ui_dumps=2 usable_dumps=0 " "$WORK/p2.log" \
       && ok "R1.4 with no dump that returns a screen records the ANR dialog as unknown" \
       || bad "R1.4 failing dumps: $(grep '^## CASE' "$WORK/p2.log")"
+    grep -q "usable_dumps=0 am_anr=none am_kill=none gate_after=" "$WORK/p2.log" \
+      && ok "R1.4 with no events of the case process records am_anr and am_kill as none" \
+      || bad "R1.4 without events: $(grep '^## CASE' "$WORK/p2.log")"
   else
+    printf '%s\n' "$R14_EVENTS" > "$STUB_DEVICE/events"
     STUB_UI='<node text="Enter your PIN" />' STUB_CASE_PAIR=5,1 case_run cold_read "$R14_STUBS"
     grep -q "anr_dialog_after_s=none ui_dumps=2 usable_dumps=2 .*predicted=yes objective=no$" "$WORK/p2.log" \
       && ok "R1.4 with dumps that show no ANR dialog records none" \
       || bad "R1.4 working dumps: $(grep '^## CASE' "$WORK/p2.log")"
+    grep -q " am_anr=40s:executing_service_com.applock/.Detector am_kill=none " "$WORK/p2.log" \
+      && ok "R1.4 records the am_anr event of the case process with its time after the hold began" \
+      || bad "R1.4 with events: $(grep '^## CASE' "$WORK/p2.log")"
   fi
 done
+# R1.4 with a death during the hold (the HELD line at epoch 1.1). For L, the death is as predicted only with an am_anr
+# event of the case process at the start of the hold or later; for S, a death is not as predicted.
+R14_DEATH_STUBS='r007_stop_app() { :; }; r007_fixture() { R007_FIXTURE_PAIR=5,1; }; r007_set_faults() { :; }
+  r007_grant_write() { :; }; r007_revoke_detector() { :; }; r007_proc_state() { printf absent; }
+  r007_inspect_checked() { printf "r007_count=5\nr007_lockout_until=1\n"; }; sleep() { SECONDS=$((SECONDS + 15)); }'
+anr_kill_events() { # epoch
+  printf '%s\n' "          $1  1871  2950 I am_anr  : [0,4242,com.applock,952745540,executing service com.applock/.D]" \
+    "          $1  1871  2950 I am_kill : [0,4242,com.applock,0,bg anr,121920]"
+}
+while IFS='|' read -r caller anr_epoch expected label; do
+  reset_device; printf '%s\n' "$R14_LOG" > "$STUB_DEVICE/logcat"
+  [ "$anr_epoch" = none ] || anr_kill_events "$anr_epoch" > "$STUB_DEVICE/events"
+  STUB_UI='<node text="Enter your PIN" />' case_run cold_read "$R14_DEATH_STUBS; r14ab $caller 1" </dev/null
+  grep -qE "process_died_after_s=[0-9]+ .*predicted=$expected objective=no$" "$WORK/p2.log" && ok "$label" \
+    || bad "$label: $(grep '^## CASE' "$WORK/p2.log")"
+done <<'VARIANTS'
+L|41.100|yes|R1.4b with a death and an am_anr event of the case process 40 s into the hold is as predicted
+L|none|no|R1.4b with a death and no am_anr event of the case process is not as predicted
+L|0.000|no|R1.4b with an am_anr event of the pid 1 s before the hold began is not as predicted
+S|41.100|no|R1.4a with a death is not as predicted, also with an am_anr event of the case process
+VARIANTS
+# r007_proc_events selects the lines of one pid (not of a pid that ends with the same digits), keeps the commas of an
+# ANR subject, and drops the size field of am_kill.
+reset_device
+printf '%s\n' "--------- beginning of events" \
+  "          40.600  1871  2950 I am_anr  : [0,4242,com.applock,952745540,Input dispatching timed out (a, b)]" \
+  "          41.200  1871  2950 I am_kill : [0,4242,com.applock,0,bg anr,121920]" \
+  "          41.300  1871  2950 I am_kill : [0,14242,com.applock,0,stop com.applock due to finished inst,1]" \
+  "          41.400  1871  2950 I am_proc_died: [0,4242,com.applock,0,2]" > "$STUB_DEVICE/events"
+seg cold_read r007_proc_events 4242
+[ "$(cat "$WORK/out")" = "am_anr 40.600 Input dispatching timed out (a, b)
+am_kill 41.200 bg anr" ] && ok "r007_proc_events gives the am_anr and am_kill events of one process" \
+  || bad "r007_proc_events: $(tr '\n' ';' < "$WORK/out")"
+seg cold_read r14_events 4242 ""
+grep -qx "am_anr=unknown:Input_dispatching_timed_out_(a,_b) am_kill=unknown:bg_anr" "$WORK/out" \
+  && ok "r14_events without the time of the HELD line records the event times as unknown" \
+  || bad "r14_events without a HELD time: $(cat "$WORK/out")"
+STUB_LOGCAT_FAIL=1 seg cold_read r14_events 4242 1.1
+grep -qx "am_anr=unknown am_kill=unknown" "$WORK/out" \
+  && ok "r14_events records am_anr and am_kill as unknown when logcat cannot be read" \
+  || bad "r14_events with a failed logcat: $(cat "$WORK/out")"
 # R3.3 with a release that always fails: each submission moves the clock 50 s on, so the release is due at once.
 reset_device
 STUB_UI='<node text="Enter your PIN" />' STUB_RELEASE_FAIL=1 STUB_SUBMIT_STATE=blocked STUB_CASE_PAIR=0,0 \
