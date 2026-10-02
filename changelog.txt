@@ -4,6 +4,19 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 security verdict rule and proposed device skips   (2026-10-02)
+----------------------------------------------------------------------------------------
+The P2 device plan gets a lead decision on the security verdict and a list of proposed test skips.
+- Lead decision 6 of the plan sets how a report judges the security objective of a case.
+- A case that reproduces a known R-007 weakness as predicted gets the verdict "not met".
+- A case with any other result gets "not applicable", and the test run counts it as a failure.
+- A control case that cannot lose a lockout also gets "not applicable".
+- A new table in the plan lists seven R-007 test-plan items that the phone runs propose to leave out.
+- Five of these items are covered by other cases, or add nothing to the verdicts.
+- The screen-off steps of two cases are a proposed skip: they need the lead present for about 4.5 h.
+- The records of load, battery, and storage conditions on the Moto G move to the stress tests of P4.
+
+
 Docs: process folder reorganization   (2026-10-02)
 --------------------------------------------------
 This change moves files of docs/process into three new subfolders: history/, active/, and strategy/. It also updates

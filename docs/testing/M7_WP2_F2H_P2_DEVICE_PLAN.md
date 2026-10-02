@@ -13,7 +13,7 @@ level. The device lanes add what the JVM cannot show: the two live callers and t
 real process death, death inside the platform commit, reboots, biometrics, and the cost of the construction read on
 the main thread.
 
-## 1. Lead decisions (2026-09-28 and 2026-10-01)
+## 1. Lead decisions (2026-09-28 to 2026-10-02)
 
 1. **Depth.** Every device-only case runs on each host. Each critical kill cut runs 10 times per caller. Each
    residual gets 3 reboots where a reboot can change the result. X16 and the R3.1c mid-commit sweep are in scope.
@@ -31,6 +31,8 @@ the main thread.
    as predicted when an `am_anr` event of the case process at the start of the hold or later shows it. Any other
    death is not as predicted. The objective verdict of a death is "no" when the main thread held for 5 s or more
    before it.
+6. **Objective verdicts (2026-10-02).** The objective rule of section 3.9 applies to the reports: a residual repeat
+   as predicted gives "no", any other repeat gives "na", and a control that cannot lose a lock gives "na".
 
 ## 2. Probe results that shape the harness
 
@@ -322,6 +324,20 @@ other caller, and the evidence records it.
 | Audit and capture effects (I5) | The audit database is encrypted, so the device lanes cannot read its rows. Accounting on the device is limited to the wrapper writes. The JVM lane covers the callbacks. |
 | NucBox biometrics (H04 biometric part, X11) | No screen lock on the AVDs (lead decision 3). |
 | Latency distributions of the test plan | Moved to the start of P3 (lead decision 1). |
+
+### 5.1 Proposed skips for the P2 exit
+
+The lead approves or rejects each item at the P2 exit. Until then, each item is a gap of the device lanes.
+
+| Test plan item | Proposal | Reason |
+|---|---|---|
+| R1.1 with 100 concurrent polls | Skip on the device | The JVM lane ran the burst: 100 polls on one thread and 100 concurrent polls. The device harness drives only the UI poll of the callers. |
+| R1.4 release with a throw | Skip on the device | A construction read that ends with a throw is the failed construction read of R1.1, which both lanes run. For L, the process dies before the release (lead decision 5). |
+| R1.4 screen-off, shutdown, and later admissions during the held read | Skip on the device | During a held construction read, no manager exists and the main thread takes no input. R1.4c runs admissions during a held re-seed read. Shutdown belongs to the runtime, which is inert until F6 (X06 and X07 on the JVM lane). |
+| R1.4 thread stacks | Skip | The marker records the main-thread read time, the `am_anr` and `am_kill` events, and any death of the process. Thread stacks add no input to the verdicts. |
+| H06 holds of 0, 10, 100, and 1000 ms | Skip on the device | A hold that the host releases lasts at least about 4.6 s on the Moto G. The JVM lane ran the four short holds. The device runs holds of at least 1 s, 5 s, and 40 s. |
+| Screen-off steps of H06 and R3.3 | Skip on the device | Each screen-off locks the Moto G at once, and the lead must unlock it: about 4.5 h for `healthy` and `death`. The markers record `screen_cycle=skipped`. During each hold, H06 still samples the gate state with UI dumps. |
+| Moto G background restrictions, load and low free space, and records of the thermal, battery, and storage conditions | Move to P4 | The phase table of the test plan puts resource stress in P4. P2 characterizes the baseline under idle conditions. |
 
 ## 6. Hosts
 
