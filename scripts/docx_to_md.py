@@ -35,7 +35,7 @@ AREAS = [
     "docs/v2.0.0/dds",
     "docs/v2.0.0/tsp",
     "docs/v2.0.0/tm",
-    "docs/process",
+    "docs/process/strategy",
 ]
 
 

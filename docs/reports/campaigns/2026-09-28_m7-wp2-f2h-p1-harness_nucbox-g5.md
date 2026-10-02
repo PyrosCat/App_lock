@@ -59,7 +59,7 @@ form:
 - **R-007:** R-007 is the entry for lockout persistence in the risk register. The F2 hardening work is about the four
   residuals of R-007, /1 to /4.
 - **Phase P1:** P1 is a phase of the test plan for F2 hardening,
-  `docs/process/proposals/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md`. Phase P1 examines the harness itself, not the
+  `docs/process/active/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md`. Phase P1 examines the harness itself, not the
   lockout candidates. Three lanes are necessary for the P1 exit: the JVM harness, one NucBox emulator lane, and the
   Moto G. This report records the NucBox lane.
 - **Cases V0 to V8:** These cases are the checks of `scripts/r007/p1_validate.sh`. V8 runs after V5 and before the

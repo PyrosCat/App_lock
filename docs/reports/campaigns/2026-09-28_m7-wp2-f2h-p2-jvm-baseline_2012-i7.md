@@ -33,7 +33,7 @@
   - **R-007/2:** the degraded fallback of a failed write lives in memory only and ends with the process.
   - **R-007/3:** a process death before an admitted change reaches storage loses that change.
   - **R-007/4:** a failed reset leaves the old count and deadline in storage, and a restart brings them back.
-- **Test plan:** `docs/process/proposals/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md`. Phase P2 characterizes the
+- **Test plan:** `docs/process/active/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md`. Phase P2 characterizes the
   baseline. Its case IDs are H01 to H06 (healthy storage), R1.1 to R4.4 (one group for each residual), and X01 to
   X15 (cross-cutting cases). This work adds X16 for the damaged-file finding of probe A (device only).
 - **Harness:** the P1 JVM harness in `security/harness`. The harness runs the production `LockoutManager` in

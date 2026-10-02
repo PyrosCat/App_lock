@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-23
 
-**Status:** Proposed testing plan; no implementation selected, tests executed, or residual accepted by this document.
+**Status:** Active. The lead adopted this plan on 2026-09-23 with the P0 decisions in the F2 hardening entry of M7_PLAN.md. The plan controls phases P0 to P6. It selects no implementation and accepts no residual.
 
 **Placement:** After F4, before F5 graph wiring and its fleet checkpoint.
 

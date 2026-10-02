@@ -27,7 +27,7 @@ M7 replaces the detection/enforcement architecture. R-007 concerns lockout persi
 
 Project authorities read include [GOVERNANCE](../../process/GOVERNANCE.md), [M7_PLAN](../../process/M7_PLAN.md), [ROADMAP](../../process/ROADMAP.md), [RISK_REGISTER](../../process/RISK_REGISTER.md), the [RTM](../../process/rtm/rtm.csv), and the active [v1.0.0 NFR](../../v1.0.0/markdown/Non_Functional_Requirements_v1.0.0.md). **NFR-SEC-011** requires dependency-security disposition; **NFR-MNT-007** requires a maintained inventory and controlled dependencies. The RTM's deferral of FR-247/FR-366 is not evidence that these NFR obligations vanished. The build's comment assigning full CVE tracking to M6 is historical scheduling text, not proof that tracking occurred.
 
-The [2026-09-24 security-crypto replacement proposal](../../process/proposals/2026-09-24_SECURITY_CRYPTO_REPLACEMENT_PLAN.md) was read before assessing Security. Its D1–D13 are review decisions, not accepted implementation evidence. The [2026-09-23 R-007 F2 test plan](../../process/proposals/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md) continues to own recovery-hardening experiments and residual disposition.
+The [2026-09-24 security-crypto replacement proposal](../../process/proposals/2026-09-24_SECURITY_CRYPTO_REPLACEMENT_PLAN.md) was read before assessing Security. Its D1–D13 are review decisions, not accepted implementation evidence. The [2026-09-23 R-007 F2 test plan](../../process/active/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md) continues to own recovery-hardening experiments and residual disposition.
 
 ### 2.1 Evidence labels and work actually performed
 

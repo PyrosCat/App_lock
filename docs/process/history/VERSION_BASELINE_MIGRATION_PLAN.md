@@ -1,6 +1,6 @@
 # Version-Baseline Migration Plan (1.0.0 active / 2.0.0 target)
 
-**Class:** Living plan (GOVERNANCE.md §5.1). **Decision of record:** [ADR-019](../architecture/adr/ADR-019-version-split-baseline.md).
+**Class:** Living plan (GOVERNANCE.md §5.1). **Decision of record:** [ADR-019](../../architecture/adr/ADR-019-version-split-baseline.md).
 **Trigger:** client approval of the reduced 1.0.0 specification, 2026-08-14.
 **Status:** **Executed 2026-08-14** — Phases A+B committed with the structure move (incl. the
 post-approval de-draft: outputs renamed `*_v1.0.0.*`, "Draft" status lines removed); Phases C+D

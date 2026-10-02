@@ -1,7 +1,7 @@
 # R-007: F2 hardening options
 
 **Date:** 2026-09-22  
-**Status:** Proposal; implementation approach and residual-risk acceptance remain undecided.  
+**Status:** Active. This analysis is an input of the F2 hardening test plan, which the lead adopted on 2026-09-23. The mechanism and the residual-risk acceptance remain undecided until phase P5 of that plan.  
 **Placement:** After F4 and before F5. This moves the four R-007 residuals forward from their previous F6 review point.  
 **Recommended starting point:** Option B, bounded recovery retries; consider fallback-deadline persistence separately.
 

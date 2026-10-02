@@ -45,7 +45,7 @@ The review applies the following project-authored authorities:
   authority, milestone citation, and classification vocabularies;
 - [`ROADMAP.md`](../../process/ROADMAP.md), the canonical M0-M6 to IS Phase 0-6 mapping and current
   milestone status;
-- [`M1_PLAN.md`](../../process/M1_PLAN.md), the applicable WP5-WP8 scope and exit checks;
+- [`M1_PLAN.md`](../../process/history/M1_PLAN.md), the applicable WP5-WP8 scope and exit checks;
 - [`RISK_REGISTER.md`](../../process/RISK_REGISTER.md), the sole authoritative risk record;
 - the [RTM guide](../../process/rtm/RTM.md) and authoritative `rtm.csv` status ledger;
 - the Test Specification sections governing [entry and exit

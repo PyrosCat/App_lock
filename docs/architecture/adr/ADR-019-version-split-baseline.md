@@ -49,7 +49,7 @@ Binding points:
    re-scoped to their 1.0.0 meaning. A single RTM is retained (no per-version RTM) because only
    1.0.0 is active and the `descoped-v1` vocabulary already expresses the deferral.
 
-Execution is staged per `docs/process/VERSION_BASELINE_MIGRATION_PLAN.md`.
+Execution is staged per `docs/process/history/VERSION_BASELINE_MIGRATION_PLAN.md`.
 
 ## Alternatives considered
 - **Active-in-place** (1.0.0 replaces `docs/srs` etc.; existing full spec → `docs/future/2.0.0/`).
@@ -83,7 +83,7 @@ Costs / follow-on work:
 ## Related
 ADR-013B (1.0.0 detection scope) · GOVERNANCE.md §5.1 (document classes), §5.3 (phase/version
 citation) · SRS v1.0.0 Appendix A (authoritative descope list) · `process/ROADMAP.md`,
-`process/rtm/rtm.csv` · migration plan `process/VERSION_BASELINE_MIGRATION_PLAN.md`.
+`process/rtm/rtm.csv` · migration plan `process/history/VERSION_BASELINE_MIGRATION_PLAN.md`.
 
 ## Implementation status
 **Not yet executed.** Staged per the migration plan: structure + reviewed-content promotion first,

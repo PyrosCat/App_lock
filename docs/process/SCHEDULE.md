@@ -125,10 +125,10 @@ Apply these rules whenever this schedule changes:
 ## References
 
 - `docs/process/ROADMAP.md`
-- `docs/process/M1_PLAN.md`
+- `docs/process/history/M1_PLAN.md`
 - `docs/process/M7_PLAN.md`
 - `docs/process/GOVERNANCE.md`
-- `docs/process/MIGRATION_ASSESSMENT.md`
+- `docs/process/history/MIGRATION_ASSESSMENT.md`
 
 ## Revision history
 

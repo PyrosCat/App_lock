@@ -4,6 +4,30 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs: process folder reorganization   (2026-10-02)
+--------------------------------------------------
+This change moves files of docs/process into three new subfolders: history/, active/, and strategy/. It also updates
+the references to them.
+- The new history/ folder holds the finished plans M0_PLAN.md, M1_PLAN.md, and VERSION_BASELINE_MIGRATION_PLAN.md.
+- The frozen snapshot MIGRATION_ASSESSMENT.md also moves to history/.
+- Three F2 hardening documents move from proposals/ to the new active/ folder. The moved documents are the options
+  proposal, the test plan, and the time estimate.
+- The client-received Implementation Strategy.docx file and its md/ mirror move to the new strategy/ folder.
+- The AREAS list of the docx_to_md.py script names docs/process/strategy as the mirror area.
+- The mirror paragraph of docs/README.md names the v2.0.0 spec areas and process/strategy/.
+- The placement guide in docs/README.md gives the path of a proposal through proposals/, active/, and history/.
+- The orientation shortcut of docs/README.md describes M1_PLAN.md as the finished M1 plan.
+- Path references to the moved files point to the new folders in README.md, SCHEDULE.md, RISK_REGISTER.md, and
+  M7_PLAN.md.
+- The references of ADR-019, archive/README.md, and the P1 and P2 device plans get the same path updates.
+- Five committed reports get in-place fixes of their paths and links to the moved files.
+- Relative links in the security-crypto replacement plan and in VERSION_BASELINE_MIGRATION_PLAN.md match the new
+  folder depths.
+- The status lines of the options proposal and the test plan record the adoption of the test plan on 2026-09-23.
+- A relative-link check of all tracked Markdown files found no new broken links.
+- In a check run after the move, the docx_to_md.py script reported all Markdown mirrors as current.
+
+
 M7/WP2 (F2 hardening): P0 to P5 time estimate   (2026-10-01)
 ------------------------------------------------------------
 A new time estimate covers the phases P0 to P5 of the R-007 test plan.

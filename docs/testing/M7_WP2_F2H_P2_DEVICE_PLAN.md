@@ -5,7 +5,7 @@
 (`scripts/r007/p2_device.sh`, `lib_p2.sh`, the segment files in `scripts/r007/p2/`, and `LockoutStoreFixture`).
 **Baseline:** `05c69b7`. The production classes under test are unchanged since `b9e7c53` (change F2).
 **SSOT:** `docs/process/M7_PLAN.md`, F2 hardening entry. The phase definition and the case IDs are in
-`docs/process/proposals/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md`. The JVM lane is
+`docs/process/active/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md`. The JVM lane is
 `docs/reports/campaigns/2026-09-28_m7-wp2-f2h-p2-jvm-baseline_2012-i7.md`.
 
 Phase P2 characterizes the baseline lockout manager. The JVM lane reproduced all four R-007 residuals at manager

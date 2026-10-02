@@ -7,7 +7,7 @@ intruder-selfie capture — local-only, encrypted at rest.
 
 **2026-07-19: the project was re-baselined** onto a new authoritative documentation set
 (SRS 375 FRs, NFR 171 requirements, TAS, SDS, Implementation Strategy). See
-[docs/process/MIGRATION_ASSESSMENT.md](docs/process/MIGRATION_ASSESSMENT.md) for the full
+[docs/process/history/MIGRATION_ASSESSMENT.md](docs/process/history/MIGRATION_ASSESSMENT.md) for the full
 transition analysis and [docs/process/rtm/rtm.csv](docs/process/rtm/RTM.md) for per-requirement
 status.
 
@@ -38,9 +38,9 @@ accessibility service in 1.0.0**.
 ### Roadmap — where the project stands
 
 Live status: [ROADMAP.md](docs/process/ROADMAP.md); baseline analysis (frozen snapshot):
-[MIGRATION_ASSESSMENT.md](docs/process/MIGRATION_ASSESSMENT.md). The **1.0.0 line is M0–M1 → M7–M10**
+[MIGRATION_ASSESSMENT.md](docs/process/history/MIGRATION_ASSESSMENT.md). The **1.0.0 line is M0–M1 → M7–M10**
 (ADR-019 re-cut); the earlier M2–M6 scope is frozen as the deferred 2.0.0 lineage. **M1 (foundation
-retrofit) closed 2026-08-25** ([M1_PLAN.md](docs/process/M1_PLAN.md), WP1–WP8 all done); **M7 is now
+retrofit) closed 2026-08-25** ([M1_PLAN.md](docs/process/history/M1_PLAN.md), WP1–WP8 all done); **M7 is now
 the current milestone** ([M7_PLAN.md](docs/process/M7_PLAN.md)).
 
 The 1.0.0 milestone spine:

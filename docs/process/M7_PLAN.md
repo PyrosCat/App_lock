@@ -1031,8 +1031,8 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     - RTM: no row changes. FR-081 to FR-085 are `descoped-v1`.
   - **F2 hardening — R-007 residual treatment.** The four R-007 residuals move here from F6 (placement adopted
     2026-09-22). This is separate work with its own commits and evidence; it does not reopen F2. The options and the
-    analysis are in `docs/process/proposals/2026-09-22_R007_F2_HARDENING_OPTIONS.md`. The test plan
-    `docs/process/proposals/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md` controls the work in phases P0 to P6 and
+    analysis are in `docs/process/active/2026-09-22_R007_F2_HARDENING_OPTIONS.md`. The test plan
+    `docs/process/active/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md` controls the work in phases P0 to P6 and
     defines the case IDs (H, R1 to R4, X) and the candidate labels (A, B1 to B3, C1 to C7).
     - **Option A**, an authentication redesign: a durable attempt record before PIN verification, and recovery of
       interrupted attempts after a restart. It gives stronger restart protection. It also adds a storage dependency

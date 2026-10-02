@@ -3,7 +3,7 @@
 Everything in this directory is **historical**. It is retained for reference and audit only and
 must not be used as a basis for implementation. The authoritative baseline (adopted 2026-07-19)
 lives in `docs/srs/`, `docs/nfr/`, `docs/architecture/`, `docs/design/`, and `docs/process/`.
-Full transition analysis: `docs/process/MIGRATION_ASSESSMENT.md`.
+Full transition analysis: `docs/process/history/MIGRATION_ASSESSMENT.md`.
 
 | File | What it was | Superseded by | Notes |
 |---|---|---|---|

@@ -514,7 +514,7 @@ by unit tests until then.
 Four residuals remain, proposed. They are treated at **F2 hardening**, a milestone after F4 and before F5
 (placement adopted 2026-09-22). The milestone selects Option A (a durable attempt record before PIN verification)
 or Option B (bounded recovery retries; B1 and B2 recommended, B3 optional). The analysis is in
-`docs/process/proposals/2026-09-22_R007_F2_HARDENING_OPTIONS.md`. The lead records a disposition for each residual
+`docs/process/active/2026-09-22_R007_F2_HARDENING_OPTIONS.md`. The lead records a disposition for each residual
 there. The residuals are distinct from the enforcement gap that the main entry describes:
 1. **Cold-start read failure.** The seed degrades to `Available`, so a persisted lockout is not enforced while
    the store stays unreadable, and the retry does not bound that window. Because a local mutation disables the

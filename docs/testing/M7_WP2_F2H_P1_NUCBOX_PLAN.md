@@ -5,7 +5,7 @@
 **Companion:** the Moto G lane is complete at `d1887f8`
 (`docs/reports/campaigns/2026-09-27_m7-wp2-f2h-p1-harness-settings_moto-g-2025.md`).
 **SSOT:** `docs/process/M7_PLAN.md`, F2 hardening entry. The phase definition is §13 of
-`docs/process/proposals/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md`.
+`docs/process/active/2026-09-23_R007_F2_HARDENING_TEST_PLAN.md`.
 
 Phase P1 validates the R-007 device harness itself, not the lockout candidates. The P1 exit needs the JVM harness
 (done), the Moto G lane (done), and one NucBox emulator lane. This plan is that lane: one recorded run of
