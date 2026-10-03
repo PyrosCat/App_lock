@@ -450,6 +450,13 @@ r007_phase_count() { # text pid op phase
   grep -cE "R007Fault: pid=$2 .*op=$3 index=[0-9]+ phase=$4( |$)" <<< "$1" || :
 }
 
+# Prints the elapsed time (ms) from the first to the last of the lines that r007_phase_count counts, or nothing when
+# fewer than two lines match.
+r007_phase_span() { # text pid op phase
+  grep -E "R007Fault: pid=$2 .*op=$3 index=[0-9]+ phase=$4( |$)" <<< "$1" | sed -n -E 's/.* elapsed=([0-9]+).*/\1/p' \
+    | awk 'NR == 1 { first = $1 } { last = $1 } END { if (NR >= 2) print last - first }'
+}
+
 # Prints the elapsed time (ms) of the last OP line of process PID for INDEX with PHASE in the log TEXT, or nothing.
 # With THREAD, only the lines of that thread count.
 r007_phase_elapsed() { # text pid op index phase [thread]

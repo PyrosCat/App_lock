@@ -2,10 +2,12 @@
 # R-007 test plan phase P2, device lanes: runs one segment of the device cases on a disposable debug install. The
 # case matrix, the segments, and the evidence rules are in docs/testing/M7_WP2_F2H_P2_DEVICE_PLAN.md.
 #
-# Usage: scripts/r007/p2_device.sh [-s SERIAL] [-r MAX_REPEATS] [-c CALLERS] [-o] SEGMENT
+# Usage: scripts/r007/p2_device.sh [-s SERIAL] [-r MAX_REPEATS] [-c CALLERS] [-k CASES] [-o] SEGMENT
 #   SEGMENT   healthy, cold-read, degraded, death, reset, cross, reboot, or biometric
 #   -r        caps every repeat count of the plan (the smoke run uses -r 1)
 #   -c        the callers, "S L" by default: S is the self-gate, L is the legacy lock screen over Clock
+#   -k        runs only these cases of the segment, for example "R1.2a". Only a segment whose file lists its cases in
+#             SEGMENT_CASES accepts a case selection.
 #   -o        an operator is present. The screen-off steps run only with -o, because on the Moto G the sleep key
 #             locks the phone at once and the operator must unlock it. Without -o, a case marker records
 #             screen_cycle=skipped. The reboot and biometric segments need -o.
@@ -36,12 +38,15 @@ HERE="$(cd "$(dirname "$0")" && pwd)"; source "$HERE/lib_p2.sh"
 
 R007_MAX_REPEATS=""
 R007_CALLERS="S L"
+R007_CASES=""        # the selected cases; empty runs every case of the segment
+R007_CASES_SET=""    # set by -k, so that an empty case selection is refused
 R007_OPERATOR=""
-while getopts "s:r:c:o" opt; do
+while getopts "s:r:c:k:o" opt; do
   case "$opt" in
     s) SERIAL="$OPTARG" ;;
     r) R007_MAX_REPEATS="$OPTARG" ;;
     c) R007_CALLERS="$OPTARG" ;;
+    k) R007_CASES="$OPTARG"; R007_CASES_SET=1 ;;
     o) R007_OPERATOR=1 ;;
     *) exit 2 ;;
   esac
@@ -50,7 +55,7 @@ shift $((OPTIND - 1))
 SEGMENT="${1:-}"
 case "$SEGMENT" in
   healthy|cold-read|degraded|death|reset|cross|reboot|biometric) ;;
-  *) echo "usage: $0 [-s SERIAL] [-r MAX_REPEATS] [-c CALLERS] [-o] SEGMENT" >&2; exit 2 ;;
+  *) echo "usage: $0 [-s SERIAL] [-r MAX_REPEATS] [-c CALLERS] [-k CASES] [-o] SEGMENT" >&2; exit 2 ;;
 esac
 case "$SEGMENT" in
   reboot|biometric) [ -n "$R007_OPERATOR" ] || { echo "the $SEGMENT segment needs an operator (-o)" >&2; exit 2; } ;;
@@ -67,6 +72,24 @@ done
 [ -n "$callers" ] || { echo "-c needs at least one caller: S, L, or both" >&2; exit 2; }
 R007_CALLERS="$callers"
 [ -f "$HERE/p2/${SEGMENT//-/_}.sh" ] || { echo "the segment $SEGMENT has no case file yet" >&2; exit 2; }
+# The segment file only defines functions and defaults, so it can load before any device command. A case list from
+# the environment must not make a segment without its own list accept a case selection.
+SEGMENT_CASES=""
+source "$HERE/p2/${SEGMENT//-/_}.sh"
+# The case selection names cases of SEGMENT_CASES, each once. A name that the segment does not know would run no case
+# and still end with no failure.
+if [ -n "$R007_CASES_SET" ]; then
+  [ -n "${SEGMENT_CASES:-}" ] || { echo "-k: the segment $SEGMENT has no case selection" >&2; exit 2; }
+  cases=""
+  for id in $R007_CASES; do
+    r007_in_list "$id" "$SEGMENT_CASES" \
+      || { echo "-k: the segment $SEGMENT has no case $id (its cases: $SEGMENT_CASES)" >&2; exit 2; }
+    ! r007_in_list "$id" "$cases" || { echo "-k names the case $id twice" >&2; exit 2; }
+    cases+="${cases:+ }$id"
+  done
+  [ -n "$cases" ] || { echo "-k needs at least one case" >&2; exit 2; }
+  R007_CASES="$cases"
+fi
 
 # ---- case helpers ------------------------------------------------------------------------------
 R007_CASE_LABEL="preflight"   # the label under which r007_clear_log saves the lines of the running case
@@ -81,6 +104,9 @@ reps() { # requested
 
 # True when CALLER is one of the selected callers.
 caller_on() { r007_in_list "$1" "$R007_CALLERS"; }
+
+# True when the run selects the case CASE: always without a case selection (-k).
+case_on() { [ -z "$R007_CASES" ] || r007_in_list "$1" "$R007_CASES"; }
 
 # Prints "yes" when the shell CONDITION is true, otherwise "no". The condition is one string, so that a compound
 # condition (a && b) is evaluated as a whole. It sees the local variables of the caller.
@@ -215,7 +241,7 @@ r007_finish_extra() {
 
 preflight() {
   local pending
-  step "preflight ($SEGMENT, callers: $R007_CALLERS, repeat cap: ${R007_MAX_REPEATS:-none})"
+  step "preflight ($SEGMENT, callers: $R007_CALLERS, repeat cap: ${R007_MAX_REPEATS:-none}, cases: ${R007_CASES:-all})"
   r007_debuggable || { fail "run-as does not work for $APP_ID (not a debuggable build?)"; return 1; }
   r007_test_apk_installed || { fail "$TEST_APP_ID is not installed"; return 1; }
   r007_unlocked \
@@ -243,17 +269,19 @@ preflight() {
     r007_protect_clock || return 1
     r007_stop_app || return 1
   fi
-  printf '## preflight segment=%s callers=%s repeat_cap=%s operator=%s clock=%s tap_gap=%s\n' "$SEGMENT" \
-    "$R007_CALLERS" "${R007_MAX_REPEATS:-none}" "${R007_OPERATOR:-no}" "${R007_CLOCK:-none}" "$TAP_GAP" \
-    >> "$R007_LOG_OUT"
+  local cases="${R007_CASES// /,}"
+  printf '## preflight segment=%s callers=%s cases=%s repeat_cap=%s operator=%s clock=%s tap_gap=%s\n' "$SEGMENT" \
+    "$R007_CALLERS" "${cases:-all}" "${R007_MAX_REPEATS:-none}" "${R007_OPERATOR:-no}" "${R007_CLOCK:-none}" \
+    "$TAP_GAP" >> "$R007_LOG_OUT"
   pass "preflight"
 }
 
 require_device || exit 2
 r007_evidence_init "p2_${SEGMENT//-/_}" || { summary "R-007 P2 $SEGMENT"; exit 1; }
 r007_trap_finish "R-007 P2 $SEGMENT"
-source "$HERE/p2/${SEGMENT//-/_}.sh"
 preflight || r007_stop_run
 segment_run
+# A selection of cases and callers that runs no case (for example -k R1.1a -c S) must not end without a failure.
+[ "${#R007_SUMMARY[@]}" -gt 0 ] || fail "no case repeat recorded a verdict"
 # r007_finish runs the cleanup, prints the summary, and sets the exit status.
 exit 0

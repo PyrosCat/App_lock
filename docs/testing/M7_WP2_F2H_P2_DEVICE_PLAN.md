@@ -129,6 +129,9 @@ leaves.
 
 - **Gate state:** a UI dump shows "Try again in" (blocked), "Enter your PIN", or "Incorrect PIN — try again" (open).
   Both callers poll the lockout state every 250 ms.
+- **Read rate (R1.2a):** the failed reads per second between the first and the last read that the harness captures
+  in its 10 s wait at the open gate. The times are the `elapsed=` values of the wrapper lines, because a slow adb call
+  makes the captured window longer than 10 s. The prediction is 3 to 5 reads per second over a span of at least 9 s.
 - **Exact V:** the number of `WRITE ... phase=BEGIN` lines of one process. It is exact when no write is held and no
   write waits in the queue at a kill. Each verified PIN admits exactly one mutation, and each mutation is one write.
 - **Inferred V:** the number of submissions made while a UI dump just before the submission showed an open gate.
@@ -207,9 +210,10 @@ It then opens the gate, enters a wrong PIN, kills, inspects, and restores the sa
 
 The run is split into segments. Each segment is one command, with its own evidence file, preconditions, settings
 record, and exit handler, as in P1. A failed segment does not stop the others. The command is
-`scripts/r007/p2_device.sh [-s SERIAL] [-r MAX_REPEATS] [-c CALLERS] [-o] SEGMENT`. The option `-r` caps every repeat
-count (the smoke run uses `-r 1`), `-c` selects the callers (`"S L"` by default; one or both, each once), and `-o`
-says that an operator is present.
+`scripts/r007/p2_device.sh [-s SERIAL] [-r MAX_REPEATS] [-c CALLERS] [-k CASES] [-o] SEGMENT`. The option `-r` caps
+every repeat count (the smoke run uses `-r 1`), `-c` selects the callers (`"S L"` by default; one or both, each once),
+and `-o` says that an operator is present. The option `-k` selects cases of the segment by their IDs, each once, for a
+rerun of single cases. The `cold-read` segment accepts it. A selection that runs no case fails the run.
 
 | Segment | Cases | Operator present |
 |---|---|---|

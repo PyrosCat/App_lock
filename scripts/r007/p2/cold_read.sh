@@ -55,12 +55,32 @@ r11b() { # caller repeat
     failed_reads="$failed" reseed_pair="${reseed:-none}" blocked_after_s="${blocked_at:-never}" pair_after="$R007_PAIR"
 }
 
-# R1.2a to R1.2d: every read throws over FIXTURE (L8 or Z). (a) The read rate at the gate polls over 10 s. (b) A
-# wrong PIN commits (1,0). (c) A correct PIN commits Z. (d) The fault ends after 10 s and the next poll loads the
-# stored pair. Over Z, (b) to (d) give the correct result for an empty store, so these controls have the objective
-# "na". The read rate of (a) is the objective of X05 on both fixtures.
+# True when READS failed reads over SPAN ms (from the first read to the last) are 3 to 5 reads per second (the 250 ms
+# poll gives 4) over at least 9 s. The window between the log clear and the capture lasts at least 10 s, so a poll
+# that runs through it spans close to 10 s, and a poll that stops early spans less. The rate comes from the elapsed
+# times of the wrapper lines: a slow adb call lengthens the window, and a count against a fixed 10 s then comes out
+# too high.
+r12a_rate_ok() { # reads span-ms
+  [[ "${1:-}" =~ ^[0-9]+$ ]] && [[ "${2:-}" =~ ^[0-9]+$ ]] && [ "$2" -ge 9000 ] \
+    && [ $(( 3 * $2 )) -le $(( ($1 - 1) * 1000 )) ] && [ $(( ($1 - 1) * 1000 )) -le $(( 5 * $2 )) ]
+}
+
+# Prints READS failed reads over SPAN ms as reads per second with two decimals, or "none" without a span.
+r12a_rate() { # reads span-ms
+  local hundredths
+  if [[ "${1:-}" =~ ^[0-9]+$ ]] && [[ "${2:-}" =~ ^[1-9][0-9]*$ ]]; then
+    hundredths=$(( (($1 - 1) * 100000 + $2 / 2) / $2 ))
+    printf '%d.%02d' $(( hundredths / 100 )) $(( hundredths % 100 ))
+  else printf none; fi
+}
+
+# R1.2a to R1.2d: every read throws over FIXTURE (L8 or Z). (a) The read rate of the gate polls over 10 s (see
+# r12a_rate_ok). (b) A wrong PIN commits (1,0). (c) A correct PIN commits Z. (d) The fault ends after 10 s and the
+# next poll loads the stored pair. Over Z, (b) to (d) give the correct result for an empty store, so these controls
+# have the objective "na". The read rate of (a) is the objective of X05 on both fixtures.
 r12() { # caller repeat variant fixture-name
-  local caller="$1" repeat="$2" variant="$3" name="$4" count deadline reads state after expected pred objective
+  local caller="$1" repeat="$2" variant="$3" name="$4" count deadline reads span="" rate=() state after expected pred
+  local objective
   if [ "$name" = L8 ]; then count=8; deadline=+240000; else count=0; deadline=0; fi
   case_start "R1.2$variant $caller $name #$repeat" && case_prepare "$caller" "$count" "$deadline" "READ * Throw" \
     && case_open "$caller" "open incorrect blocked" || return 1
@@ -73,10 +93,13 @@ r12() { # caller repeat variant fixture-name
   esac
   r007_capture_log || { fail "R1.2: logcat could not be read"; return 1; }
   reads="$(r007_phase_count "$R007_CAPTURE" "$R007_CASE_PID" READ THREW)"
+  if [ "$variant" = a ]; then
+    span="$(r007_phase_span "$R007_CAPTURE" "$R007_CASE_PID" READ THREW)"
+    rate=(read_span_ms="${span:-none}" reads_per_s="$(r12a_rate "$reads" "$span")")
+  fi
   case_kill_inspect || return 1
   case "$variant" in
-    a) pred="$(yn '[ "$state" = open ] && [ "$reads" -ge 30 ] && [ "$reads" -le 50 ] &&
-         [ "$R007_PAIR" = "$R007_FIXTURE_PAIR" ]')" ;;
+    a) pred="$(yn '[ "$state" = open ] && r12a_rate_ok "$reads" "$span" && [ "$R007_PAIR" = "$R007_FIXTURE_PAIR" ]')" ;;
     b) pred="$(yn '[ "$state" = open ] && [ "$R007_PAIR" = 1,0 ]')" ;;
     c) pred="$(yn '[ "$state" = open ] && [ "$R007_PAIR" = 0,0 ]')" ;;
     d) expected=open; [ "$name" = Z ] || expected=blocked
@@ -85,7 +108,7 @@ r12() { # caller repeat variant fixture-name
   objective="$(r007_residual "$pred")"
   [ "$name" = L8 ] || [ "$variant" = a ] || objective=na
   r007_mark "R1.2$variant" "$caller" "$repeat" "$pred" "$objective" fixture="$name" \
-    script="READ_*_Throw" pid="$R007_CASE_PID" gate_at_open="$state" failed_reads="$reads" \
+    script="READ_*_Throw" pid="$R007_CASE_PID" gate_at_open="$state" failed_reads="$reads" "${rate[@]}" \
     gate_after_fault="${after:-none}" pair_before="$R007_FIXTURE_PAIR" pair_after="$R007_PAIR"
 }
 
@@ -278,20 +301,30 @@ r14c() { # caller repeat
     v="$entries" v_label=exact v_inferred="$R007_V_INFERRED" last_write_pair="$last" pair_after="$R007_PAIR"
 }
 
+# The cases that a case selection (-k) can name. R1.1a runs only for L, R1.4a only for S, and R1.4b only for L.
+SEGMENT_CASES="R1.1a R1.1b R1.2a R1.2b R1.2c R1.2d R1.2e R1.3a R1.3b R1.3f R1.4a R1.4b R1.4c"
+
 segment_run() {
-  local caller repeat n variant
+  local caller repeat n variant r14
   n="$(reps 3)"
-  if caller_on L; then for (( repeat=1; repeat<=n; repeat++ )); do r11a "$repeat"; done; fi
+  if caller_on L && case_on R1.1a; then for (( repeat=1; repeat<=n; repeat++ )); do r11a "$repeat"; done; fi
   for caller in $R007_CALLERS; do
-    for (( repeat=1; repeat<=n; repeat++ )); do r11b "$caller" "$repeat"; done
+    if case_on R1.1b; then for (( repeat=1; repeat<=n; repeat++ )); do r11b "$caller" "$repeat"; done; fi
     for variant in a b c d; do
+      case_on "R1.2$variant" || continue
       for (( repeat=1; repeat<=n; repeat++ )); do
         r12 "$caller" "$repeat" "$variant" L8; r12 "$caller" "$repeat" "$variant" Z
       done
     done
-    r12e "$caller" fault
-    r12e "$caller" control
-    for variant in a b f; do for (( repeat=1; repeat<=n; repeat++ )); do r13 "$caller" "$repeat" "$variant"; done; done
-    for (( repeat=1; repeat<=n; repeat++ )); do r14ab "$caller" "$repeat"; r14c "$caller" "$repeat"; done
+    if case_on R1.2e; then r12e "$caller" fault; r12e "$caller" control; fi
+    for variant in a b f; do
+      case_on "R1.3$variant" || continue
+      for (( repeat=1; repeat<=n; repeat++ )); do r13 "$caller" "$repeat" "$variant"; done
+    done
+    r14=R1.4a; [ "$caller" = S ] || r14=R1.4b
+    for (( repeat=1; repeat<=n; repeat++ )); do
+      if case_on "$r14"; then r14ab "$caller" "$repeat"; fi
+      if case_on R1.4c; then r14c "$caller" "$repeat"; fi
+    done
   done
 }

@@ -4,6 +4,24 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 read-rate check and single-case reruns   (2026-10-03)
+-------------------------------------------------------------------------------
+The device test harness of the R-007 hardening work gets a rate check and a way to rerun single cases. In
+phase P2, the current app is tested on devices before any fix is chosen.
+- Case R1.2a measures how often the lock screen reads the stored lockout state while every read fails.
+- A slow Android debug bridge call stretched one 10 s window of the full Moto G run to 13 s.
+- In that window, the R1.2a case counted 53 reads, where 30 to 50 were expected.
+- The new r007_phase_span function of the lib_p2.sh script gives the time from the first read to the last.
+- The R1.2a check now expects 3 to 5 reads per second over at least 9 s.
+- The case record of R1.2a now holds the measured time span and the rate.
+- A new -k option of the p2_device.sh script reruns single test cases, for example R1.2a.
+- Of the eight parts of the device run, only the cold-start read tests accept the option.
+- A case selection that runs no test case makes the run fail.
+- Twenty-eight new host tests in test_lib_r007.sh cover the rate check, the time span, and the case selection.
+- The P2 device plan describes the rate measurement and the new option.
+- The test_lib_r007.sh script passed all 475 host tests.
+
+
 Docs: changelog rules for outside readers   (2026-10-02)
 --------------------------------------------------------
 The writing rules of the repository get changes that help a reader outside the project follow each changelog entry.

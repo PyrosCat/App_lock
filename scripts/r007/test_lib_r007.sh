@@ -1313,6 +1313,20 @@ for callers in "" " " "S S" "S,L"; do
     && ok "the caller selection '$callers' is refused before the preflight" \
     || bad "the caller selection '$callers': rc $rc, $(tr '\n' ';' < "$WORK/out")"
 done
+# A case selection is refused before any device command when the segment has no case list, when it names a case that
+# the segment does not have or one case twice, and when it is empty.
+for selection in "healthy:R1.2a" "cold-read:R9.9" "cold-read:R1.2a R1.2a" "cold-read:" "cold-read: "; do
+  reset_device
+  bash "$HERE/p2_device.sh" -s stub -r 1 -k "${selection#*:}" "${selection%%:*}" > "$WORK/out" 2>&1; rc=$?
+  [ "$rc" = 2 ] && [ ! -s "$STUB_DEVICE/ops" ] && grep -q "^-k" "$WORK/out" \
+    && ok "the case selection '${selection#*:}' of the segment ${selection%%:*} is refused before the preflight" \
+    || bad "the case selection '$selection': rc $rc, $(tr '\n' ';' < "$WORK/out")"
+done
+reset_device
+SEGMENT_CASES=R1.2a bash "$HERE/p2_device.sh" -s stub -r 1 -k R1.2a healthy > "$WORK/out" 2>&1; rc=$?
+[ "$rc" = 2 ] && [ ! -s "$STUB_DEVICE/ops" ] && grep -q "has no case selection" "$WORK/out" \
+  && ok "a case list from the environment does not give the healthy segment a case selection" \
+  || bad "the case list from the environment: rc $rc, $(tr '\n' ';' < "$WORK/out")"
 
 echo "fault script cleanup"
 reset_device; mkdir -p "$STUB_DEVICE/files/r007/release" "$PENDING"
@@ -1538,6 +1552,25 @@ window_refused() { # low high
 window_refused 103 250
 window_refused 103 ""
 window_refused "" ""
+rate_is() { # expectation(ok|fail) label reads span-ms
+  local expect="$1" label="$2"; shift 2
+  if seg cold_read r12a_rate_ok "$@"; then [ "$expect" = ok ] && ok "$label" || bad "$label"
+  else [ "$expect" = fail ] && ok "$label" || bad "$label"; fi
+}
+rate_is ok "R1.2a: 41 reads over 10 s are a rate of 4 per second" 41 10000
+rate_is ok "R1.2a: 53 reads over a window that a slow adb call stretched to 13.1 s are a rate of 4 per second" \
+  53 13132
+rate_is ok "R1.2a: 31 reads over 10 s are the lowest rate of 3 per second" 31 10000
+rate_is ok "R1.2a: 51 reads over 10 s are the highest rate of 5 per second" 51 10000
+rate_is fail "R1.2a: 53 reads over 10 s are more than 5 per second" 53 10000
+rate_is fail "R1.2a: 25 reads over 10 s are fewer than 3 per second" 25 10000
+rate_is ok "R1.2a: 37 reads over 9 s, the shortest span, are a rate of 4 per second" 37 9000
+rate_is fail "R1.2a: a poll that stops after 8.75 s does not count, although its rate is 4 per second" 36 8750
+rate_is fail "R1.2a: reads without a span do not count" 41 ""
+seg cold_read r12a_rate 53 13132
+out_is 3.96 && ok "R1.2a: 53 reads over 13.1 s print as 3.96 reads per second" || bad "the rate: $(cat "$WORK/out")"
+seg cold_read r12a_rate 41 ""
+out_is none && ok "R1.2a: reads without a span print the rate none" || bad "the rate without a span: $(cat "$WORK/out")"
 reason_is() { # expected lines sent tap-status main-ticks
   seg death r31a_reason "$2" "$3" "$4" "$5"
   out_is "$1" \
@@ -1605,6 +1638,53 @@ STUB_UI='<node text="Incorrect PIN — try again" />' STUB_CASE_PAIR=1,0 case_ru
 grep -q "gate_samples=[1-9][0-9]* .*predicted=yes objective=yes$" "$WORK/p2.log" \
   && ok "H06 with gate samples and no ANR is as predicted, and its objective is met" \
   || bad "H06 with samples: $(grep '^## CASE' "$WORK/p2.log")"
+# R1.2a over L8: READS failed reads of process 4242, STEP ms apart. The log clear and the 10 s wait are stubbed, so
+# the capture holds all the reads.
+r12a_log() { # reads step-ms
+  local read
+  for (( read=0; read<$1; read++ )); do
+    printf '1.0 4242 4243 I R007Fault: pid=4242 thread=lockout-io op=READ index=%d phase=THREW script=Throw' "$read"
+    printf ' wall=1 elapsed=%d\n' $(( 1000 + read * $2 ))
+  done
+}
+r12a_is() { # label reads step-ms marker-pattern failures
+  reset_device; r12a_log "$2" "$3" > "$STUB_DEVICE/logcat"
+  STUB_CASE_PAIR=8,5 case_run cold_read 'r007_clear_log() { :; }; sleep() { :; }; R007_GATE=open; R007_FIXTURE_PAIR=8,5
+    r12 S 1 a L8; echo "fails=$FAIL_COUNT"'
+  grep -q "$4" "$WORK/p2.log" && grep -qx "fails=$5" "$WORK/out" && ok "$1" \
+    || bad "$1: $(grep '^## CASE' "$WORK/p2.log") $(tail -1 "$WORK/out")"
+}
+r12a_is "R1.2a: 41 reads over 10 s are as predicted, with the rate in the marker" 41 250 \
+  "failed_reads=41 read_span_ms=10000 reads_per_s=4.00 gate_after_fault=none .*predicted=yes objective=no$" 0
+r12a_is "R1.2a: 53 reads at the 250 ms poll over a window of 13 s are as predicted" 53 250 \
+  "failed_reads=53 read_span_ms=13000 reads_per_s=4.00 .*predicted=yes objective=no$" 0
+r12a_is "R1.2a: 53 reads over 10 s are not as predicted and fail once, with the objective na" 53 192 \
+  "failed_reads=53 read_span_ms=9984 reads_per_s=5.21 .*predicted=no objective=na$" 1
+# The case selection of the cold-read segment, with the real caller_on and case_on of p2_device.sh and one repeat. Each
+# case function prints its call.
+P2_SELECTORS="$(sed -n '/^caller_on() /p; /^case_on() /p' "$HERE/p2_device.sh")"
+selection_stubs() {
+  reps() { printf 1; }
+  r11a() { echo "r11a $*"; }; r11b() { echo "r11b $*"; }; r12() { echo "r12 $*"; }; r12e() { echo "r12e $*"; }
+  r13() { echo "r13 $*"; }; r14ab() { echo "r14ab $*"; }; r14c() { echo "r14c $*"; }
+}
+selection_is() { # label expected-calls callers cases
+  SELECTED_CALLERS="$3" SELECTED_CASES="$4" case_run cold_read 'eval "$P2_SELECTORS"; selection_stubs
+    R007_CALLERS="$SELECTED_CALLERS"; R007_CASES="$SELECTED_CASES"; segment_run'
+  [ "$(tr '\n' ';' < "$WORK/out")" = "$2" ] && ok "$1" || bad "$1: $(tr '\n' ';' < "$WORK/out")"
+}
+[ "$(grep -c '()' <<< "$P2_SELECTORS")" = 2 ] && ok "the selection test reads caller_on and case_on of p2_device.sh" \
+  || bad "the selectors of p2_device.sh: $P2_SELECTORS"
+selection_is "the case selection R1.2a runs only R1.2a, over both fixtures, for each caller" \
+  "r12 S 1 a L8;r12 S 1 a Z;r12 L 1 a L8;r12 L 1 a Z;" "S L" R1.2a
+selection_is "the case selection R1.4b runs the cold-start hold only for caller L" "r14ab L 1;" "S L" R1.4b
+selection_is "the case selection R1.1a with caller S runs no case" "" S R1.1a
+SELECTED_CALLERS="S L" SELECTED_CASES="" case_run cold_read 'eval "$P2_SELECTORS"; selection_stubs
+  R007_CALLERS="$SELECTED_CALLERS"; R007_CASES="$SELECTED_CASES"; segment_run'
+[ "$(wc -l < "$WORK/out")" = 33 ] && [ "$(head -1 "$WORK/out")" = "r11a 1" ] \
+  && [ "$(tail -1 "$WORK/out")" = "r14c L 1" ] \
+  && ok "without a case selection, the cold-read segment runs all 33 case calls" \
+  || bad "the cold-read segment without a selection: $(tr '\n' ';' < "$WORK/out")"
 # R2.1: the write ended 30 s before the stub device time, so the kill is due at once; the kill time is the stub.
 R21_LOG="1.0 4242 4243 I R007Fault: pid=4242 thread=lockout-io op=WRITE index=0 phase=RETURNED"
 R21_LOG+=" script=ReturnFalseBeforeCommit result=false wall=1789999970000 elapsed=1"
@@ -1770,6 +1850,9 @@ v_case "a WRITE line of any phase is counted" 1 r007_phase_count "$PLOG" 60 WRIT
 v_case "the elapsed time of a phase line is read" 158 r007_phase_elapsed "$PLOG" 60 READ 0 RETURNED
 v_case "a line of another thread is not read" "" r007_phase_elapsed "$PLOG" 60 READ 1 THREW main
 v_case "a line of the named thread is read" 200 r007_phase_elapsed "$PLOG" 60 READ 1 THREW lockout-io
+v_case "the span runs from the first to the last READ line of one process" 100 r007_phase_span "$PLOG" 60 READ "[A-Z_]+"
+v_case "the span uses only the lines of the matching phases" 58 r007_phase_span "$PLOG" 60 READ "(BEGIN|RETURNED)"
+v_case "a single matching line gives no span" "" r007_phase_span "$PLOG" 61 READ BEGIN
 
 echo "H05 reboot verdict"
 h05_is() { # expectation(ok|fail) label args...
