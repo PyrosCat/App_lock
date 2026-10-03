@@ -2,10 +2,12 @@
 
 **Date:** 2026-10-01
 
+**Progress:** as of 2026-10-02.
+
 **Status:** Estimate for planning. It sets no dates and changes no decision.
 
-**Basis:** The commit dates of the F2 hardening work, and the device timestamps of the Moto G smoke run of
-2026-10-01 (all segments except `reboot` and `biometric`, each case once).
+**Basis:** The commit dates of the F2 hardening work, and the device timestamps of the Moto G smoke runs of
+2026-10-01 and 2026-10-02 (all eight segments, each case once).
 
 Each value has one of two labels:
 
@@ -19,13 +21,13 @@ Each value has one of two labels:
 |---|---|---|
 | P0: freeze questions and policy | Done | about 1 day (measured) |
 | P1: validate the harness | Done | about 5.5 days (measured) |
-| P2: characterize the baseline | In progress | about 3.5 days so far (measured), about 2 to 2.5 weeks remain (estimated) |
+| P2: characterize the baseline | In progress | about 4.5 days so far (measured), about 1.8 to 2.3 weeks remain (estimated) |
 | P3: compare candidates | Not started | about 5 to 7 weeks (estimated) |
 | P4: adversarial and fleet confirmation | Not started | about 2 to 3 weeks (estimated) |
 | P5: recommend and disposition | Not started | about 1 week, then 1 to 2 weeks to the exit gate (estimated) |
 
-The remaining work takes about 11 to 15.5 weeks if the working weeks follow each other. The P5 exit then falls
-between mid-December 2026 and mid-January 2027.
+The remaining work takes about 11 to 15 weeks if the working weeks follow each other. P2 then ends between
+2026-10-15 and 2026-10-19, and the P5 exit falls between mid-December 2026 and mid-January 2027.
 
 ## 2. Completed work (measured)
 
@@ -33,14 +35,14 @@ between mid-December 2026 and mid-January 2027.
 |---|---|---|---|
 | P0 | 2026-09-22 to 2026-09-23 (`f46d04c`) | about 1 day | Options proposal, test plan, P0 decisions |
 | P1 | 2026-09-23 to 2026-09-28 (`bfbd8f7`) | about 5.5 days | JVM harness and Android fault harness (2026-09-23). Moto G lane with a report, a preconditions fix, a rerun, and a settings fix (2026-09-26 and 2026-09-27). NucBox plan and report (2026-09-27 and 2026-09-28). M7/M8 dependency and crypto work ran in the same period |
-| P2 to date | 2026-09-28 to 2026-10-01 | about 3.5 days | JVM lane (2026-09-28). Device plan (2026-09-29). Device harness with four or more review rounds (`f756287`, 2026-10-01). Moto G smoke run (2026-10-01) |
+| P2 to date | 2026-09-28 to 2026-10-02 | about 4.5 days | JVM lane (2026-09-28). Device plan (2026-09-29). Device harness with four or more review rounds (`f756287`, 2026-10-01). Moto G smoke run of all eight segments, with two harness-fix commits (`3f5f186`, `ab749fc`) and reruns of the segments they affected (2026-10-01 and 2026-10-02). Lead decisions 5 and 6 and the proposed skips (`3f5f186`, `c05a3dd`) |
 
-## 3. P2: remaining work (about 2 to 2.5 weeks)
+## 3. P2: remaining work (about 1.8 to 2.3 weeks)
 
 ### 3.1 Moto G device time
 
-The smoke run took 2.4 h of device time. The full recorded run is scaled from the mean time of each case type in
-the smoke logs.
+The smoke run took 2.7 h of device time for the eight segments. The full recorded run is scaled from the mean time
+of each case type in the smoke logs.
 
 | Segment | Smoke run (measured) | Full recorded run (estimated) | Operator |
 |---|---|---|---|
@@ -50,13 +52,15 @@ the smoke logs.
 | `death` | 36 min | about 3 h 20 min (the R3.1c sweep takes about 75 min of it) | unlock at the start |
 | `reset` | 19 min | about 1 h 50 min | unlock at the start |
 | `cross` | 11 min | about 30 min | unlock at the start |
-| `reboot` | not run | about 1 h (11 reboots of about 5 min) | lead present |
-| `biometric` | not run | about 30 min (12 cases) | lead present |
-| **Total** | **2.4 h** | **about 12.5 h (11 h unattended, 1.5 h attended)** | |
+| `reboot` | 15 min (5 reboots) | about 35 min (11 reboots of about 3 min) | lead present |
+| `biometric` | 5 min (6 cases) | about 15 min (12 cases) | lead present |
+| **Total** | **2.7 h** | **about 12 h (11 h unattended, 50 min attended)** | |
 
 Assumptions and limits of the scaling:
 
 - A repeat at full depth takes the mean time of its case type in the smoke run.
+- The smoke times of `reboot` and `biometric` come from their runs after the harness fixes. A reboot, including
+  the unlock by the lead, takes about 3 min.
 - The cases with 21 processes (R1.2e, R2.4, R4.4) ran one process in the smoke run. The estimate uses 35 to 40 s
   for each restart cycle. Together they add about 2.5 h. This is the least certain part of the estimate.
 - The R3.1c sweep stops after 60 trials when at least 10 trials end inside the platform write. If fewer trials end
@@ -67,15 +71,15 @@ Assumptions and limits of the scaling:
 
 ### 3.2 Steps
 
-| Step | Estimate |
-|---|---|
-| Harness-fix commit. A rerun of the `cold-read` smoke segment (30 min of device time). The `reboot` and `biometric` smoke segments with the lead present (45 min). The reboot wait has not run on a device yet, so one more fix round is likely | 1 to 1.5 days |
-| Moto G recorded run of all segments at one clean revision, with reruns of failed repeats (20 % added) | 2 to 3 days |
-| Moto G report and review | 1 day |
-| NucBox operator plan: an API 30 AVD, a check of the R3.1a kill window, a tap gap of 1.3 s | 1 day |
-| NucBox smoke and recorded runs at API 36 and API 30, about 13 to 15 h of device time for each API level (the 1.3 s tap gap on API 30 adds 15 to 20 %). No segment needs an operator | 3 to 4 days, depending on NucBox availability |
-| NucBox report | 1 day |
-| P2 exit: a clean JVM run, the list of proposed skips for the lead, the exit record | 0.5 day |
+| Step | Estimate | Status |
+|---|---|---|
+| Harness-fix commit. A rerun of the `cold-read` smoke segment. The `reboot` and `biometric` smoke segments with the lead present. One more fix round for the reboot wait | 1 to 1.5 days | Done on 2026-10-02 (1 day) |
+| Moto G recorded run of all segments at one clean revision, with reruns of failed repeats (20 % added) | 2 to 3 days | Next |
+| Moto G report and review | 1 day | Not started |
+| NucBox operator plan: an API 30 AVD, a check of the R3.1a kill window, a tap gap of 1.3 s | 1 day | Not started |
+| NucBox smoke and recorded runs at API 36 and API 30, about 13 to 15 h of device time for each API level (the 1.3 s tap gap on API 30 adds 15 to 20 %). No segment needs an operator | 3 to 4 days, depending on NucBox availability | Not started |
+| NucBox report | 1 day | Not started |
+| P2 exit: a clean JVM run, the list of proposed skips for the lead, the exit record | 0.5 day | Partly done: lead decision 6 and the proposed skips are in the P2 device plan |
 
 Before P3, the lead decides the storage policy (fail-open or fail-closed), the numeric limit of extra guesses for
 each restart, and the Option A policies. These decisions can overlap the NucBox runs.
@@ -95,7 +99,7 @@ each restart, and the Option A policies. These decisions can overlap the NucBox 
 
 | Work | Estimate |
 |---|---|
-| The full critical crash-cut matrix for the selected candidate: about 12.5 h on the Moto G, about 14 h for each NucBox API level | 3 to 4 days |
+| The full critical crash-cut matrix for the selected candidate: about 12 h on the Moto G, about 14 h for each NucBox API level | 3 to 4 days |
 | The NucBox lane at API 26, 29, 30, 33, 35, and 36: H01 to H05, one representative case for each residual, a reboot deadline case, 3 repeats. About 2 to 3 h for each API level. API 26 needs a manual AVD | 3 to 4 days |
 | Persistent stalls, restart attacks, clock, sleep, and reboot cases, and load and low-free-space stress on the Moto G (a small harness addition) | 3 to 4 days |
 | Reports for each host | 2 days |
@@ -121,4 +125,4 @@ each restart, and the Option A policies. These decisions can overlap the NucBox 
 | Narrow the P3 candidates at the P2 exit, from the P2 results | about 1 week for each candidate removed |
 | Run the latency arms for the baseline and the finalists only, on the Moto G and one NucBox lane | about 1 week of device time |
 | In P3, run only the residual cases that each candidate changes, not the full matrix | several days of device time for each candidate |
-| Record the screen-off steps of `healthy` and `death` (which need `-o`) as a gap | about 4.5 h of lead attendance |
+| Skip the screen-off steps of `healthy` and `death`, which need `-o` (a proposed skip in the P2 device plan) | about 4.5 h of lead attendance |

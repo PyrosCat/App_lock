@@ -4,6 +4,15 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 progress in the time estimate   (2026-10-02)
+----------------------------------------------------------------------
+The planning document for the R-007 hardening work now shows the progress up to 2026-10-02. In phase P2, the
+current app is tested on a phone and on emulators before any fix is chosen.
+- The document now expects phase P2 to end between 2026-10-15 and 2026-10-19.
+- A new status column shows the trial run on the phone as complete and the full test run as next.
+- Trial-run timings cut the expected time of the project lead at the phone from 1.5 h to 50 min.
+
+
 M7/WP2 (F2 hardening): P2 reboot wait and log reads without a device   (2026-10-02)
 -----------------------------------------------------------------------------------
 The device harness now handles a phone that connects adb only after its first unlock following a reboot. On the
