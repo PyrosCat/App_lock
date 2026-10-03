@@ -4,6 +4,16 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs: changelog rules for outside readers   (2026-10-02)
+--------------------------------------------------------
+The writing rules of the repository get changes that help a reader outside the project follow each changelog entry.
+- A new content rule asks for plain words and for an explanation of each project term at its first use.
+- A table under that rule shows two rejected changelog sentences next to their rewrites.
+- A changed variety rule asks for introductions that start with the changed item, not with "This change".
+- The example of the sentence rule against appositive chains now starts with the changed item.
+- The hand-off check gets a step that reads each entry as a reader outside the project would.
+
+
 M7/WP2 (F2 hardening): P2 progress in the time estimate   (2026-10-02)
 ----------------------------------------------------------------------
 The planning document for the R-007 hardening work now shows the progress up to 2026-10-02. In phase P2, the

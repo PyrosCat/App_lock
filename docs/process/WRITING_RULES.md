@@ -86,6 +86,14 @@ fleet machine.
    - Reassurances, such as "the status of both rows does not change".
    - A restatement of a recorded decision or policy as if it were a change.
    - References to rules of any kind: governance sections, plan invariants, ADR requirements, or RTM status.
+5. Write for a reader outside the project. Use plain words, and explain a phase, a case ID, or another project
+   term at its first use, for example "phase P2, in which the current app is tested on devices". Do not use the
+   shorthand of a test harness, such as "smoke run", "segment", or "objective rule".
+
+   | Do not write | Write |
+   |---|---|
+   | The Moto G smoke times of the reboot and biometric segments lower their full-run estimate to about 50 min. | Trial-run timings cut the expected time of the project lead at the phone from 1.5 h to 50 min. |
+   | Lead decision 6 confirms the objective rule for residual repeats and for controls that cannot lose a lock. | A case that reproduces a known R-007 weakness as predicted gets the verdict "not met". |
 
 ### 5.3 Sentences
 
@@ -100,8 +108,8 @@ fleet machine.
    | Separate sections list the limits. | Other sections of the report list the limits. |
    | test_lib_r007.sh passed 169 of 169. | The test_lib_r007.sh script passed all 169 host tests. |
 
-3. Do not use appositive chains or semicolon lists. Write "This change adds X to Y. X does Z.", not "X, a
-   factory for Y, does Z".
+3. Do not use appositive chains or semicolon lists. Write "The harness gets X. X does Z.", not "X, a factory for
+   Y, does Z".
 4. Start a sentence about a file with "The <name> script", "The <name> class", or "The <name> report", not with
    a bare file name.
 5. Keep each sentence to 20 words or fewer.
@@ -110,7 +118,9 @@ fleet machine.
 
 1. No two bullets of an entry start with the same three words.
 2. Do not chain sentences that start with "It", and avoid chains of "its". Name the item instead.
-3. Use "This change ..." only where the action needs it.
+3. Do not start the introduction with "This change". Start with the item that changes, for example "The planning
+   document for the R-007 hardening work now shows ...". In a bullet, use "This change ..." only where the action
+   needs it.
 
 ## 6. Commit subjects
 
@@ -125,5 +135,5 @@ fleet machine.
 1. Read every added line of the change, not only the line widths: `git diff -U0 -- <files>`, then each line that
    starts with `+`. Include comments, messages, test names, and each header paragraph that the change touches.
 2. For a changelog entry, also read the first three words of each bullet, and check each subject for a noun that
-   says what it is.
+   says what it is. Then read the entry as a reader outside the project: each term is plain or explained.
 3. The hand-off states that the check was done and what it changed.
