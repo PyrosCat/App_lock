@@ -198,6 +198,10 @@ It then opens the gate, enters a wrong PIN, kills, inspects, and restores the sa
 - The harness sets the app setting `biometric_unlock` to false for the PIN cases, by writing
   `shared_prefs/applock_settings.xml` through `run-as` while no app process runs. It records the original file (or
   its absence) and restores it at the end. The biometric segment sets it to true.
+- In X11a, the prompt shows "Not recognized" for about 2 s, and one UI dump takes 2 to 5 s, so dumps can miss it.
+  The accessibility event stream does not carry the message on the Moto G. The harness waits instead for the log line
+  of the biometric service for a rejected attempt of the app (`Biometrics/AuthenticationClient: onAuthenticated(false)`
+  with `Owner: com.applock`). The evidence file keeps the lines, and the marker counts them.
 - Each change of app data that a run must undo (the saved app settings file, a saved store copy, a read-only
   preferences directory) has a marker file in `files/r007/pending/`. A run does not start while a marker of an earlier
   run exists. `scripts/r007/restore_settings.sh` undoes the changes that the markers name, and then restores the
@@ -213,7 +217,8 @@ record, and exit handler, as in P1. A failed segment does not stop the others. T
 `scripts/r007/p2_device.sh [-s SERIAL] [-r MAX_REPEATS] [-c CALLERS] [-k CASES] [-o] SEGMENT`. The option `-r` caps
 every repeat count (the smoke run uses `-r 1`), `-c` selects the callers (`"S L"` by default; one or both, each once),
 and `-o` says that an operator is present. The option `-k` selects cases of the segment by their IDs, each once, for a
-rerun of single cases. The `cold-read` segment accepts it. A selection that runs no case fails the run.
+rerun of single cases. The `cold-read` and `biometric` segments accept it. A selection that runs no case fails the
+run.
 
 | Segment | Cases | Operator present |
 |---|---|---|

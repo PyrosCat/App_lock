@@ -1806,6 +1806,47 @@ reset_device
 STUB_UI='<node text="Use PIN" bounds="[100,200][300,400]" />' seg biometric tap_use_pin \
   && grep -qx "tap 200 300" "$STUB_DEVICE/ops" && ok "the Use PIN button is tapped at the middle of its text" \
   || bad "the Use PIN tap: $(cat "$WORK/out") ops $(tr '\n' ';' < "$STUB_DEVICE/ops")"
+reset_device
+STUB_UI='<node text="Enter your PIN" />' case_run biometric 'R007_CASE_LABEL="X11a L #1"; tap_use_pin; echo "rc=$?"'
+grep -qx "rc=1" "$WORK/out" && grep -q "the Use PIN button was not found" "$WORK/out" \
+  && grep -A1 "^## use-pin-missing" "$WORK/p2.log" | grep -qF 'text="Enter your PIN"' \
+  && ok "a missing Use PIN button fails after 3 dumps and saves the texts of the last dump" \
+  || bad "the missing Use PIN button: $(tr '\n' ';' < "$WORK/out") log $(tr '\n' ';' < "$WORK/p2.log")"
+# X11a: the biometric service logs the rejected attempt of the app, or logs nothing within the finger wait.
+x11a_is() { # label log-line expectation(record|fail)
+  reset_device; printf '%s\n' "$2" > "$STUB_DEVICE/logcat"
+  STUB_UI='<node text="Use PIN" bounds="[100,200][300,400]" />' STUB_CASE_PAIR=4,0 R007_FINGER_WAIT=2 \
+    case_run biometric 'x11a 1; echo "rc=$? fails=$FAIL_COUNT"'
+  local marker="^## CASE X11a caller=L repeat=1 .*rejected_attempts=1 writes=0 pair_after=4,0 predicted=yes"
+  if [ "$3" = record ]; then
+    grep -qx "rc=0 fails=0" "$WORK/out" && grep -qx "tap 200 300" "$STUB_DEVICE/ops" \
+      && grep -q "$marker objective=yes$" "$WORK/p2.log" \
+      && grep -A1 "^## bio-rejected X11a L #1" "$WORK/p2.log" | grep -q "onAuthenticated(false)" && ok "$1" \
+      || bad "$1: $(tr '\n' ';' < "$WORK/out") log $(grep '^## ' "$WORK/p2.log" | tr '\n' ';')"
+  else
+    grep -qx "rc=1 fails=1" "$WORK/out" && grep -q "no result within 2 s" "$WORK/out" \
+      && ! grep -q "^## CASE" "$WORK/p2.log" && ok "$1" || bad "$1: $(tr '\n' ';' < "$WORK/out")"
+  fi
+}
+X11A_LINE="1791142630.365 1895 2216 V Biometrics/AuthenticationClient: onAuthenticated(false), ID:0, Owner:"
+x11a_is "X11a: the rejected attempt of the app in the log gives the record and saves the log line" \
+  "$X11A_LINE com.applock, isBP: true" record
+x11a_is "X11a: without a rejected attempt in the log, the repeat fails once" "" fail
+x11a_is "X11a: a rejected attempt of another app does not count" "$X11A_LINE com.android.systemui, isBP: false" fail
+# The case selection of the biometric segment, with the real caller_on and case_on of p2_device.sh.
+biometric_calls() { # cases
+  SELECTED_CASES="$1" case_run biometric 'eval "$P2_SELECTORS"; reps() { printf 3; }
+    x11a() { echo "x11a $*"; }; x11b() { echo x11b; }; x11c() { echo x11c; }; x11d() { echo "x11d $*"; }
+    x11e() { echo x11e; }; h04_biometric() { echo "h04 $*"; }
+    R007_CALLERS="S L"; R007_CASES="$SELECTED_CASES"; segment_run'
+  tr '\n' ';' < "$WORK/out"
+}
+[ "$(biometric_calls X11a)" = "x11a 1;x11a 2;x11a 3;" ] \
+  && ok "the case selection X11a runs only the three X11a repeats" \
+  || bad "the biometric selection X11a: $(biometric_calls X11a)"
+[ "$(biometric_calls "")" = "x11a 1;x11a 2;x11a 3;x11b;x11d 1;x11d 2;x11d 3;x11e;h04 1;h04 2;h04 3;x11c;" ] \
+  && ok "without a case selection, the biometric segment runs all its cases in order" \
+  || bad "the biometric segment without a selection: $(biometric_calls "")"
 
 echo "UI dump and unlock wait"
 reset_device

@@ -4,6 +4,23 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 rejected fingerprint detection   (2026-10-04)
+-----------------------------------------------------------------------
+The device test harness of the R-007 hardening work now detects a rejected fingerprint from the system log. In
+phase P2, the current app is tested on devices before any fix is chosen.
+- Case X11a checks that a finger that is not enrolled unlocks nothing and writes nothing.
+- In the full Moto G run, the X11a case gave a result in only one of three tries.
+- The "Not recognized" message shows for about 2 s, and a screen dump takes 2 to 5 s.
+- The X11a case now waits for the log line of the biometric service for a rejected attempt of the app.
+- The test record of X11a keeps these log lines and counts them.
+- The lookup of the "Use PIN" button now tries three screen dumps before it fails.
+- A failed lookup saves the texts of the last screen dump to the test record.
+- The biometric tests now accept the -k option, which reruns single test cases.
+- Six new host tests in test_lib_r007.sh cover the log line, the button lookup, and the case selection.
+- The P2 device plan describes the log line and the option for the biometric tests.
+- The test_lib_r007.sh script passed all 481 host tests.
+
+
 M7/WP2 (F2 hardening): P2 read-rate check and single-case reruns   (2026-10-03)
 -------------------------------------------------------------------------------
 The device test harness of the R-007 hardening work gets a rate check and a way to rerun single cases. In

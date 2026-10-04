@@ -17,12 +17,33 @@ operator_step() { # request condition
   done
 }
 
-# Taps the "Use PIN" button of the biometric prompt, at the middle of its text (_digit_xy of lib.sh).
+# Taps the "Use PIN" button of the biometric prompt, at the middle of its text (_digit_xy of lib.sh). A dump can come
+# back without the prompt, so it looks up to 3 times. When the button stays missing, the evidence file gets the texts
+# of the last dump.
 tap_use_pin() {
-  local xy
-  xy="$(_digit_xy "$(ui_xml)" "$R007_UI_BIOMETRIC")"
-  [ -n "$xy" ] || { fail "$R007_CASE_LABEL: the Use PIN button was not found"; return 1; }
-  sh_ input tap $xy
+  local xml xy try
+  for (( try=1; try<=3; try++ )); do
+    xml="$(ui_xml)"; xy="$(_digit_xy "$xml" "$R007_UI_BIOMETRIC")"
+    if [ -n "$xy" ]; then sh_ input tap $xy; return; fi
+    sleep 1
+  done
+  printf '## use-pin-missing %s\n%s\n' "$R007_CASE_LABEL" \
+    "$(grep -oE 'text="[^"]+"' <<< "$xml" | tr '\n' ' ')" >> "$R007_LOG_OUT"
+  fail "$R007_CASE_LABEL: the Use PIN button was not found"; return 1
+}
+
+# The "Not recognized" message of the prompt shows for about 2 s, and one UI dump takes 2 to 5 s on the Moto G, so
+# dumps can miss it. The accessibility event stream does not carry the message either. The biometric service logs
+# each rejected attempt with the owner of the prompt, and the line stays in the log (Moto G, 2026-10-04):
+# "Biometrics/AuthenticationClient: onAuthenticated(false), ID:0, Owner: com.applock, isBP: true, ...".
+R007_BIO_REJECTED="Biometrics/AuthenticationClient: onAuthenticated\(false\).* Owner: $APP_ID[, ]"
+
+# Prints the log lines of the rejected biometric attempts of the app, or nothing. Returns 1 when logcat cannot be read.
+# The log can hold NUL bytes, which a command substitution would warn about.
+bio_rejected_lines() {
+  local out
+  out="$(r007_logcat -d -v epoch | tr -d '\000')" || return 1
+  grep -E -- "$R007_BIO_REJECTED" <<< "$out" || :
 }
 
 # Prints the number of WRITE BEGIN lines of the case process.
@@ -31,17 +52,20 @@ case_writes() {
   r007_v_exact "$R007_CAPTURE" "$R007_CASE_PID"
 }
 
-# X11a: a finger that is not enrolled, from C4. The prompt stays, and nothing is written.
+# X11a: a finger that is not enrolled, from C4. The prompt stays, and nothing is written. The log line of the rejected
+# attempt shows the mismatch (case_start cleared the log). The evidence file keeps the lines.
 x11a() { # repeat
-  local repeat="$1" writes
+  local repeat="$1" writes rejected
   case_start "X11a L #$repeat" && case_prepare L 4 0 && case_open L "biometric" || return 1
   operator_step "touch the fingerprint sensor once with a finger that is not enrolled" \
-    'grep -qi "not recognized" <<< "$(ui_xml)"' || return 1
-  sleep 2; writes="$(case_writes)"
+    '[ -n "$(bio_rejected_lines)" ]' || return 1
+  sleep 2; writes="$(case_writes)"; rejected="$(bio_rejected_lines)"
+  printf '## bio-rejected %s\n%s\n' "$R007_CASE_LABEL" "$(cut -c1-300 <<< "$rejected")" >> "$R007_LOG_OUT"
   tap_use_pin || return 1
   case_kill_inspect || return 1
   r007_mark X11a L "$repeat" "$(yn '[ "$writes" = 0 ] && [ "$R007_PAIR" = 4,0 ]')" "$(yn '[ "$R007_PAIR" = 4,0 ]')" \
-    fixture=C4 script=none pid="$R007_CASE_PID" writes="$writes" pair_after="$R007_PAIR"
+    fixture=C4 script=none pid="$R007_CASE_PID" rejected_attempts="$(grep -c . <<< "$rejected")" writes="$writes" \
+    pair_after="$R007_PAIR"
 }
 
 # X11b: the harness cancels the prompt with "Use PIN". The PIN pad shows, and nothing is written.
@@ -118,14 +142,17 @@ h04_biometric() { # repeat
     pid="$R007_CASE_PID" opened_while_held="$opened" returned_before_release="$returned" pair_after="$R007_PAIR"
 }
 
+# The cases that a case selection (-k) can name.
+SEGMENT_CASES="X11a X11b X11c X11d X11e H04-biometric"
+
 segment_run() {
   local repeat n3
   caller_on L || { fail "the biometric segment needs the legacy caller (-c L or the default)"; return 1; }
   n3="$(reps 3)"
-  for (( repeat=1; repeat<=n3; repeat++ )); do x11a "$repeat"; done
-  x11b
-  for (( repeat=1; repeat<=n3; repeat++ )); do x11d "$repeat"; done
-  x11e
-  for (( repeat=1; repeat<=n3; repeat++ )); do h04_biometric "$repeat"; done
-  x11c
+  if case_on X11a; then for (( repeat=1; repeat<=n3; repeat++ )); do x11a "$repeat"; done; fi
+  if case_on X11b; then x11b; fi
+  if case_on X11d; then for (( repeat=1; repeat<=n3; repeat++ )); do x11d "$repeat"; done; fi
+  if case_on X11e; then x11e; fi
+  if case_on H04-biometric; then for (( repeat=1; repeat<=n3; repeat++ )); do h04_biometric "$repeat"; done; fi
+  if case_on X11c; then x11c; fi
 }
