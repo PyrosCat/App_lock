@@ -4,6 +4,21 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): Moto G report for the P2 device lane   (2026-10-04)
+--------------------------------------------------------------------------
+The reports folder gets the Moto G 2025 report for phase P2 of the R-007 hardening work. In phase P2, the
+current app is tested on devices before any fix is chosen.
+- The new report is campaigns/2026-10-04_m7-wp2-f2h-p2-device_moto-g-2025.md.
+- In the full run on the phone at ca57786, 558 of 559 test repetitions gave the predicted result.
+- A slow Android debug bridge call stretched the time window of the one other repetition.
+- Reruns of single test cases at 6f28d8a and 8d1c28b gave the predicted result 15 times out of 15.
+- On the phone, all four known weaknesses of the PIN lockout appear with both PIN screens of the app.
+- Tables in the report give the observed behaviour and two verdicts for each test case.
+- A findings section of the report covers five problems of the test harness and the phone.
+- An appendix lists the SHA-256 of each of the 11 evidence files.
+- The Moto G row of the fleet table in reports/README.md links to the new report.
+
+
 M7/WP2 (F2 hardening): P2 rejected fingerprint detection   (2026-10-04)
 -----------------------------------------------------------------------
 The device test harness of the R-007 hardening work now detects a rejected fingerprint from the system log. In
