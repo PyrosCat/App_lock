@@ -4,6 +4,22 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): NucBox plan for the P2 device lanes   (2026-10-05)
+-------------------------------------------------------------------------
+A new test plan covers phase P2 on the NucBox emulators at API 36 and API 30. In phase P2, the current app is
+tested on devices before any fix is chosen.
+- The new plan is testing/M7_WP2_F2H_P2_NUCBOX_PLAN.md.
+- The plan covers the matrix_api36 and matrix_api30def emulators one after the other, with one report for both.
+- Setup sections give the build, the install, the screen-lock step, and a p1_validate.sh run that sets the PIN.
+- A probe section lists read-only checks of the device queries, each with its expected value.
+- The emulator runs include the screen-off test steps, which the phone runs skipped.
+- Another section allows longer waits and small fixes of the test scripts.
+- Other sections give the pass criteria, the stop conditions, the rerun rules, and the report contents.
+- The build commands of the plan ran on the 2012 i7 host, and the probe commands on the Moto G.
+- On the phone, the p1_validate.sh script passed all 18 checks at 8d1c28b.
+- The test_lib_r007.sh script passed all 481 host tests.
+
+
 Docs: writing rule for document names   (2026-10-05)
 ----------------------------------------------------
 The writing rules of the repository get a rule for the way a text names another document.
