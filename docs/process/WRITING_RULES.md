@@ -27,6 +27,10 @@ fleet machine.
 9. Refer to another document by its name and the topic, not by a section number. Write "the latency
    distributions of the test plan", not "test plan §12". Use a section number only when the reader must find one
    exact passage. Inside a document, write "section 3.3", not "§3.3".
+10. Name a document by its file name when that name is unique in the repository, for example `WRITING_RULES.md`
+    or `M7_PLAN.md`. When the name is not unique, add the shortest part of the path that makes it unique, for
+    example `reports/README.md`. Do not write a full path, because documents move between folders. A command keeps
+    the paths that it needs to run.
 
 ## 2. Code comments and KDoc
 

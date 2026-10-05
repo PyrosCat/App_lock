@@ -4,6 +4,14 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs: writing rule for document names   (2026-10-05)
+----------------------------------------------------
+The writing rules of the repository get a rule for the way a text names another document.
+- A new rule for all text asks for the file name of a document when that name is unique.
+- For a name that is not unique, the rule asks for the shortest unique part of the path.
+- A command in a document keeps the paths that it needs to run.
+
+
 M7/WP2 (F2 hardening): P2 phone results in the time estimate   (2026-10-04)
 ---------------------------------------------------------------------------
 The planning document for the R-007 hardening work now shows the progress up to 2026-10-04. In phase P2, the
