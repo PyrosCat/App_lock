@@ -4,6 +4,18 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 phone results in the time estimate   (2026-10-04)
+---------------------------------------------------------------------------
+The planning document for the R-007 hardening work now shows the progress up to 2026-10-04. In phase P2, the
+current app is tested on a phone and on emulators before any fix is chosen.
+- The document now expects phase P2 to end between 2026-10-12 and 2026-10-13.
+- A new column shows that the full phone run took 12 h 7 min, against 12 h estimated.
+- The full phone run and its report are marked as done, and the emulator test plan is marked as next.
+- The completed-work table adds the full phone run, its reruns, two test-tool fixes, and the report.
+- Each assumption of the phone estimate now states what the full run measured.
+- With a stopped run and two reruns, the phone used about 13 h 22 min of device time.
+
+
 M7/WP2 (F2 hardening): Moto G report for the P2 device lane   (2026-10-04)
 --------------------------------------------------------------------------
 The reports folder gets the Moto G 2025 report for phase P2 of the R-007 hardening work. In phase P2, the
