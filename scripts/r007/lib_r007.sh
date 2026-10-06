@@ -4,10 +4,10 @@
 #
 # It controls the debug fault wrapper (FaultInjectingLockoutStorage) through files in the app's private directory,
 # written with `run-as`; reads the wrapper's evidence from logcat (tag R007Fault); kills the app with SIGKILL through
-# `run-as`; and runs the fresh-process inspector (LockoutStoreInspector) with `am instrument`. For the unknown-state
-# case it also saves, tampers, and restores the lockout store file. It records, changes, and restores the stay-awake
-# and rotation settings of the device, and it records and restores the accessibility settings that the phase P2
-# library (lib_p2.sh) changes.
+# `run-as`, or through `su 0` after the SELinux denial of that kill on Android 11; and runs the fresh-process inspector
+# (LockoutStoreInspector) with `am instrument`. For the unknown-state case it also saves, tampers, and restores the
+# lockout store file. It records, changes, and restores the stay-awake and rotation settings of the device, and it
+# records and restores the accessibility settings that the phase P2 library (lib_p2.sh) changes.
 #
 # Every check captures a command's output first and fails when the command fails. It then matches the captured
 # text, never a live pipe: lib.sh sets pipefail, so `producer | grep -q` can report a match as a failure when grep
@@ -23,6 +23,7 @@ source "$R007_HERE/../e2e/lib.sh"
 : "${R007_RUNNER:=androidx.test.runner.AndroidJUnitRunner}"
 : "${WRONG_PIN:=0000}"
 : "${R007_KILL_POLLS:=40}"   # r007_kill polls /proc this many times, 0.25 s apart
+: "${R007_DENIAL_POLLS:=8}"  # r007_kill_denial reads the events log this many times, 0.25 s apart
 R007_CONTROL="files/r007"
 R007_INSPECTOR="com.applock.r007.LockoutStoreInspector"
 R007_STORE="shared_prefs/applock_lockout.xml"   # the lockout store file, relative to the app's data directory
@@ -304,13 +305,89 @@ r007_wait_dead() { # pid
   return 1
 }
 
+# The audit line of the SELinux denial that Android 11 (API 30) logs when run-as sends SIGKILL to the app: the run-as
+# domain has no sigkill permission on the app domain. r007_kill sends a kill through `su 0` only after this denial.
+R007_KILL_DENIAL='type=1400 audit\([0-9.:]+\): avc: denied \{ sigkill \} for comm="kill" scontext=u:r:runas_app:[^ ]+ '
+R007_KILL_DENIAL+='tcontext=u:r:untrusted_app:[^ ]+ tclass=process permissive=0( |$)'
+
+# The audit time of a denial comes from the coarse kernel clock, which lags the clock that `date` reads by less than
+# one tick (10 ms at HZ=100). r007_kill_denial accepts a denial up to this many ms before the start of the attempt.
+# The pid of the attempt cannot belong to an earlier process in that time: the device would have to start about 32000
+# processes first (pid_max 32768).
+R007_AUDIT_SLACK_MS=100
+
+# Prints the line of the events log that shows the denial R007_KILL_DENIAL for the kill command with pid SENDER,
+# logged at or after the device time START (ms) of the attempt, less R007_AUDIT_SLACK_MS. The log entry of an audit
+# line carries the pid of the denied process and the time of the denial. The events buffer keeps old lines, and an
+# older line with the same pid belongs to an earlier process with that pid. The read asks logcat only for the lines
+# since that boundary (-t), and the time check here still applies. The line can arrive after the command has
+# returned, so the log is read up to R007_DENIAL_POLLS times. Fails when no such line arrives, when the log is
+# unreadable, or when SENDER or START is not valid.
+r007_kill_denial() { # sender start-ms
+  local i out line lines boundary since pattern time_re='^ *([0-9]+)\.([0-9]{3}) '
+  [[ "$1" =~ ^[0-9]+$ && "$2" =~ ^[0-9]{13}$ ]] || return 1
+  pattern="^ *[0-9]+\.[0-9]{3} +$1 +[0-9]+ I auditd *: $R007_KILL_DENIAL"
+  boundary=$(( $2 - R007_AUDIT_SLACK_MS )); printf -v since '%d.%03d' $(( boundary / 1000 )) $(( boundary % 1000 ))
+  for (( i=0; i<R007_DENIAL_POLLS; i++ )); do
+    if out="$(r007_logcat -b events -d -v epoch -t "$since" -s auditd:I)"; then
+      lines="$(tr -d '\r' <<< "$out" | grep -E -- "$pattern")"
+      while IFS= read -r line; do
+        [[ "$line" =~ $time_re ]] && (( BASH_REMATCH[1] * 1000 + 10#${BASH_REMATCH[2]} >= boundary )) \
+          && { printf '%s' "$line"; return 0; }
+      done <<< "$lines"
+    fi
+    sleep 0.25
+  done
+  return 1
+}
+
+# Sends SIGKILL to PID through `su 0`, after the denial line DENIAL of its run-as kill (see r007_kill). A root kill is
+# not limited to the app's uid, so the root shell checks just before the kill that PID is still the one app process.
+# The evidence file gets a "## kill-via-su" line and DENIAL for each such kill. Without an evidence file, no kill is
+# sent, and a failed write fails the kill.
+r007_kill_su() { # pid denial
+  local cmd out rc
+  [ -n "${R007_LOG_OUT:-}" ] \
+    || { fail "r007_kill: no evidence file (r007_evidence_init was not called), so no kill through su 0"; return 1; }
+  cmd="p=\$(pidof $APP_ID); if [ \"\$p\" != $1 ]; then echo \"moved \${p:-none}\""
+  cmd+="; elif kill -9 $1; then echo killed; else exit 1; fi"
+  out="$(sh_ "su 0 sh -c '$cmd'")"; rc=$?
+  if [ "$rc" = 0 ] && [ "${out%% *}" = moved ]; then
+    fail "r007_kill: pid $1 is no longer the one app process (pidof: ${out#moved }), so su 0 killed nothing"
+    return 1
+  fi
+  # A kill counts only with both the answer and a successful exit: an answer alone can precede a failure.
+  [ "$rc" = 0 ] && [ "$out" = killed ] \
+    || { fail "r007_kill: kill -9 $1 through su 0 failed (exit status $rc, answer: ${out:-none})"; return 1; }
+  printf '## kill-via-su pid=%s\n%s\n' "$1" "$2" >> "$R007_LOG_OUT" \
+    || { fail "r007_kill: pid $1 was killed through su 0, but the kill-via-su line could not be saved"; return 1; }
+}
+
 # Kills the app process with SIGKILL, as its own uid, and waits for an explicit "absent" answer for its /proc entry.
 # Prints the killed pid. A failed kill, a failed query, or no answer is a failure, never a confirmed death. This is
 # an abrupt death: no onDestroy, no flush. It is not `am force-stop`, which also changes later launches.
+# On Android 11 (API 30), SELinux denies the run-as kill. After this denial only, the same SIGKILL goes through `su 0`
+# (r007_kill_su), which a userdebug image such as the AOSP emulator has. Any other failure of the run-as kill, such
+# as a lost connection, a run-as error, or a process that is gone, fails without a kill through su 0.
 r007_kill() {
-  local pid
+  local pid out sender start denial answer
   pid="$(r007_pid)" || { fail "r007_kill: $APP_ID does not run as exactly one process"; return 1; }
-  r007_run_as kill -9 "$pid" || { fail "r007_kill: kill -9 $pid failed"; return 1; }
+  # The device shell prints its pid and the device time (ms), then replaces itself with run-as, which runs kill in the
+  # same process. So the sender is the pid of the kill command, and the audit line of a denial carries this pid. The
+  # start time comes before the kill.
+  if ! out="$(sh_ "echo sender=\$\$ start=\$(date +%s%3N); exec run-as $APP_ID kill -9 $pid 2>&1")"; then
+    answer="$(grep -v '^sender=' <<< "$out" | tr '\n' ' ')"; answer="${answer% }"
+    read -r sender start <<< "$(sed -n -E 's/^sender=([0-9]+) start=([0-9]{13})$/\1 \2/p' <<< "$out")"
+    if [ -z "$start" ]; then
+      fail "r007_kill: kill -9 $pid failed, and the device shell gave no pid and time (answer: ${answer:-none})"
+      return 1
+    fi
+    if ! denial="$(r007_kill_denial "$sender" "$start")"; then
+      fail "r007_kill: kill -9 $pid failed (answer: ${answer:-none}), and the events log shows no SELinux denial of it"
+      return 1
+    fi
+    r007_kill_su "$pid" "$denial" || return 1
+  fi
   r007_wait_dead "$pid" \
     || { fail "r007_kill: no confirmed absence of pid $pid (last answer: ${R007_PROC_STATE:-none})"; return 1; }
   printf '%s' "$pid"

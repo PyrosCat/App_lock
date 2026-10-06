@@ -42,7 +42,14 @@ case "$cmd" in
     [ -n "${STUB_LOGCAT_FAIL:-}" ] && { echo "error: device offline" >&2; exit 1; }
     case " $* " in
       *" -c "*) : > "$STUB_DEVICE/logcat" ;;
-      *" -b events "*) cat "$STUB_DEVICE/events" ;;
+      # A read of the events buffer prints all of it, and ops records the time of -t. The lines of events.late join
+      # the buffer after the read, as an audit line that logd writes late.
+      *" -b events "*)
+        [[ " $* " =~ \ -t\ ([^ ]+)\  ]] && echo "events-since ${BASH_REMATCH[1]}" >> "$STUB_DEVICE/ops"
+        cat "$STUB_DEVICE/events"
+        if [ -e "$STUB_DEVICE/events.late" ]; then
+          cat "$STUB_DEVICE/events.late" >> "$STUB_DEVICE/events"; rm -f "$STUB_DEVICE/events.late"
+        fi ;;
       *) cat "$STUB_DEVICE/logcat" ;;
     esac ;;
   exec-in)
@@ -86,7 +93,33 @@ case "$cmd" in
       # A release of a held operation (r007_release); it fails with STUB_RELEASE_FAIL.
       "run-as "*"/release && touch "*)
         [ -n "${STUB_RELEASE_FAIL:-}" ] && exit 1; echo "release" >> "$STUB_DEVICE/ops" ;;
-      "run-as "*" kill -9 "*) [ -n "${STUB_KILL_FAIL:-}" ] && exit 1; echo "kill" >> "$STUB_DEVICE/ops" ;;
+      # A kill as the app's uid (r007_kill). The device shell prints its pid (STUB_SENDER), which run-as and kill keep,
+      # and its time (STUB_KILL_START, by default 1791260664900 ms). STUB_KILL_FAIL fails the kill. With "selinux",
+      # SELinux denies the signal as on Android 11, and the events log gets the audit line STUB_DENIAL with the pid of
+      # the kill at 1791260664.927 (with STUB_DENIAL_LATE, after the next read). "runas" fails as for an app that is
+      # not debuggable, "offline" as for a lost connection, and any other value as for a process that is gone.
+      "echo sender=\$\$ start=\$(date +%s%3N); exec run-as "*" kill -9 "*)
+        [ "${STUB_KILL_FAIL:-}" = offline ] && { echo "error: device offline" >&2; exit 1; }
+        sender="${STUB_SENDER:-7143}"; target="${line% 2>&1}"; target="${target##* }"
+        echo "sender=$sender start=${STUB_KILL_START:-1791260664900}"
+        case "${STUB_KILL_FAIL:-}" in
+          "") echo "kill" >> "$STUB_DEVICE/ops"; exit 0 ;;
+          runas) echo "run-as: package not debuggable: com.applock"; exit 1 ;;
+          selinux)
+            printf '         1791260664.927  %s  %s I auditd  : %s\n' "$sender" "$sender" "$STUB_DENIAL" \
+              >> "$STUB_DEVICE/events${STUB_DENIAL_LATE:+.late}" ;;
+        esac
+        echo "kill: unknown pid '$target'"; exit 1 ;;
+      # The root shell of r007_kill_su. It kills the target only while the app process is that pid: STUB_SU_PID, by
+      # default STUB_PID or 4242. It fails with STUB_SU_KILL_FAIL, as on a device without su. With STUB_SU_EXIT, it
+      # answers as usual but exits with that status, as when the connection breaks after the answer.
+      "su 0 sh -c "*)
+        echo "su" >> "$STUB_DEVICE/ops"
+        [ -n "${STUB_SU_KILL_FAIL:-}" ] && exit 127
+        target="$(sed -E 's/.* elif kill -9 ([0-9]+);.*/\1/' <<< "$line")"; now="${STUB_SU_PID:-${STUB_PID:-4242}}"
+        if [ "$now" = "$target" ]; then echo "su-kill" >> "$STUB_DEVICE/ops"; echo killed
+        else echo "moved $now"; fi
+        exit "${STUB_SU_EXIT:-0}" ;;
       # The boot id read fails with STUB_BOOT_FAIL, and gives an empty line with STUB_BOOT_EMPTY.
       "cat /proc/sys/kernel/random/boot_id")
         [ -n "${STUB_BOOT_FAIL:-}" ] && exit 1
@@ -232,6 +265,12 @@ STUB
 chmod +x "$WORK/bin/adb"
 export PATH="$WORK/bin:$PATH"
 export SERIAL=stub
+# The audit line that the events log of Android 11 shows when SELinux denies the run-as kill, without its time and
+# pid (emulator probe of 2026-10-06). The stub logs it for STUB_KILL_FAIL=selinux.
+STUB_DENIAL='type=1400 audit(0.0:623): avc: denied { sigkill } for comm="kill" '
+STUB_DENIAL+='scontext=u:r:runas_app:s0:c137,c256,c512,c768 tcontext=u:r:untrusted_app:s0:c137,c256,c512,c768 '
+STUB_DENIAL+='tclass=process permissive=0 app=com.applock'
+export STUB_DENIAL
 
 TESTS=0 BAD=0
 ok()  { TESTS=$((TESTS+1)); printf '  ok   %s\n' "$1"; }
@@ -378,7 +417,109 @@ echo "process death"
 reset_device
 expect_ok "an explicit absent answer confirms the death" r007_kill
 reset_device
-STUB_KILL_FAIL=1 expect_fail "a failed kill is not a death" r007_kill
+STUB_KILL_FAIL=1 R007_DENIAL_POLLS=2 expect_fail "a failed kill is not a death" r007_kill
+reset_device; rm -f "$WORK/kill.log"
+R007_LOG_OUT="$WORK/kill.log" expect_ok "an allowed run-as kill confirms the death" r007_kill
+grep -qx kill "$STUB_DEVICE/ops" && ! grep -q '^su' "$STUB_DEVICE/ops" && [ ! -e "$WORK/kill.log" ] \
+  && ok "an allowed run-as kill invokes no su and writes no evidence line" \
+  || bad "an allowed run-as kill invoked su or wrote an evidence line"
+DENIAL_LINE="         1791260664.927  7143  7143 I auditd  : $STUB_DENIAL"   # the denial of the kill by process 7143
+reset_device; rm -f "$WORK/kill.log"
+R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=selinux \
+  expect_ok "a run-as kill that SELinux denies falls back to su 0 and confirms the death" r007_kill
+grep -qx su-kill "$STUB_DEVICE/ops" && [ "$(cat "$WORK/kill.log")" = "## kill-via-su pid=4242"$'\n'"$DENIAL_LINE" ] \
+  && ok "the su 0 kill is sent, and the evidence gets a kill-via-su line with the denial of the run-as kill" \
+  || bad "the su 0 kill: $(tr '\n' ';' < "$STUB_DEVICE/ops") evidence: $(cat "$WORK/kill.log" 2>/dev/null)"
+grep -qx "events-since 1791260664.800" "$STUB_DEVICE/ops" \
+  && ok "the denial lookup reads the events log since 100 ms before the attempt start" \
+  || bad "the read of the events log: $(tr '\n' ';' < "$STUB_DEVICE/ops")"
+reset_device; rm -f "$WORK/kill.log"
+R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=selinux STUB_KILL_START=1791260664107 lib r007_kill
+grep -qx "events-since 1791260664.007" "$STUB_DEVICE/ops" && grep -qx su-kill "$STUB_DEVICE/ops" \
+  && ok "the read since 100 ms before the start 1791260664107 asks for 1791260664.007" \
+  || bad "the read since a start with few ms: $(tr '\n' ';' < "$STUB_DEVICE/ops")"
+reset_device; rm -f "$WORK/kill.log"
+R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=selinux STUB_DENIAL_LATE=1 \
+  expect_ok "a denial that reaches the events log after the first read still counts" r007_kill
+[ "$(grep -c '^events-since ' "$STUB_DEVICE/ops")" = 2 ] && grep -qx su-kill "$STUB_DEVICE/ops" \
+  && ok "the late denial is found by the second read and sends the kill through su 0" \
+  || bad "the late denial: $(tr '\n' ';' < "$STUB_DEVICE/ops")"
+# A run-as kill that fails for another cause than the SELinux denial of that kill invokes no su and writes no evidence
+# line. In each case, the events log holds the denial of an earlier kill, by process 6924.
+for failure in "offline:a lost connection" "runas:a run-as error" "gone:a process that is gone"; do
+  reset_device; rm -f "$WORK/kill.log"; printf '%s\n' "${DENIAL_LINE//7143/6924}" > "$STUB_DEVICE/events"
+  R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL="${failure%%:*}" R007_DENIAL_POLLS=2 lib r007_kill; rc=$?
+  [ "$rc" != 0 ] && ! grep -q '^su' "$STUB_DEVICE/ops" && [ ! -e "$WORK/kill.log" ] \
+    && ok "a run-as kill that fails because of ${failure#*:} invokes no su and is not a death" \
+    || bad "the run-as kill that fails because of ${failure#*:}: rc=$rc ops=$(tr '\n' ';' < "$STUB_DEVICE/ops")"
+done
+reset_device; rm -f "$WORK/kill.log"
+R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=selinux STUB_LOGCAT_FAIL=1 R007_DENIAL_POLLS=2 lib r007_kill; rc=$?
+[ "$rc" != 0 ] && ! grep -q '^su' "$STUB_DEVICE/ops" && [ ! -e "$WORK/kill.log" ] \
+  && ok "a denied run-as kill with an unreadable events log invokes no su and is not a death" \
+  || bad "the denied kill with an unreadable events log: rc=$rc ops=$(tr '\n' ';' < "$STUB_DEVICE/ops")"
+reset_device; rm -f "$WORK/kill.log"
+R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=selinux STUB_KILL_START='1791260664%3N' R007_DENIAL_POLLS=2 \
+  lib r007_kill; rc=$?
+[ "$rc" != 0 ] && ! grep -q '^su' "$STUB_DEVICE/ops" && grep -q "gave no pid and time" "$WORK/out" \
+  && ok "a denied run-as kill without a valid device time invokes no su and is not a death" \
+  || bad "the denied kill without a valid device time: rc=$rc $(cat "$WORK/out")"
+# A denial with the pid of the attempt that was logged before the attempt began belongs to an earlier process with that
+# pid. The attempt began at 1791260664.900. The coarse audit clock gets a slack of 100 ms.
+denial_at() { printf '         %s  7143  7143 I auditd  : %s\n' "$1" "$STUB_DENIAL"; }   # the denial of 7143 at $1
+for old_denial in "1791260064.900:10 minutes" "1791260664.799:101 ms"; do
+  reset_device; rm -f "$WORK/kill.log"; denial_at "${old_denial%%:*}" > "$STUB_DEVICE/events"
+  R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=gone R007_DENIAL_POLLS=2 lib r007_kill; rc=$?
+  [ "$rc" != 0 ] && ! grep -q '^su' "$STUB_DEVICE/ops" && [ ! -e "$WORK/kill.log" ] \
+    && ok "a denial of the same sender pid ${old_denial#*:} before the attempt invokes no su" \
+    || bad "the denial ${old_denial#*:} before the attempt: rc=$rc ops=$(tr '\n' ';' < "$STUB_DEVICE/ops")"
+done
+reset_device; rm -f "$WORK/kill.log"; denial_at 1791260664.800 > "$STUB_DEVICE/events"
+R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=gone R007_DENIAL_POLLS=2 \
+  expect_ok "a denial of the sender pid 100 ms before the attempt is in the slack and counts" r007_kill
+grep -qx su-kill "$STUB_DEVICE/ops" && ok "the denial in the slack sends the kill through su 0" \
+  || bad "the denial in the slack: $(tr '\n' ';' < "$STUB_DEVICE/ops")"
+# Without a valid start time, the lookup has no boundary for old lines, so it accepts none.
+for start in "" 17912606; do
+  reset_device; denial_at 1791260664.927 > "$STUB_DEVICE/events"
+  R007_DENIAL_POLLS=1 expect_fail "a denial lookup with the start time '$start' accepts no line" \
+    r007_kill_denial 7143 "$start"
+done
+reset_device; rm -f "$WORK/kill.log"
+R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=selinux STUB_DENIAL="${STUB_DENIAL/untrusted_app/platform_app}" \
+  R007_DENIAL_POLLS=2 lib r007_kill; rc=$?
+[ "$rc" != 0 ] && ! grep -q '^su' "$STUB_DEVICE/ops" && [ ! -e "$WORK/kill.log" ] \
+  && ok "a run-as kill with another SELinux denial invokes no su and is not a death" \
+  || bad "the run-as kill with another denial: rc=$rc ops=$(tr '\n' ';' < "$STUB_DEVICE/ops")"
+reset_device; rm -f "$WORK/kill.log"
+R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=selinux STUB_SU_PID=4343 lib r007_kill; rc=$?
+[ "$rc" != 0 ] && grep -qx su "$STUB_DEVICE/ops" && ! grep -qx su-kill "$STUB_DEVICE/ops" && [ ! -e "$WORK/kill.log" ] \
+  && grep -q "pidof: 4343" "$WORK/out" \
+  && ok "the root shell kills nothing when the pid is no longer the app process" \
+  || bad "the root kill of a changed pid: rc=$rc $(cat "$WORK/out")"
+reset_device; rm -f "$WORK/kill.log"
+R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=selinux STUB_SU_KILL_FAIL=1 lib r007_kill; rc=$?
+[ "$rc" != 0 ] && [ ! -e "$WORK/kill.log" ] && ok "a denied kill on a device without su is not a death" \
+  || bad "the denied kill without su: rc=$rc $(cat "$WORK/out")"
+reset_device; rm -f "$WORK/kill.log"
+R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=selinux STUB_SU_EXIT=1 lib r007_kill; rc=$?
+[ "$rc" != 0 ] && [ ! -e "$WORK/kill.log" ] && grep -q "exit status 1, answer: killed" "$WORK/out" \
+  && ok "a su 0 kill that answers killed but exits with an error is not a death" \
+  || bad "the su 0 kill with an exit error: rc=$rc $(cat "$WORK/out")"
+reset_device; rm -f "$WORK/kill.log"
+R007_LOG_OUT="$WORK/kill.log" STUB_KILL_FAIL=selinux STUB_PROC_ANSWER=present R007_KILL_POLLS=2 \
+  expect_fail "a su 0 kill without a confirmed absence is not a death" r007_kill
+reset_device
+STUB_KILL_FAIL=selinux lib r007_kill; rc=$?
+[ "$rc" != 0 ] && ! grep -q '^su' "$STUB_DEVICE/ops" && grep -q "no evidence file" "$WORK/out" \
+  && ok "without an evidence file, a denied run-as kill invokes no su" \
+  || bad "the denied kill without an evidence file: rc=$rc $(cat "$WORK/out")"
+reset_device
+mkdir -p "$WORK/kill-unwritable.log"   # a directory: an append to it fails, also on Git Bash
+R007_LOG_OUT="$WORK/kill-unwritable.log" STUB_KILL_FAIL=selinux lib r007_kill; rc=$?
+[ "$rc" != 0 ] && grep -q "the kill-via-su line could not be saved" "$WORK/out" \
+  && ok "a kill-via-su line that cannot be saved fails the kill" \
+  || bad "the unsaved kill-via-su line: rc=$rc $(cat "$WORK/out")"
 reset_device
 STUB_PROC_FAIL=1 R007_KILL_POLLS=2 expect_fail "a failed /proc query is not a death" r007_kill
 reset_device
@@ -1315,7 +1456,7 @@ for callers in "" " " "S S" "S,L"; do
 done
 # A case selection is refused before any device command when the segment has no case list, when it names a case that
 # the segment does not have or one case twice, and when it is empty.
-for selection in "healthy:R1.2a" "cold-read:R9.9" "cold-read:R1.2a R1.2a" "cold-read:" "cold-read: "; do
+for selection in "healthy:R1.2a" "cold-read:R9.9" "cold-read:R1.2a R1.2a" "cold-read:" "cold-read: " "death:R3.1e"; do
   reset_device
   bash "$HERE/p2_device.sh" -s stub -r 1 -k "${selection#*:}" "${selection%%:*}" > "$WORK/out" 2>&1; rc=$?
   [ "$rc" = 2 ] && [ ! -s "$STUB_DEVICE/ops" ] && grep -q "^-k" "$WORK/out" \
@@ -1847,6 +1988,28 @@ biometric_calls() { # cases
 [ "$(biometric_calls "")" = "x11a 1;x11a 2;x11a 3;x11b;x11d 1;x11d 2;x11d 3;x11e;h04 1;h04 2;h04 3;x11c;" ] \
   && ok "without a case selection, the biometric segment runs all its cases in order" \
   || bad "the biometric segment without a selection: $(biometric_calls "")"
+# The case selection of the death segment, with the real caller_on and case_on of p2_device.sh and one repeat.
+death_calls() { # cases
+  SELECTED_CASES="$1" case_run death 'eval "$P2_SELECTORS"; reps() { printf 1; }
+    r31a() { echo "r31a $*"; }; r31b() { echo "r31b $*"; }; r31held() { echo "r31held $*"; }
+    r31d() { echo "r31d $*"; }; r31c() { echo "r31c $*"; }; r32() { echo "r32 $*"; }; r33() { echo "r33 $*"; }
+    r34() { echo "r34 $*"; }
+    R007_CALLERS="S L"; R007_CASES="$SELECTED_CASES"; segment_run'
+  tr '\n' ';' < "$WORK/out"
+}
+DEATH_CALLS_S="r31a S;r31b S 1;r31held S 1;r31d S 1;r31c S;r32 S 0;r32 S 1;r32 S 2;r32 S 3;r32 S 4;"
+DEATH_CALLS_S+="r33 S 1 40s;r33 S 1 never;r34 S 1 Z;r34 S 1 C4;r34 S 1 reset;"
+DEATH_ALL_CALLS="$DEATH_CALLS_S${DEATH_CALLS_S// S/ L}"
+DEATH_API30_CASES="R3.1b R3.1held R3.1d R3.2 R3.3 R3.4"
+[ "$(death_calls "")" = "$DEATH_ALL_CALLS" ] \
+  && ok "without a case selection, the death segment runs all its cases in order" \
+  || bad "the death segment without a selection: $(death_calls "")"
+[ "$(death_calls "$DEATH_API30_CASES")" = "$(sed -E 's/r31[ac] [SL];//g' <<< "$DEATH_ALL_CALLS")" ] \
+  && ok "the case selection without R3.1a and R3.1c runs every other death case and neither of the two" \
+  || bad "the death selection without R3.1a and R3.1c: $(death_calls "$DEATH_API30_CASES")"
+[ "$(death_calls R3.4)" = "r34 S 1 Z;r34 S 1 C4;r34 S 1 reset;r34 L 1 Z;r34 L 1 C4;r34 L 1 reset;" ] \
+  && ok "the case selection R3.4 runs only the R3.4 repeats, for each caller" \
+  || bad "the death selection R3.4: $(death_calls R3.4)"
 
 echo "UI dump and unlock wait"
 reset_device

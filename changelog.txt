@@ -4,6 +4,22 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 test scripts on Android 11 emulators   (2026-10-06)
+-----------------------------------------------------------------------------
+The device test scripts of phase P2 can now run on an Android 11 emulator. In phase P2, the current app is tested
+on devices before any fix is chosen.
+- The SELinux policy of Android 11 (API 30) denies the SIGKILL that the scripts send as the app's own user.
+- After this denial, the r007_kill function now sends the same SIGKILL as the root user, with su 0.
+- A check of the device audit log limits the kill through su 0 to this SELinux denial.
+- Each kill through su 0 adds a kill-via-su line and the denial to the evidence file of the run.
+- The death.sh script for abrupt process deaths now accepts a selection of cases.
+- Case R3.1a kills the app during the PIN check. Case R3.1c kills it during a write of the stored lockout state.
+- Runs on Android 11 use the case selection to leave out these two cases, because SELinux also denies their kills.
+- Thirty new host tests in test_lib_r007.sh cover the kill through su 0 and the case selection of death.sh.
+- A trial run of the p1_validate.sh script on the matrix_api30def emulator passed all 18 checks.
+- The test_lib_r007.sh script passed all 511 host tests.
+
+
 M7/WP2 (F2 hardening): NucBox plan for the P2 device lanes   (2026-10-05)
 -------------------------------------------------------------------------
 A new test plan covers phase P2 on the NucBox emulators at API 36 and API 30. In phase P2, the current app is

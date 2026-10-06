@@ -302,19 +302,27 @@ r34() { # caller repeat kind
     write_pair="$begin" pair_after="$R007_PAIR" gate_after_restart="$after"
 }
 
+# The cases that a case selection (-k) can name. R3.1a includes its control. On Android 11 (API 30), SELinux denies
+# the run-as kill of R3.1a and of the R3.1c loop, so that a run there can leave out these two cases.
+SEGMENT_CASES="R3.1a R3.1b R3.1held R3.1d R3.1c R3.2 R3.3 R3.4"
+
 segment_run() {
   local caller repeat released n10 n3
   n10="$(reps 10)"; n3="$(reps 3)"
   for caller in $R007_CALLERS; do
-    r31a "$caller"
-    for (( repeat=1; repeat<=n10; repeat++ )); do r31b "$caller" "$repeat"; done
-    for (( repeat=1; repeat<=n10; repeat++ )); do r31held "$caller" "$repeat"; done
-    for (( repeat=1; repeat<=n10; repeat++ )); do r31d "$caller" "$repeat"; done
-    r31c "$caller"
-    for released in 0 1 2 3 4; do r32 "$caller" "$released"; done
-    for (( repeat=1; repeat<=n3; repeat++ )); do r33 "$caller" "$repeat" 40s; r33 "$caller" "$repeat" never; done
-    for (( repeat=1; repeat<=n3; repeat++ )); do
-      r34 "$caller" "$repeat" Z; r34 "$caller" "$repeat" C4; r34 "$caller" "$repeat" reset
-    done
+    if case_on R3.1a; then r31a "$caller"; fi
+    if case_on R3.1b; then for (( repeat=1; repeat<=n10; repeat++ )); do r31b "$caller" "$repeat"; done; fi
+    if case_on R3.1held; then for (( repeat=1; repeat<=n10; repeat++ )); do r31held "$caller" "$repeat"; done; fi
+    if case_on R3.1d; then for (( repeat=1; repeat<=n10; repeat++ )); do r31d "$caller" "$repeat"; done; fi
+    if case_on R3.1c; then r31c "$caller"; fi
+    if case_on R3.2; then for released in 0 1 2 3 4; do r32 "$caller" "$released"; done; fi
+    if case_on R3.3; then
+      for (( repeat=1; repeat<=n3; repeat++ )); do r33 "$caller" "$repeat" 40s; r33 "$caller" "$repeat" never; done
+    fi
+    if case_on R3.4; then
+      for (( repeat=1; repeat<=n3; repeat++ )); do
+        r34 "$caller" "$repeat" Z; r34 "$caller" "$repeat" C4; r34 "$caller" "$repeat" reset
+      done
+    fi
   done
 }
