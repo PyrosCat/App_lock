@@ -148,7 +148,17 @@ case "$cmd" in
         if [ "${STUB_APP_PROC-}" = until-stop ]; then
           if grep -qx force-stop "$STUB_DEVICE/ops"; then echo absent; else echo present; fi
         else echo "${STUB_APP_PROC-absent}"; fi ;;
-      "am force-stop "*) [ -n "${STUB_STOP_FAIL:-}" ] && exit 1; echo "force-stop" >> "$STUB_DEVICE/ops" ;;
+      # With STUB_A11Y_R11, a force-stop of the bound detector acts as on Android 11: the detector gets the crash mark
+      # ($STUB_DEVICE/a11y_crashed), and the service list loses it (here the list holds only the detector).
+      "am force-stop "*)
+        [ -n "${STUB_STOP_FAIL:-}" ] && exit 1; echo "force-stop" >> "$STUB_DEVICE/ops"
+        a11y="$STUB_DEVICE/settings/secure"
+        if [ -n "${STUB_A11Y_R11:-}" ] && [ ! -e "$STUB_DEVICE/a11y_crashed" ] \
+          && grep -q AppDetectionService "$a11y.enabled_accessibility_services" 2>/dev/null \
+          && [ "$(cat "$a11y.accessibility_enabled" 2>/dev/null)" = 1 ]; then
+          touch "$STUB_DEVICE/a11y_crashed"; rm -f "$a11y.enabled_accessibility_services"
+          echo 0 > "$a11y.accessibility_enabled"; : > "$STUB_DEVICE/a11y_observed"
+        fi ;;
       "dumpsys activity activities")
         [ -n "${STUB_DUMPSYS_FAIL:-}" ] && exit 1
         locked="$(cat "$STUB_DEVICE/locked" 2>/dev/null || echo 0)"
@@ -176,7 +186,18 @@ case "$cmd" in
         mkdir -p "$STUB_DEVICE/$(dirname "$dst")"; : > "$STUB_DEVICE/$dst"
         cat "$STUB_DEVICE/$src" > "$STUB_DEVICE/$dst" 2>/dev/null || exit 1
         echo "copy $src $dst" >> "$STUB_DEVICE/ops" ;;
-      "run-as "*" cat "*) cat "$STUB_DEVICE/${line##* }" ;;
+      # The first STUB_CAT_FAILS (default 1) reads of the file STUB_CAT_FAIL_FILE fail with a run-as error. The real
+      # answer of the failed read on the emulator (2026-10-06) was not kept, so the error text here is an example.
+      "run-as "*" cat "*)
+        f="${line##* }"
+        if [ "${STUB_CAT_FAIL_FILE:-}" = "$f" ]; then
+          fails="$(cat "$STUB_DEVICE/cat_fails" 2>/dev/null || echo 0)"
+          if [ "$fails" -lt "${STUB_CAT_FAILS:-1}" ]; then
+            echo $(( fails + 1 )) > "$STUB_DEVICE/cat_fails"
+            echo "run-as: couldn't stat /data/user/0/com.applock: No such file or directory" >&2; exit 1
+          fi
+        fi
+        cat "$STUB_DEVICE/$f" ;;
       "run-as "*" mv -f "*)
         set -- $line
         mv -f "$STUB_DEVICE/${@: -2:1}" "$STUB_DEVICE/${@: -1}" && echo "mv ${@: -1}" >> "$STUB_DEVICE/ops" ;;
@@ -189,21 +210,40 @@ case "$cmd" in
         printf '%s\n' "${STUB_INSTRUMENT:-}" ;;
       "run-as "*" rm -f "*) rm -f "$STUB_DEVICE/${line##* }" ;;
       "run-as "*" rm -rf "*) set -- $line; shift 4; for f in "$@"; do rm -rf "${STUB_DEVICE:?}/$f"; done ;;
-      # The detector is bound while the service list names it and accessibility_enabled is 1.
+      # The detector is bound while the service list names it, accessibility_enabled is 1, and it has no crash mark.
+      # With STUB_A11Y_R11, the dump also has the Crashed services line of the Android 11 dump of 2026-10-06.
+      # With STUB_A11Y_LAZY, the settings observer of Android 11 runs only before a dump: it compares the current list
+      # with the list that it read last ($STUB_DEVICE/a11y_observed), so a delete and a new write between two dumps
+      # leave the crash mark.
       "dumpsys accessibility")
         [ -n "${STUB_A11Y_FAIL:-}" ] && exit 1
         [ -n "${STUB_A11Y_NO_LINE:-}" ] && { echo "ACCESSIBILITY MANAGER"; exit 0; }
         svc="$(cat "$STUB_DEVICE/settings/secure.enabled_accessibility_services" 2>/dev/null)"
         on="$(cat "$STUB_DEVICE/settings/secure.accessibility_enabled" 2>/dev/null)"
+        if [ -n "${STUB_A11Y_LAZY:-}" ]; then
+          seen="$(cat "$STUB_DEVICE/a11y_observed" 2>/dev/null)"
+          case "$seen" in *AppDetectionService*) case "$svc" in *AppDetectionService*) ;;
+            *) [ -n "${STUB_A11Y_CRASH_STUCK:-}" ] || rm -f "$STUB_DEVICE/a11y_crashed" ;; esac ;; esac
+          printf '%s' "$svc" > "$STUB_DEVICE/a11y_observed"
+        fi
         state="${STUB_A11Y_STUCK:-}"
         if [ -z "$state" ]; then
           state=unbound
-          case "$svc" in *AppDetectionService*) [ "$on" = 1 ] && state=bound ;; esac
+          case "$svc" in
+            *AppDetectionService*) [ "$on" = 1 ] && [ ! -e "$STUB_DEVICE/a11y_crashed" ] && state=bound ;;
+          esac
         fi
         if [ "$state" = bound ]; then
           echo "    Bound services:{Service[label=App Lock protection, feedbackType[FEEDBACK_GENERIC]]}"
         else echo "    Bound services:{}"; fi
-        echo "    Enabled services:{{$svc}}" ;;
+        echo "    Enabled services:{{$svc}}"
+        # With STUB_A11Y_CRASH_LINE_DUMPS=N, the dumps after the first N have no Crashed services line.
+        dumps=$(( $(cat "$STUB_DEVICE/a11y_dumps" 2>/dev/null || echo 0) + 1 ))
+        echo "$dumps" > "$STUB_DEVICE/a11y_dumps"
+        if [ -n "${STUB_A11Y_CRASH_LINE_DUMPS:-}" ] && [ "$dumps" -gt "$STUB_A11Y_CRASH_LINE_DUMPS" ]; then :
+        elif [ -e "$STUB_DEVICE/a11y_crashed" ]; then
+          echo "     Crashed services:{{com.applock/com.applock.applocker.service.AppDetectionService}}]"
+        elif [ -n "${STUB_A11Y_R11:-}" ]; then echo "     Crashed services:{}]"; fi ;;
       # Device settings live in $STUB_DEVICE/settings/<namespace>.<key>; a missing file is an unset setting.
       "settings get "*)
         [ -n "${STUB_SETTINGS_GET_FAIL:-}" ] && exit 1
@@ -213,10 +253,23 @@ case "$cmd" in
         # The device shell removes the single quotes around the value, so '' is an empty string.
         [ -n "${STUB_SETTINGS_PUT_FAIL:-}" ] && exit 1
         set -- $line; mkdir -p "$STUB_DEVICE/settings"; v="${5-}"; v="${v//\'/}"
+        old="$(cat "$STUB_DEVICE/settings/$3.$4" 2>/dev/null)"
         [ "${STUB_SETTINGS_IGNORE:-}" = "$4" ] || echo "$v" > "$STUB_DEVICE/settings/$3.$4"
+        # Android 11 removes the crash mark when a change of the service list drops the detector, unless
+        # STUB_A11Y_CRASH_STUCK. With STUB_A11Y_LAZY, this happens only at the next dump.
+        if [ "$3.$4" = secure.enabled_accessibility_services ] && [ -z "${STUB_A11Y_CRASH_STUCK:-}${STUB_A11Y_LAZY:-}" ]
+        then
+          case "$old" in *AppDetectionService*) case "$v" in *AppDetectionService*) ;;
+            *) rm -f "$STUB_DEVICE/a11y_crashed" ;; esac ;; esac
+        fi
         echo "put $3 $4 $v" >> "$STUB_DEVICE/ops" ;;
       "settings delete "*)
-        set -- $line; rm -f "$STUB_DEVICE/settings/$3.$4"; echo "delete $3 $4" >> "$STUB_DEVICE/ops" ;;
+        set -- $line; old="$(cat "$STUB_DEVICE/settings/$3.$4" 2>/dev/null)"; rm -f "$STUB_DEVICE/settings/$3.$4"
+        if [ "$3.$4" = secure.enabled_accessibility_services ] && [ -z "${STUB_A11Y_CRASH_STUCK:-}${STUB_A11Y_LAZY:-}" ]
+        then
+          case "$old" in *AppDetectionService*) rm -f "$STUB_DEVICE/a11y_crashed" ;; esac
+        fi
+        echo "delete $3 $4" >> "$STUB_DEVICE/ops" ;;
       *"r007_settings.pending ]; then echo present"*)
         [ -n "${STUB_RECORD_QUERY_FAIL:-}" ] && exit 1
         if [ -e "$STUB_DEVICE/data/local/tmp/r007_settings.pending" ]; then echo present; else echo absent; fi ;;
@@ -922,6 +975,33 @@ expect_ok "a valid script is published" r007_set_faults "WRITE 0 Throw" "READ * 
 reset_device
 STUB_WRITE_FAIL=1 expect_fail "a failed write is reported" r007_set_faults "WRITE 0 Throw"
 reset_device
+STUB_CAT_FAIL_FILE=files/r007/faults.tmp R007_LOG_OUT="$WORK/retry.log" \
+  expect_ok "a read-back of the fault script that fails once is read again" r007_set_faults "WRITE 0 Throw"
+[ "$(cat "$STUB_DEVICE/files/r007/faults" 2>/dev/null)" = "WRITE 0 Throw" ] \
+  && grep -q "^## read-retry file=files/r007/faults.tmp answer=status 1: run-as: couldn't stat" "$WORK/retry.log" \
+  && grep -q "one more read in 1 s" "$WORK/out" \
+  && ok "after one failed read-back, the script is published and the failed answer is in the evidence file" \
+  || bad "the retried read-back: $(tr '\n' ';' < "$WORK/out") evidence: $(cat "$WORK/retry.log" 2>/dev/null)"
+rm -f "$WORK/retry.log"; reset_device
+STUB_CAT_FAIL_FILE=files/r007/faults.tmp STUB_CAT_FAILS=2 \
+  expect_fail "a read-back of the fault script that fails twice is reported" r007_set_faults "WRITE 0 Throw"
+grep -q "the fault script could not be read back (status 1: run-as: couldn't stat" "$WORK/out" \
+  && [ ! -e "$STUB_DEVICE/files/r007/faults" ] && ! grep -q "^mv " "$STUB_DEVICE/ops" \
+  && ok "two failed read-backs give the run-as answer, and nothing is published" \
+  || bad "the twice-failed read-back: $(tr '\n' ';' < "$WORK/out")"
+reset_device
+STUB_CAT_FAIL_FILE=files/r007/faults \
+  expect_ok "a read of the published fault script that fails once is read again" r007_set_faults "WRITE 0 Throw"
+reset_device
+STUB_CAT_FAIL_FILE=files/r007/faults.tmp R007_LOG_OUT="$WORK/missing/retry.log" \
+  expect_fail "a read-retry line that cannot be saved fails the read" r007_set_faults "WRITE 0 Throw"
+grep -q "the read-retry line could not be saved" "$WORK/out" && [ ! -e "$STUB_DEVICE/files/r007/faults" ] \
+  && ok "a lost read-retry line stops the publication of the fault script" \
+  || bad "the lost read-retry line: $(tr '\n' ';' < "$WORK/out")"
+reset_device
+lib r007_read_private "$STORE"; [ "$(cat "$WORK/out")" = "$(printf '%s' "$STORE_XML")" ] \
+  && ok "a read that succeeds at once prints the file content unchanged" || bad "the plain read: $(cat "$WORK/out")"
+reset_device
 expect_ok "an empty script is published for a clear" r007_set_faults
 [ -e "$STUB_DEVICE/files/r007/faults" ] && [ ! -s "$STUB_DEVICE/files/r007/faults" ] \
   && ok "the cleared script is an empty file" || bad "the cleared script is an empty file"
@@ -1077,6 +1157,81 @@ reset_device; seed_settings
 p2 'r007_kill_for_inspection && echo killed'
 grep -qx "killed" "$WORK/out" && grep -qx "kill" "$STUB_DEVICE/ops" && ! grep -q "secure" "$STUB_DEVICE/ops" \
   && ok "a kill with the detector unbound changes no setting" || bad "the unbound kill: $(cat "$WORK/out")"
+# Android 11 (the dump of 2026-10-06): a force-stop of the bound detector gives it a crash mark and removes it from the
+# service list, and a grant does not bind a marked detector.
+list_ops() { # the writes of the service list in the stub's ops, as "op [value];" each
+  grep "secure enabled_accessibility_services" "$STUB_DEVICE/ops" | sed 's/ secure enabled_accessibility_services//' \
+    | tr '\n' ';'
+}
+reset_device; seed_settings
+STUB_A11Y_R11=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_detector && r007_stop_app \
+  && echo "stopped crashed=$(r007_a11y_lists_detector Crashed)" && r007_grant_detector \
+  && echo "granted=$(r007_detector_state) crashed=$(r007_a11y_lists_detector Crashed)"'
+grep -qx "stopped crashed=yes" "$WORK/out" && grep -qx "granted=bound crashed=no" "$WORK/out" \
+  && [ "$(list_ops)" = "delete;put $DETECTOR;put $DETECTOR;delete;delete;put $DETECTOR;" ] \
+  && [ "$(grep -cx "## detector-crash-cleared" "$WORK/p2.log")" = 1 ] \
+  && ok "after a force-stop on Android 11, the grant removes the crash mark of the detector and then binds it" \
+  || bad "the crash mark: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_crashed"; echo "$DETECTOR" > "$services_file"
+STUB_A11Y_R11=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_detector \
+  && echo "granted=$(r007_detector_state)"'
+grep -qx "granted=bound" "$WORK/out" && [ "$(list_ops)" = "delete;delete;put $DETECTOR;" ] \
+  && [ "$(grep -cx "## detector-crash-cleared" "$WORK/p2.log")" = 1 ] \
+  && ok "a crash mark with the detector still listed: the grant deletes the list, then waits for the mark to go" \
+  || bad "the listed crash mark: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+# With a settings observer that runs only before a dump, the delete and the write of the grant alone would leave the
+# mark (the observer would read the same list twice).
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_crashed"; echo "$DETECTOR" > "$services_file"
+printf '%s' "$DETECTOR" > "$STUB_DEVICE/a11y_observed"
+STUB_A11Y_R11=1 STUB_A11Y_LAZY=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_detector \
+  && echo "granted=$(r007_detector_state) crashed=$(r007_a11y_lists_detector Crashed)"'
+grep -qx "granted=bound crashed=no" "$WORK/out" && [ "$(list_ops)" = "delete;delete;put $DETECTOR;" ] \
+  && ok "with a late settings observer, a listed crashed detector loses its mark before the grant writes the list" \
+  || bad "the late observer, listed: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings
+STUB_A11Y_R11=1 STUB_A11Y_LAZY=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_detector \
+  && r007_stop_app && r007_grant_detector && echo "granted=$(r007_detector_state)"'
+grep -qx "granted=bound" "$WORK/out" \
+  && [ "$(list_ops)" = "delete;put $DETECTOR;put $DETECTOR;delete;delete;put $DETECTOR;" ] \
+  && ok "with a late settings observer, the grant after a force-stop removes the crash mark and binds the detector" \
+  || bad "the late observer, force-stop: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings
+STUB_A11Y_R11=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_detector'
+[ "$(list_ops)" = "delete;put $DETECTOR;" ] && ! grep -q "detector-crash-cleared" "$WORK/p2.log" \
+  && ok "an Android 11 dump without a crash mark adds no step to the grant" || bad "no crash mark: ops: $(list_ops)"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_crashed"
+STUB_A11Y_R11=1 STUB_A11Y_CRASH_STUCK=1 R007_BIND_POLLS=2 \
+  p2 'r007_settings_apply && r007_detector_init && r007_grant_write'
+grep -q "stayed marked as crashed" "$WORK/out" && [ "$(list_ops)" = "put $DETECTOR;delete;" ] \
+  && ! grep -q "detector-crash-cleared" "$WORK/p2.log" \
+  && ok "a crash mark that stays fails the grant before the grant writes the detector" \
+  || bad "the stuck crash mark: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_crashed"
+STUB_A11Y_R11=1 STUB_SETTINGS_IGNORE=enabled_accessibility_services R007_BIND_POLLS=2 \
+  p2 'r007_settings_apply && r007_detector_init && r007_grant_write'
+grep -q "was not listed as enabled" "$WORK/out" && [ "$(list_ops)" = "put $DETECTOR;" ] \
+  && ok "a marked detector that the dump does not list as enabled fails the grant, and the list is not deleted" \
+  || bad "not listed as enabled: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings
+STUB_A11Y_FAIL=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_write'
+grep -q "the accessibility state could not be read" "$WORK/out" && [ -z "$(list_ops)" ] \
+  && ok "a failed accessibility query fails the grant before any write of the service list" \
+  || bad "the failed query: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_crashed"
+STUB_A11Y_R11=1 p2 'r007_settings_apply && r007_detector_init && R007_LOG_OUT="$WORK/missing/p2.log" r007_grant_write'
+grep -q "the detector-crash-cleared line could not be saved" "$WORK/out" \
+  && ok "a detector-crash-cleared line that cannot be saved fails the grant" \
+  || bad "the unsaved line: $(tr '\n' ';' < "$WORK/out")"
+reset_device; seed_settings
+lib2 r007_a11y_lists_detector Crashed; out_is missing \
+  && ok "a dump without a Crashed services line reads as missing, not as a removed mark" \
+  || bad "no Crashed line: $(cat "$WORK/out")"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_crashed"
+STUB_A11Y_R11=1 STUB_A11Y_CRASH_STUCK=1 STUB_A11Y_CRASH_LINE_DUMPS=2 R007_BIND_POLLS=2 \
+  p2 'r007_settings_apply && r007_detector_init && r007_grant_write'
+grep -q "stayed marked as crashed" "$WORK/out" && ! grep -q "detector-crash-cleared" "$WORK/p2.log" \
+  && ok "a wait for the end of the crash mark does not accept a dump without a Crashed services line" \
+  || bad "the missing Crashed line in the wait: $(tr '\n' ';' < "$WORK/out")"
 
 echo "P2 gates and V"
 gate_is() { # expected xml

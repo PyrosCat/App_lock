@@ -4,6 +4,23 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 detector grant on Android 11 and fault script reads   (2026-10-06)
+--------------------------------------------------------------------------------------------
+The P2 test scripts now grant accessibility access to the app's detector on Android 11 and retry failed reads. In
+phase P2, the current app is tested on devices before any fix is chosen.
+- On Android 11 (API 30), a force-stop of the app leaves a crash mark on a running detector.
+- The new r007_clear_crashed_detector function in lib_p2.sh removes this mark before each grant.
+- Each removed crash mark adds a detector-crash-cleared line to the evidence file of the run.
+- A fault script makes the test build of the app fail or hold a storage operation.
+- On the matrix_api36 emulator, one read of a fault script with the run-as tool failed with no known cause.
+- The new r007_read_private function in lib_r007.sh reads a private file of the app and retries a failed read once.
+- The r007_set_faults function now reads the fault script with r007_read_private.
+- A failed first read adds a read-retry line with the error output to the evidence file of the run.
+- Nineteen new host tests in test_lib_r007.sh cover the crash mark and the failed reads.
+- A trial run on the matrix_api30def emulator gave the predicted result in all 28 test cases, 14 with the detector.
+- The test_lib_r007.sh script passed all 530 host tests.
+
+
 M7/WP2 (F2 hardening): P2 test scripts on Android 11 emulators   (2026-10-06)
 -----------------------------------------------------------------------------
 The device test scripts of phase P2 can now run on an Android 11 emulator. In phase P2, the current app is tested

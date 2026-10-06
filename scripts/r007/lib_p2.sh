@@ -155,13 +155,72 @@ r007_wait_detector() { # state
   return 1
 }
 
+# Prints "yes" when the first "NAME services:" line of the accessibility DUMP names the detector, in its full or its
+# short component form (case does not matter), "no" when that line does not name it, and "missing" when the dump has
+# no such line. NAME is Enabled or Crashed.
+r007_a11y_names_detector() { # name dump
+  local line short="${R007_DETECTOR/\/$APP_ID./\/.}"
+  line="$(grep -m1 -E "^ *$1 services:" <<< "$2")" || { printf missing; return 0; }
+  if grep -qiF -e "$R007_DETECTOR" -e "$short" <<< "$line"; then printf yes; else printf no; fi
+}
+
+# Prints the answer of r007_a11y_names_detector NAME for a new `dumpsys accessibility`. Fails when the query fails.
+r007_a11y_lists_detector() { # name
+  local out
+  out="$(sh_ dumpsys accessibility)" || return 1
+  r007_a11y_names_detector "$1" "$out"
+}
+
+# Waits until r007_a11y_lists_detector NAME prints ANSWER.
+r007_wait_a11y_list() { # name answer
+  local i
+  for (( i=0; i<R007_BIND_POLLS; i++ )); do
+    [ "$(r007_a11y_lists_detector "$1")" = "$2" ] && return 0
+    sleep 0.25
+  done
+  return 1
+}
+
+# Removes the crash mark of the detector on Android 11, with the service LIST of the grant. Android 11 marks a bound
+# service as crashed when its process dies, for example at `am force-stop`, and does not bind a marked service again,
+# also not after a new grant. Its settings observer removes the mark only when it reads a list that drops the service,
+# compared with the list that it read before (the "Enabled services" line of the dump). The observer runs later and
+# reads the current value, so a delete followed at once by a new write can leave the mark. So when the dump marks the
+# detector, this function first makes the dump list the detector as enabled. When the dump does not list it, the
+# function writes LIST and accessibility_enabled 1, as a grant does. Then it deletes the list and waits until the mark
+# is gone. Only then may the grant write the list again. The marked detector does not bind in between. The evidence
+# file gets a "## detector-crash-cleared" line. A dump without a Crashed services line shows no mark, but while the
+# function waits, only a Crashed services line without the detector shows that the mark is gone. Android 16 leaves
+# no mark after a force-stop, so there this function only reads the dump.
+r007_clear_crashed_detector() { # list
+  local dump
+  dump="$(sh_ dumpsys accessibility)" \
+    || { fail "the detector grant: the accessibility state could not be read"; return 1; }
+  [ "$(r007_a11y_names_detector Crashed "$dump")" = yes ] || return 0
+  if [ "$(r007_a11y_names_detector Enabled "$dump")" != yes ]; then
+    r007_setting_write secure:enabled_accessibility_services "$1" && r007_setting_write secure:accessibility_enabled 1 \
+      || { fail "the detector grant: the service list could not be written to remove the crash mark"; return 1; }
+    r007_wait_a11y_list Enabled yes \
+      || { fail "the detector grant: the marked detector was not listed as enabled"; return 1; }
+  fi
+  sh_ settings delete secure enabled_accessibility_services >/dev/null \
+    || { fail "the detector grant: the service list could not be deleted to remove the crash mark"; return 1; }
+  r007_wait_a11y_list Crashed no || { fail "the detector grant: the detector stayed marked as crashed"; return 1; }
+  if [ -n "${R007_LOG_OUT:-}" ]; then
+    printf '## detector-crash-cleared\n' >> "$R007_LOG_OUT" \
+      || { fail "the detector grant: the detector-crash-cleared line could not be saved"; return 1; }
+  fi
+  info "the crash mark of the detector is removed (Android 11)"
+}
+
 # Writes the grant of the detector: the recorded services without the detector, then the detector, and
 # accessibility_enabled 1. An identical `settings put` does not bind the service again after a force-stop, so the list
-# is deleted first.
+# is deleted first. On Android 11, r007_clear_crashed_detector first removes the crash mark that a force-stop leaves.
 r007_grant_write() {
   local value="$R007_DETECTOR"
   [ -n "$R007_A11Y_OFF_SERVICES" ] || { fail "the detector grant needs r007_detector_init"; return 1; }
   [ "$R007_A11Y_OFF_SERVICES" = null ] || value="$R007_A11Y_OFF_SERVICES:$R007_DETECTOR"
+  r007_clear_crashed_detector "$value" || return 1
   sh_ settings delete secure enabled_accessibility_services >/dev/null \
     && r007_setting_write secure:enabled_accessibility_services "$value" \
     && r007_setting_write secure:accessibility_enabled 1 \

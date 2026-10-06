@@ -163,6 +163,28 @@ r007_valid_rule() { # rule
   esac
 }
 
+# Prints the content of the app-private FILE (run-as cat). A run-as read can fail once without a known cause, so a
+# failed read is tried once more after 1 s. The answer of the first failed read (the exit status and the error output
+# of adb and run-as) goes to the console and, as a "## read-retry" line, to the evidence file. When the second read
+# also fails, the function prints its answer instead of the content and fails.
+r007_read_private() { # file
+  local out rc errfile answer try
+  errfile="$(mktemp)" || { printf 'no temporary file for the error output of the read'; return 1; }
+  for try in 1 2; do
+    out="$(adbx shell run-as "$APP_ID" cat "$1" 2>"$errfile" | tr -d '\r')"; rc=$?
+    [ "$rc" = 0 ] && { rm -f "$errfile"; printf '%s' "$out"; return 0; }
+    answer="status $rc: $(tr -d '\r' < "$errfile" | tr '\n' ' ')${out:+ $(tr '\n' ' ' <<< "$out")}"
+    [ "$try" = 2 ] && break
+    info "the read of $1 failed ($answer); one more read in 1 s" >&2
+    if [ -n "${R007_LOG_OUT:-}" ]; then
+      printf '## read-retry file=%s answer=%s\n' "$1" "$answer" >> "$R007_LOG_OUT" \
+        || { rm -f "$errfile"; printf '%s' "$answer; the read-retry line could not be saved"; return 1; }
+    fi
+    sleep 1
+  done
+  rm -f "$errfile"; printf '%s' "$answer"; return 1
+}
+
 # Publishes the fault script atomically. Each argument is one rule; no argument publishes an empty script. The
 # script goes to a temporary file first; after its content is verified, a rename replaces the live file, so an
 # operation that starts during the update reads the complete old script or the complete new one.
@@ -176,14 +198,14 @@ r007_set_faults() { # rule...
   printf '%s' "$content" \
     | adbx exec-in "run-as $APP_ID sh -c 'mkdir -p $R007_CONTROL && cat > $R007_CONTROL/faults.tmp'" \
     || { fail "the fault script could not be written"; return 1; }
-  actual="$(r007_run_as cat "$R007_CONTROL/faults.tmp")" \
-    || { fail "the fault script could not be read back"; return 1; }
+  actual="$(r007_read_private "$R007_CONTROL/faults.tmp")" \
+    || { fail "the fault script could not be read back ($actual)"; return 1; }
   [ "$actual" = "$expected" ] || { fail "the fault script on the device differs from the rules"; return 1; }
   R007_FAULTS_OWNED=1
   r007_run_as mv -f "$R007_CONTROL/faults.tmp" "$R007_CONTROL/faults" \
     || { fail "the fault script could not be published"; return 1; }
-  actual="$(r007_run_as cat "$R007_CONTROL/faults")" \
-    || { fail "the published fault script could not be read"; return 1; }
+  actual="$(r007_read_private "$R007_CONTROL/faults")" \
+    || { fail "the published fault script could not be read ($actual)"; return 1; }
   [ "$actual" = "$expected" ] || { fail "the published fault script differs from the rules"; return 1; }
 }
 
