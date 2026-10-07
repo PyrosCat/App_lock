@@ -1087,8 +1087,8 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         a persistent read fault; the re-seed read runs on the writer thread, so a stalled read also blocks queued
         writes; `reseedInFlight` stays set if the read throws a cancellation; the completion callbacks, which
         include the legacy audit and capture, run inside the manager lock.
-      - Open before P3: the storage policy, the numeric restart limit, and the A policies in §4.2 of the options
-        proposal (needed for the design-level evaluation of A).
+      - Open before P3: the decisions that the options proposal requires before Option A is coded (needed for the
+        design-level evaluation of A). The P3 criteria below set the storage policy and the restart limit.
     - **P1 harness decisions (lead, 2026-09-23).**
       - JVM (`security/harness` tests): the harness observes only the public manager API, the simulated store, and
         its ledger. `LockoutManager` has no test seam.
@@ -1127,6 +1127,22 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         because the AVDs have no screen lock.
       - Verifier entries: the app does not change. The count is exact from the wrapper write lines while no write is
         held. Otherwise it is inferred from the gate state in a UI dump. The evidence labels each count.
+    - **P3 criteria and start (lead, 2026-10-07).** The criteria are frozen before any formal comparison, that is,
+      any recorded run whose results enter the P3 comparison report, the evidence matrix, or the ranking.
+      - Unknown lockout state: fail-closed. PIN verification is not admitted until the lockout state is trusted. A
+        read failure is never treated as an empty store.
+      - Restart allowance: zero extra PIN-verifier entries attributable to a restart, including interrupted checks
+        and outcomes not yet persisted. A restart does not replenish the attempt allowance or reset the lockout
+        ladder. Normal expiry still applies.
+      - Under these criteria, B1, B2, B3, and every B-only combination are recovery components, not complete
+        solutions. C1 addresses the unknown startup state. Preventing guesses lost through interrupted writes also
+        needs durable admission, such as A or C2, which costs availability during storage faults.
+      - P3 starts before the P2 exit. B1, B2, and B2+B3 are implemented in parallel on experimental branches from a
+        shared base branch that adds the recovery scheduler without changing behaviour. The branches never merge to
+        main. The experiments keep the current fail-open admission, so that their runs measure the tradeoffs. A
+        measured tradeoff is not accepted for production. The storage policy unblocks C1. A still waits for its
+        recovery and admission rules. The designs are in `2026-10-07_R007_F2_HARDENING_P3_SCHEDULER_SPEC.md`
+        and the B1, B2, and B3 specifications beside it.
     - **Exit:** the selected work passes the local gate and a fleet gate (NucBox, Moto G: fault injection, restart,
       and inspection of the persisted state) with a host-tagged report. The lead records a decision for each
       residual in the risk register. FR-174 cites re-verification evidence in the same commit. If Option A is
@@ -1169,6 +1185,10 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       suspend mutation. An in-flight guard prevents a duplicate submission while one is pending, and a
       submission-keyed result prevents a stale unlock from a superseded submission. If F2 hardening selects Option
       A, this work is done there, and F6 reuses it.
+    - The runtime self-gate runs its `LOCKOUT_TRIGGERED` audit and its capture after its await, so a cancelled
+      caller skips them. F6 makes these steps run exactly once for each admitted failure, also for a cancelled
+      caller, for example through a completion callback that the manager owns (lead decision of 2026-10-07, P3 of
+      F2 hardening).
     - `MainActivity.onResume` reports the APP_LOCK arrival signal (the F1 seam; the launch intent carries the
       attempt token) and reads the derived `EnforcementHealth.state` for the banner.
     - Health readers: `ProtectionWatchdogService` and the `MainActivity` banner read the derived health.

@@ -4,6 +4,22 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 candidate specifications and comparison criteria   (2026-10-07)
+-----------------------------------------------------------------------------------------
+Four new documents specify the first fixes that phase P3 tests, and the project plan records the comparison
+criteria. In phase P3, candidate fixes for the R-007 lockout storage weaknesses are compared with the current app.
+- The scheduler specification describes one shared retry mechanism on the single storage thread.
+- The delays of that mechanism start at 1 s and double up to 60 s.
+- The B1 specification adds retries of a failed startup read until the stored lockout is loaded.
+- The B2 specification adds retries of a failed lockout write, and an accepted write runs even if its caller cancels.
+- In the B3 specification, a B2 retry also stores the in-memory lockout deadline in the existing storage keys.
+- The project plan records two comparison criteria. No PIN check runs while the lockout state is unknown, and a
+  restart adds no extra check.
+- The plan also records that the candidates run as experiments on branches that never merge into the main branch.
+- A new task for F6, the step that turns on the new lock engine, covers cancelled PIN checks. With it, each lockout
+  is audited exactly once.
+
+
 M7/WP2 (F2 hardening): P2 detector grant after an unfinished bind on Android 11   (2026-10-07)
 ----------------------------------------------------------------------------------------------
 The P2 test scripts now grant accessibility access to the app's detector after an unfinished bind on Android 11. In
