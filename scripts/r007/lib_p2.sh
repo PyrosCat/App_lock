@@ -135,13 +135,19 @@ r007_detector_init() {
   R007_A11Y_OFF_ENABLED="$(sed -n 's/^secure:accessibility_enabled=//p' <<< "$record")"
 }
 
-# Prints "bound" or "unbound", from the first "Bound services" line of `dumpsys accessibility`. Fails when the query
-# fails or has no such line, so an unknown state is never taken for either answer.
-r007_detector_state() {
-  local out line
-  out="$(sh_ dumpsys accessibility)" || return 1
-  line="$(grep -m1 -E '^ *Bound services:' <<< "$out")" || return 1
+# Prints "bound" or "unbound", from the first "Bound services" line of the accessibility DUMP. Fails when the dump has
+# no such line, so an unknown state is never taken for either answer.
+r007_dump_detector_state() { # dump
+  local line
+  line="$(grep -m1 -E '^ *Bound services:' <<< "$1")" || return 1
   if grep -qF "label=$R007_DETECTOR_LABEL" <<< "$line"; then printf bound; else printf unbound; fi
+}
+
+# Prints the answer of r007_dump_detector_state for a new `dumpsys accessibility`. Fails when the query fails.
+r007_detector_state() {
+  local out
+  out="$(sh_ dumpsys accessibility)" || return 1
+  r007_dump_detector_state "$out"
 }
 
 # Waits until the detector state is STATE (bound or unbound).
@@ -157,7 +163,7 @@ r007_wait_detector() { # state
 
 # Prints "yes" when the first "NAME services:" line of the accessibility DUMP names the detector, in its full or its
 # short component form (case does not matter), "no" when that line does not name it, and "missing" when the dump has
-# no such line. NAME is Enabled or Crashed.
+# no such line. NAME is Enabled, Binding, or Crashed.
 r007_a11y_names_detector() { # name dump
   local line short="${R007_DETECTOR/\/$APP_ID./\/.}"
   line="$(grep -m1 -E "^ *$1 services:" <<< "$2")" || { printf missing; return 0; }
@@ -213,14 +219,51 @@ r007_clear_crashed_detector() { # list
   info "the crash mark of the detector is removed (Android 11)"
 }
 
+# Removes the detector from the binding list of Android 11 after a bind that did not finish. In R1.4b, the system
+# stops the detector while the construction read holds its bind, and then starts the service again. The harness then
+# removes the grant and stops the app, so the new process dies before it connects. After that, the dump names the
+# detector in the "Binding services" line but not in the "Bound services" line. Android 11 does not bind a service
+# that it lists as binding, also not after a new grant. A force-stop of the app removes each enabled service of the
+# app from the binding list. So this function first makes the dump list the detector as enabled, with the service
+# LIST of the grant, as r007_clear_crashed_detector does. Then it stops the app and waits until a Binding services
+# line no longer names the detector. The evidence file gets a "## detector-binding-cleared" line. A dump without a
+# Binding services line shows no binding. A dump without a Bound services line fails the grant before the stop: a
+# stop of a bound detector would leave a crash mark after r007_clear_crashed_detector has run. The detector can still
+# connect between the dump and the stop, so this function ends with r007_clear_crashed_detector.
+r007_clear_binding_detector() { # list
+  local dump state
+  dump="$(sh_ dumpsys accessibility)" \
+    || { fail "the detector grant: the accessibility state could not be read"; return 1; }
+  [ "$(r007_a11y_names_detector Binding "$dump")" = yes ] || return 0
+  state="$(r007_dump_detector_state "$dump")" \
+    || { fail "the detector grant: the dump has no Bound services line, so the binding cannot be checked"; return 1; }
+  [ "$state" = unbound ] || return 0
+  if [ "$(r007_a11y_names_detector Enabled "$dump")" != yes ]; then
+    r007_setting_write secure:enabled_accessibility_services "$1" && r007_setting_write secure:accessibility_enabled 1 \
+      || { fail "the detector grant: the service list could not be written to remove the binding"; return 1; }
+    r007_wait_a11y_list Enabled yes \
+      || { fail "the detector grant: the detector in the binding list was not listed as enabled"; return 1; }
+  fi
+  r007_stop_app || return 1
+  r007_wait_a11y_list Binding no || { fail "the detector grant: the detector stayed in the binding list"; return 1; }
+  if [ -n "${R007_LOG_OUT:-}" ]; then
+    printf '## detector-binding-cleared\n' >> "$R007_LOG_OUT" \
+      || { fail "the detector grant: the detector-binding-cleared line could not be saved"; return 1; }
+  fi
+  info "the binding of the detector is removed (Android 11)"
+  r007_clear_crashed_detector "$1"
+}
+
 # Writes the grant of the detector: the recorded services without the detector, then the detector, and
 # accessibility_enabled 1. An identical `settings put` does not bind the service again after a force-stop, so the list
-# is deleted first. On Android 11, r007_clear_crashed_detector first removes the crash mark that a force-stop leaves.
+# is deleted first. On Android 11, r007_clear_crashed_detector first removes the crash mark that a force-stop leaves,
+# and r007_clear_binding_detector removes the detector from the binding list after a bind that did not finish.
 r007_grant_write() {
   local value="$R007_DETECTOR"
   [ -n "$R007_A11Y_OFF_SERVICES" ] || { fail "the detector grant needs r007_detector_init"; return 1; }
   [ "$R007_A11Y_OFF_SERVICES" = null ] || value="$R007_A11Y_OFF_SERVICES:$R007_DETECTOR"
   r007_clear_crashed_detector "$value" || return 1
+  r007_clear_binding_detector "$value" || return 1
   sh_ settings delete secure enabled_accessibility_services >/dev/null \
     && r007_setting_write secure:enabled_accessibility_services "$value" \
     && r007_setting_write secure:accessibility_enabled 1 \

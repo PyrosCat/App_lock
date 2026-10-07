@@ -4,6 +4,22 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 detector grant after an unfinished bind on Android 11   (2026-10-07)
+----------------------------------------------------------------------------------------------
+The P2 test scripts now grant accessibility access to the app's detector after an unfinished bind on Android 11. In
+phase P2, the current app is tested on devices before any fix is chosen.
+- Test case R1.4b holds the first storage read of the detector for 40 s during its bind.
+- On Android 11 (API 30), the cleanup of this case leaves the detector in the list of binding services.
+- Android 11 does not bind a service from this list again, so the next test case, R1.4c, could not start.
+- The new r007_clear_binding_detector function in lib_p2.sh removes this binding before each grant.
+- Each removed binding adds a detector-binding-cleared line to the evidence file of the run.
+- The new r007_dump_detector_state function in lib_p2.sh reads the bound state of the detector from a dump.
+- The r007_detector_state function now reads this state through r007_dump_detector_state.
+- Thirteen new host tests in test_lib_r007.sh cover the binding and its removal.
+- On the matrix_api30def emulator, a trial run of R1.4b and R1.4c gave the predicted result in all 3 test cases.
+- The test_lib_r007.sh script passed all 543 host tests.
+
+
 M7/WP2 (F2 hardening): P2 detector grant on Android 11 and fault script reads   (2026-10-06)
 --------------------------------------------------------------------------------------------
 The P2 test scripts now grant accessibility access to the app's detector on Android 11 and retry failed reads. In

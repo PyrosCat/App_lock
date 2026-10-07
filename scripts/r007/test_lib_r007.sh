@@ -150,10 +150,21 @@ case "$cmd" in
         else echo "${STUB_APP_PROC-absent}"; fi ;;
       # With STUB_A11Y_R11, a force-stop of the bound detector acts as on Android 11: the detector gets the crash mark
       # ($STUB_DEVICE/a11y_crashed), and the service list loses it (here the list holds only the detector).
+      # A detector in the binding list ($STUB_DEVICE/a11y_binding) has no process, so a force-stop gives no crash mark.
+      # When the service list names the detector, the force-stop removes it from the binding list and the service
+      # list, as on Android 11 (2026-10-07), unless STUB_A11Y_BINDING_STUCK. With STUB_A11Y_BINDING_CONNECTS, the
+      # detector connected just before the stop, so the stop also leaves a crash mark.
       "am force-stop "*)
         [ -n "${STUB_STOP_FAIL:-}" ] && exit 1; echo "force-stop" >> "$STUB_DEVICE/ops"
         a11y="$STUB_DEVICE/settings/secure"
-        if [ -n "${STUB_A11Y_R11:-}" ] && [ ! -e "$STUB_DEVICE/a11y_crashed" ] \
+        if [ -e "$STUB_DEVICE/a11y_binding" ]; then
+          if [ -z "${STUB_A11Y_BINDING_STUCK:-}" ] \
+            && grep -q AppDetectionService "$a11y.enabled_accessibility_services" 2>/dev/null; then
+            rm -f "$STUB_DEVICE/a11y_binding" "$a11y.enabled_accessibility_services"
+            echo 0 > "$a11y.accessibility_enabled"
+            if [ -n "${STUB_A11Y_BINDING_CONNECTS:-}" ]; then touch "$STUB_DEVICE/a11y_crashed"; fi
+          fi
+        elif [ -n "${STUB_A11Y_R11:-}" ] && [ ! -e "$STUB_DEVICE/a11y_crashed" ] \
           && grep -q AppDetectionService "$a11y.enabled_accessibility_services" 2>/dev/null \
           && [ "$(cat "$a11y.accessibility_enabled" 2>/dev/null)" = 1 ]; then
           touch "$STUB_DEVICE/a11y_crashed"; rm -f "$a11y.enabled_accessibility_services"
@@ -230,16 +241,25 @@ case "$cmd" in
         if [ -z "$state" ]; then
           state=unbound
           case "$svc" in
-            *AppDetectionService*) [ "$on" = 1 ] && [ ! -e "$STUB_DEVICE/a11y_crashed" ] && state=bound ;;
+            *AppDetectionService*) [ "$on" = 1 ] && [ ! -e "$STUB_DEVICE/a11y_crashed" ] \
+              && [ ! -e "$STUB_DEVICE/a11y_binding" ] && state=bound ;;
           esac
         fi
-        if [ "$state" = bound ]; then
+        # With STUB_A11Y_NO_BOUND_LINE, the dump has no Bound services line.
+        if [ -n "${STUB_A11Y_NO_BOUND_LINE:-}" ]; then :
+        elif [ "$state" = bound ]; then
           echo "    Bound services:{Service[label=App Lock protection, feedbackType[FEEDBACK_GENERIC]]}"
         else echo "    Bound services:{}"; fi
         echo "    Enabled services:{{$svc}}"
         # With STUB_A11Y_CRASH_LINE_DUMPS=N, the dumps after the first N have no Crashed services line.
         dumps=$(( $(cat "$STUB_DEVICE/a11y_dumps" 2>/dev/null || echo 0) + 1 ))
         echo "$dumps" > "$STUB_DEVICE/a11y_dumps"
+        # The Binding services line of the Android 11 dump (2026-10-07) names a detector whose bind did not finish.
+        # With STUB_A11Y_BINDING_LINE_DUMPS=N, the dumps after the first N have no Binding services line.
+        if [ -n "${STUB_A11Y_BINDING_LINE_DUMPS:-}" ] && [ "$dumps" -gt "$STUB_A11Y_BINDING_LINE_DUMPS" ]; then :
+        elif [ -e "$STUB_DEVICE/a11y_binding" ]; then
+          echo "     Binding services:{{com.applock/com.applock.applocker.service.AppDetectionService}}"
+        elif [ -n "${STUB_A11Y_R11:-}" ]; then echo "     Binding services:{}"; fi
         if [ -n "${STUB_A11Y_CRASH_LINE_DUMPS:-}" ] && [ "$dumps" -gt "$STUB_A11Y_CRASH_LINE_DUMPS" ]; then :
         elif [ -e "$STUB_DEVICE/a11y_crashed" ]; then
           echo "     Crashed services:{{com.applock/com.applock.applocker.service.AppDetectionService}}]"
@@ -1232,6 +1252,96 @@ STUB_A11Y_R11=1 STUB_A11Y_CRASH_STUCK=1 STUB_A11Y_CRASH_LINE_DUMPS=2 R007_BIND_P
 grep -q "stayed marked as crashed" "$WORK/out" && ! grep -q "detector-crash-cleared" "$WORK/p2.log" \
   && ok "a wait for the end of the crash mark does not accept a dump without a Crashed services line" \
   || bad "the missing Crashed line in the wait: $(tr '\n' ';' < "$WORK/out")"
+# Android 11 (the probe of 2026-10-07): when a bind does not finish, the dump names the detector in the Binding services
+# line, and a grant does not bind it. A force-stop removes the detector from the binding list only while the service
+# list names it.
+reset_device; seed_settings
+STUB_A11Y_R11=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_detector \
+  && touch "$STUB_DEVICE/a11y_binding" && r007_revoke_detector && r007_stop_app \
+  && echo "stopped binding=$(r007_a11y_lists_detector Binding)" && r007_grant_detector \
+  && echo "granted=$(r007_detector_state) binding=$(r007_a11y_lists_detector Binding)"'
+grep -qx "stopped binding=yes" "$WORK/out" && grep -qx "granted=bound binding=no" "$WORK/out" \
+  && [ "$(grep -cx force-stop "$STUB_DEVICE/ops")" = 2 ] \
+  && [ "$(grep -cx "## detector-binding-cleared" "$WORK/p2.log")" = 1 ] \
+  && ok "after a bind that did not finish on Android 11, the grant stops the app to remove the binding, then binds" \
+  || bad "the binding: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_binding"; echo "$DETECTOR" > "$services_file"
+STUB_A11Y_R11=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_detector \
+  && echo "granted=$(r007_detector_state)"'
+grep -qx "granted=bound" "$WORK/out" && [ "$(list_ops)" = "delete;put $DETECTOR;" ] \
+  && [ "$(grep -cx force-stop "$STUB_DEVICE/ops")" = 1 ] \
+  && ok "a binding with the detector still listed: the grant stops the app without a new write of the list first" \
+  || bad "the listed binding: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings
+STUB_A11Y_R11=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_detector'
+! grep -qx force-stop "$STUB_DEVICE/ops" && ! grep -q "detector-binding-cleared" "$WORK/p2.log" \
+  && [ "$(list_ops)" = "delete;put $DETECTOR;" ] \
+  && ok "an Android 11 dump with an empty Binding services line adds no step to the grant" \
+  || bad "no binding: ops: $(tr '\n' ';' < "$STUB_DEVICE/ops")"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_binding"
+STUB_A11Y_R11=1 STUB_A11Y_STUCK=bound p2 'r007_settings_apply && r007_detector_init && r007_grant_write'
+! grep -qx force-stop "$STUB_DEVICE/ops" && [ "$(list_ops)" = "delete;put $DETECTOR;" ] \
+  && ok "a detector that the dump lists as bound is not stopped for its binding" \
+  || bad "the bound binding: ops: $(tr '\n' ';' < "$STUB_DEVICE/ops")"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_binding"
+STUB_A11Y_R11=1 STUB_A11Y_BINDING_STUCK=1 R007_BIND_POLLS=2 \
+  p2 'r007_settings_apply && r007_detector_init && r007_grant_write'
+grep -q "stayed in the binding list" "$WORK/out" && [ "$(list_ops)" = "put $DETECTOR;" ] \
+  && ! grep -q "detector-binding-cleared" "$WORK/p2.log" \
+  && ok "a binding that stays fails the grant before the grant writes the detector" \
+  || bad "the stuck binding: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_binding"
+STUB_A11Y_R11=1 STUB_A11Y_BINDING_STUCK=1 STUB_A11Y_BINDING_LINE_DUMPS=3 R007_BIND_POLLS=2 \
+  p2 'r007_settings_apply && r007_detector_init && r007_grant_write'
+grep -q "stayed in the binding list" "$WORK/out" && ! grep -q "detector-binding-cleared" "$WORK/p2.log" \
+  && ok "a wait for the end of the binding does not accept a dump without a Binding services line" \
+  || bad "the missing Binding line in the wait: $(tr '\n' ';' < "$WORK/out")"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_binding"
+STUB_A11Y_R11=1 p2 'r007_settings_apply && r007_detector_init && R007_LOG_OUT="$WORK/missing/p2.log" r007_grant_write'
+grep -q "the detector-binding-cleared line could not be saved" "$WORK/out" \
+  && ok "a detector-binding-cleared line that cannot be saved fails the grant" \
+  || bad "the unsaved binding line: $(tr '\n' ';' < "$WORK/out")"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_binding"
+STUB_A11Y_R11=1 STUB_STOP_FAIL=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_write'
+grep -q "am force-stop failed" "$WORK/out" && [ "$(list_ops)" = "put $DETECTOR;" ] \
+  && ok "a failed stop of the app fails the grant before the grant writes the detector" \
+  || bad "the failed stop: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_binding"
+STUB_A11Y_R11=1 STUB_SETTINGS_IGNORE=enabled_accessibility_services R007_BIND_POLLS=2 \
+  p2 'r007_settings_apply && r007_detector_init && r007_grant_write'
+grep -q "the detector in the binding list was not listed as enabled" "$WORK/out" \
+  && ! grep -qx force-stop "$STUB_DEVICE/ops" && [ "$(list_ops)" = "put $DETECTOR;" ] \
+  && ok "a detector in the binding list that the dump does not list as enabled fails the grant before the stop" \
+  || bad "the binding, not listed as enabled: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_binding"
+STUB_A11Y_BINDING_LINE_DUMPS=0 p2 'r007_settings_apply && r007_detector_init && r007_grant_write'
+! grep -qx force-stop "$STUB_DEVICE/ops" && [ "$(list_ops)" = "delete;put $DETECTOR;" ] \
+  && ok "a dump without a Binding services line adds no step to the grant" \
+  || bad "no Binding line: ops: $(tr '\n' ';' < "$STUB_DEVICE/ops")"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_binding"
+STUB_A11Y_R11=1 STUB_A11Y_NO_BOUND_LINE=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_write'
+grep -q "the dump has no Bound services line, so the binding cannot be checked" "$WORK/out" \
+  && ! grep -qx force-stop "$STUB_DEVICE/ops" && [ -z "$(list_ops)" ] \
+  && ok "a binding in a dump without a Bound services line fails the grant without a stop" \
+  || bad "no Bound line: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_crashed" "$STUB_DEVICE/a11y_binding"
+STUB_A11Y_R11=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_detector \
+  && echo "granted=$(r007_detector_state) crashed=$(r007_a11y_lists_detector Crashed)" \
+  && echo "binding=$(r007_a11y_lists_detector Binding)"'
+grep -qx "granted=bound crashed=no" "$WORK/out" && grep -qx "binding=no" "$WORK/out" \
+  && [ "$(list_ops)" = "put $DETECTOR;delete;put $DETECTOR;delete;put $DETECTOR;" ] \
+  && [ "$(grep -cx "## detector-crash-cleared" "$WORK/p2.log")" = 1 ] \
+  && [ "$(grep -cx "## detector-binding-cleared" "$WORK/p2.log")" = 1 ] \
+  && ok "a crash mark and a binding together: the grant removes the mark, then the binding, and binds the detector" \
+  || bad "the crash mark and the binding: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
+reset_device; seed_settings; touch "$STUB_DEVICE/a11y_binding"
+STUB_A11Y_R11=1 STUB_A11Y_BINDING_CONNECTS=1 p2 'r007_settings_apply && r007_detector_init && r007_grant_detector \
+  && echo "granted=$(r007_detector_state) crashed=$(r007_a11y_lists_detector Crashed)"'
+grep -qx "granted=bound crashed=no" "$WORK/out" \
+  && [ "$(grep -cx "## detector-binding-cleared" "$WORK/p2.log")" = 1 ] \
+  && [ "$(grep -cx "## detector-crash-cleared" "$WORK/p2.log")" = 1 ] \
+  && ok "a crash mark that the stop of the binding cleanup leaves is removed, and the detector binds" \
+  || bad "the connect before the stop: $(tr '\n' ';' < "$WORK/out") ops: $(list_ops)"
 
 echo "P2 gates and V"
 gate_is() { # expected xml
