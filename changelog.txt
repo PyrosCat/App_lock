@@ -4,6 +4,16 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): Kotlin project data in the Gradle folder   (2026-10-08)
+------------------------------------------------------------------------------
+The settings.gradle.kts script now moves the project data of the Kotlin plugin into the .gradle folder, which git
+ignores.
+- The script sets the kotlin.project.persistent.dir property to the root .gradle/kotlin folder.
+- In the default .kotlin folder, a compiler session file made some R-007 lockout test runs report a changed
+  source tree.
+- A test compile of the main checkout put its session file into the .gradle/kotlin folder.
+
+
 M7/WP2 (F2 hardening): P3 candidate specifications and comparison criteria   (2026-10-07)
 -----------------------------------------------------------------------------------------
 Four new documents specify the first fixes that phase P3 tests, and the project plan records the comparison
