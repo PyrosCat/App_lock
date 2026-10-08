@@ -4,6 +4,19 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 scheduler specification for a cancelled manager job   (2026-10-08)
+--------------------------------------------------------------------------------------------
+The 2026-10-07_R007_F2_HARDENING_P3_SCHEDULER_SPEC.md specification now covers retries after a cancellation of the
+coroutine job of the lockout manager. In phase P3, candidate fixes for the R-007 lockout storage weaknesses are
+compared with the current app.
+- A new transition ends a retry that starts after the cancellation, with the event reason job-cancelled.
+- Two more transitions cover a cancellation before the completion step and an Error in the storage operation.
+- The section on threads and locking now requires an atomic start of each retry task.
+- A new paragraph states that the prepare step, the completion step, and the event listener must not throw.
+- The description of the virtual test timer now states that no task runs after a stop.
+- The test table gets rows for these cases.
+
+
 M7/WP2 (F2 hardening): Kotlin project data in the Gradle folder   (2026-10-08)
 ------------------------------------------------------------------------------
 The settings.gradle.kts script now moves the project data of the Kotlin plugin into the .gradle folder, which git

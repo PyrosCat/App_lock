@@ -21,7 +21,7 @@ their rules. The mechanism follows the P0 retry policy in the F2 hardening entry
 | `RecoveryTimer` | Calls a task once after a delay, on a thread that is not the writer. The production timer (section 7) and the virtual test timer (section 8) implement it |
 | `RecoveryBackoff` | Maps the attempt number of a chain to its delay (section 4) |
 | `RecoveryAction` | The three steps of one retry, supplied by a candidate: `prepare`, `perform`, and `complete` |
-| `RecoveryListener` | Receives the lifecycle events of each retry. The harness writes them to its ledger as test evidence. Production keeps a listener that does nothing (lead decision of 2026-10-07), so recovery creates no authentication audit event. Production diagnostics would need a separate change with a defined purpose |
+| `RecoveryListener` | Receives the lifecycle events of each retry. The harness writes them to its ledger as test evidence. Production keeps a listener that does nothing (lead decision of 2026-10-07), so recovery creates no authentication audit event. Production diagnostics would need a separate change with a defined purpose. A listener must not throw (section 5) |
 | `RecoverySetup` | Bundles the timer, the backoff, and the listener for the new constructor parameter of `LockoutManager` |
 
 All components are pure Kotlin in the `security` package, next to `LockoutManager.kt`.
@@ -44,17 +44,19 @@ current number.
 | Pending(n) | The timer fires | Queued(n) | `FIRED n` |
 | Pending(n) or Queued(n) | `start` for a new chain | Pending(n+1) | `CANCELLED n replaced`, then `SCHEDULED n+1` |
 | Pending(n) or Queued(n) | `cancel()` | Idle | `CANCELLED n cancelled` |
-| Queued(n) | The writer reaches the task, n is current, and `prepare` returns no operation | Idle | `IGNORED n not-wanted` |
-| Queued(n) | The writer reaches the task, n is current, and `prepare` returns an operation | Running(n) | `STARTED n` |
+| Queued(n) | The writer reaches the task, n is current, and the manager job is cancelled | Idle. `prepare` is not called, and no storage I/O runs | `IGNORED n job-cancelled` |
+| Queued(n) | The writer reaches the task, n is current, the manager job is active, and `prepare` returns no operation | Idle | `IGNORED n not-wanted` |
+| Queued(n) | The writer reaches the task, n is current, the manager job is active, and `prepare` returns an operation | Running(n) | `STARTED n` |
 | Running(n) | `start` for a new chain | Pending(n+1); run n continues without ownership | `SCHEDULED n+1` |
 | Running(n) | `cancel()` | Idle; run n continues without ownership | none |
 | Running(n) | `complete` reports success while n is current | Idle | `ENDED n success` |
 | Running(n) | `complete` calls `scheduleNext(n)` while n is current | Pending(n+1) | `ENDED n retry`, then `SCHEDULED n+1 attempt+1 delay` |
 | Running(n) | `complete` reports that the chain is no longer wanted while n is current | Idle | `ENDED n abandoned` |
 | Running(n) | The adapter throws a `CancellationException` while the manager job is active and n is current | Pending(n+1) | `ENDED n retry`, then `SCHEDULED n+1 attempt+1 delay` |
-| Running(n) | The manager job is cancelled during `perform` while n is current | Idle | `ENDED n threw` |
+| Running(n) | The manager job is cancelled during `perform`, or before `complete` takes the manager lock, while n is current | Idle. `complete` is not called | `ENDED n threw` |
+| Running(n) | `perform` throws an `Error` while n is current | Idle. The `Error` propagates | `ENDED n threw` |
 | Any | `stop()` | Stopped; a running retry continues without ownership | `CANCELLED n stopped` for a pending or queued retry |
-| Any state of a newer owner | The writer reaches a queued task n without ownership | Unchanged. `prepare` is not called | `IGNORED n stale` |
+| Any state of a newer owner | The writer reaches a queued task n without ownership, also after a cancellation of the manager job | Unchanged. `prepare` is not called | `IGNORED n stale` |
 | Any state of a newer owner | A run n without ownership finishes `perform`, with any result | Unchanged. `complete` is not called | `ENDED n abandoned` |
 | Stopped | `start` or `scheduleNext` | Stopped | none (refused) |
 | Any | Process death | none | none: the timer, the queue, and the running step die with the process |
@@ -91,12 +93,13 @@ Pending and Queued differ only in where the task waits.
 
 On the writer, the task runs three steps:
 
-1. Under the manager lock, the scheduler checks the sequence number. It then calls the candidate's `prepare`, which
-   decides whether the retry is still wanted and returns the operation to perform or nothing.
+1. Under the manager lock, the scheduler checks the sequence number and then the manager job. It then calls the
+   candidate's `prepare`, which decides whether the retry is still wanted and returns the operation to perform or
+   nothing.
 2. Without a lock, `perform` does the storage read or write. A storage fault becomes a failed result, as in the
    existing `runWrite` and `runRead`.
-3. Under the manager lock, the scheduler checks again that the run owns the state (section 3). Only then does
-   `complete` apply the result and either end the chain or call `scheduleNext`.
+3. Under the manager lock, the scheduler checks again that the run owns the state (section 3) and that the manager
+   job is active. Only then does `complete` apply the result and either end the chain or call `scheduleNext`.
 
 `prepare` and `complete` do no I/O, so no thread holds the manager lock while it does storage I/O. No thread holds it
 during a delay either. `start`, `scheduleNext`, `cancel()`, and `stop()` run under the manager lock. They only update
@@ -106,7 +109,20 @@ One cancellation rule applies to every retry kind (lead decision of 2026-10-07),
 `perform`. A `CancellationException` that the storage adapter throws while the manager job is active is an
 unsuccessful storage operation. `complete` receives it as a failed attempt, and the backoff applies. A cancellation
 of the manager job itself ends the work, and no retry follows. A storage failure never becomes an authentication
-failure. The scheduler clears its running state in every case, so no flag can stay set.
+failure. Within the callback contract below, the scheduler clears its running state in every case, so no flag can
+stay set.
+
+The two job checks of the steps above apply the cancellation rule outside `perform` (lead decision of 2026-10-08). A
+retry that reaches the first check after a cancellation records `IGNORED n job-cancelled`, frees its slot, and does
+no storage I/O. A cancellation after the first check cannot stop the storage operation, so a write can still reach
+storage. The second check then prevents the publication: the run records `ENDED n threw`, and `complete` is not
+called. `ENDED n threw` therefore always follows `STARTED n`. The writer task starts with `CoroutineStart.ATOMIC`, so
+a retry that fired before a cancellation still enters its task and reaches the first check. The atomic start only
+guarantees this entry.
+
+`prepare`, `complete`, and the listener must not throw. The scheduler does not recover from such an exception, and
+the affected chain can keep its slot until the next `start` (lead decision of 2026-10-08). A throwing listener also
+cannot report its own failure through another event.
 
 `currentState()` never starts a storage read through the scheduler.
 
@@ -128,8 +144,8 @@ delay.
 ## 8. Test support
 
 **Virtual timer.** `VirtualRecoveryTimer` keeps each task with a due time on the elapsed clock of `VirtualClocks`. It
-runs due tasks in due-time order, on the thread that asks, and never runs a cancelled task. Due times use the elapsed
-clock, so `jumpWall()` fires nothing.
+runs due tasks in due-time order, on the thread that asks. It never runs a cancelled task, and it runs no task after
+`stop()`. Due times use the elapsed clock, so `jumpWall()` fires nothing.
 
 **Harness.** `LockoutHarness` gives each new process its own virtual timer and a listener that writes to the ledger.
 `advance(ms)` pauses the executor, moves the clocks, and fires every task that is due at the new time. Firing never
@@ -182,7 +198,9 @@ package stay unchanged and must pass. The ledger traces of their evidence files 
 | Firing during a storage hold | A retry that falls due while an earlier write is held joins the queue behind that write and runs only after the write is released |
 | Firing during a parked callback | A retry fires and queues while a completion callback holds the manager lock |
 | Adapter cancellation | A `CancellationException` from the adapter with the job active reaches `complete` as a failed attempt and schedules the next delay |
-| Job cancellation | A cancellation of the manager job during `perform` ends the chain, and the scheduler returns to Idle |
+| Job cancellation | A cancellation of the manager job during `perform` ends the chain with `ENDED n threw`, also when the storage operation then returns normally or the run waits for the manager lock before `complete`. The scheduler returns to Idle, and no retry follows |
+| Cancellation before the run | A retry that fired before a cancellation of the manager job, or that waits for the manager lock during it, records `IGNORED n job-cancelled` without `prepare` or storage I/O and frees its slot. A cancelled retry without ownership is ignored as stale, and the newer chain stays pending |
+| Error in `perform` | An `Error` from `perform` ends the chain with `ENDED n threw`, and the `Error` propagates |
 | Lazy production thread | A manager that never starts a chain creates no `lockout-retry` thread |
 | Baseline unchanged | The `r007` suite, `LockoutManagerTest`, and the harness tests pass without change, and S11 holds in every case |
 
