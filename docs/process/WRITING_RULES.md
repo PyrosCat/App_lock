@@ -125,6 +125,9 @@ fleet machine.
 3. Do not start the introduction with "This change". Start with the item that changes, for example "The planning
    document for the R-007 hardening work now shows ...". In a bullet, use "This change ..." only where the action
    needs it.
+4. No bullet repeats a bullet of the previous entry word for word. When the evidence has the same form, name what is
+   new in this run, for example the commit that the run was compared with.
+5. A bullet does not repeat a phrase of the bullet before it. Refer back instead, for example "these cases".
 
 ## 6. Commit subjects
 
