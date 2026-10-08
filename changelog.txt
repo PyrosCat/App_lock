@@ -4,6 +4,14 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs: changelog rules against repeated bullets   (2026-10-08)
+-------------------------------------------------------------
+The writing rules of the repository get two rules against repeated text in changelog entries.
+- A new rule says that no bullet repeats a bullet of the previous entry word for word.
+- Where the evidence has the same form, the rule asks the writer to name what is new in the run.
+- Under a second new rule, a bullet refers back to the bullet before it and does not repeat its words.
+
+
 M7/WP2 (F2 hardening): P3 base retries of a cancelled manager job   (2026-10-08)
 --------------------------------------------------------------------------------
 The P3 retry scheduler now ends a retry that starts after the coroutine job of the lockout manager was cancelled. In
