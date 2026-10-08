@@ -42,6 +42,8 @@ sealed interface ExpectedOutcome {
  * - S10 A poll starts one re-seed read when a re-seed is requested and none runs. A successful re-seed read applies
  *   only while the request stands: the count and the wall deadline come from storage, with no elapsed mirror and no
  *   fallback.
+ * - S11 The manager starts no retry, so the ledger holds no retry event. A candidate branch replaces this rule with
+ *   its own retry rules.
  */
 class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) {
     @Suppress("LongParameterList") // each field is a distinct admission-time fact that the completion rules need
@@ -82,6 +84,9 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
 
     /** Admitted writes that have not finished yet, in admission order. */
     val pendingWrites: Int get() = queue.size
+
+    /** S11: the number of retry events that the ledger holds for the live process. The manager starts no retry. */
+    val retryEventsExpected: Int get() = 0
 
     private var recordedWall = NONE
     private var recordedElapsed = NONE

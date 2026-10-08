@@ -94,6 +94,9 @@ class LockoutManager(
     // in-flight write drains to completion (its completion effect is dropped by the stopped check). Defaulted for
     // production.
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + ioDispatcher),
+    // The timer, delays, and listener of the [RecoveryScheduler]. No code path of this manager starts a retry, and the
+    // default timer starts its thread only at the first retry.
+    recovery: RecoverySetup = RecoverySetup(),
 ) {
 
     /**
@@ -151,6 +154,10 @@ class LockoutManager(
     data class Pending<T>(val immediate: LockoutState, val resolved: Deferred<T>)
 
     private val lock = Any()
+
+    // Retries join the same writer queue as the durable writes, behind the work already queued.
+    private val recoveryScheduler =
+        RecoveryScheduler(lock, recovery) { block -> scope.launch(ioDispatcher) { block() } }
 
     // Assigned under [lock]. The first mutation is revision 1; the construction seed is revision 0.
     private var nextRevision = 1L
@@ -508,10 +515,14 @@ class LockoutManager(
      * write drains to completion (its durable data reaches storage) and its Deferred resolves, but its completion
      * effect is dropped by the [stopped] check. It is non-suspend and holds no lock across IO, so it never blocks on
      * disk. The manager is a process-lifetime singleton, so production rarely calls this. Stopping the manager is not
-     * how one runtime stops: a runtime cancels its own scope and leaves this shared manager up.
+     * how one runtime stops: a runtime cancels its own scope and leaves this shared manager up. It also stops the retry
+     * scheduler, which then refuses every retry.
      */
     fun shutdown() {
-        synchronized(lock) { stopped = true }
+        synchronized(lock) {
+            stopped = true
+            recoveryScheduler.stop()
+        }
     }
 
     companion object {

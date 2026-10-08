@@ -4,6 +4,8 @@ import com.applock.security.LockoutManager
 import com.applock.security.LockoutSnapshot
 import com.applock.security.LockoutState
 import com.applock.security.LockoutStorage
+import com.applock.security.RecoveryEvent
+import com.applock.security.RecoverySetup
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.SupervisorJob
@@ -32,8 +34,12 @@ import java.util.concurrent.TimeUnit
  * operations wake and end. `shutdown()` is called on the dead manager only to silence its callbacks.
  *
  * [check] compares the model with the durable state, the process cache, the public manager API, the resolved
- * operation outcomes, the read count, and the one-writer maximum. While a re-seed is requested, [check] does not call
- * `currentState()`, because that call starts a re-seed read; [poll] is the observation that does.
+ * operation outcomes, the read count, the retry events, and the one-writer maximum. While a re-seed is requested,
+ * [check] does not call `currentState()`, because that call starts a re-seed read; [poll] is the observation that does.
+ *
+ * Each process gets its own [VirtualRecoveryTimer] for the retry scheduler of the manager, and the retry events go to
+ * the ledger while the process lives. [advance] fires the retries that are due at the new time, also while a storage
+ * operation or a callback is held, and then settles. A dead process fires no retry and records no retry event.
  */
 class LockoutHarness(
     initial: LockoutSnapshot = LockoutSnapshot(0, 0L),
@@ -81,6 +87,13 @@ class LockoutHarness(
         get() = checkNotNull(managerOrNull) { "no live manager in g$generation" }
 
     private var executor: ControlledIoExecutor? = null
+    private var recoveryTimer: VirtualRecoveryTimer? = null
+
+    // The generation whose retry events reach the ledger, or 0 while no process lives. A kill clears it first, so the
+    // shutdown of a dead manager records nothing.
+    @Volatile
+    private var recordingGeneration = 0
+
     private var starter: FutureTask<LockoutManager>? = null
     private var syncedSeq = 0
     private val liveOps = ArrayList<LiveOp>()
@@ -124,6 +137,8 @@ class LockoutHarness(
     fun kill() {
         val io = executor ?: return
         ledger.action(generation, "KILL", "", clocks)
+        recordingGeneration = 0
+        recoveryTimer?.stop()
         store.fence(generation)
         val dropped = io.stop()
         ledger.action(generation, "DROPPED", "$dropped queued task(s)", clocks)
@@ -141,6 +156,7 @@ class LockoutHarness(
         }
         managerOrNull = null
         executor = null
+        recoveryTimer = null
         liveOps.clear()
     }
 
@@ -165,17 +181,27 @@ class LockoutHarness(
         model.startProcess(generation)
         liveOps.clear()
         ledger.action(generation, "START", "boot=${clocks.bootCount()}", clocks)
+        recoveryTimer = VirtualRecoveryTimer(clocks)
+        recordingGeneration = generation
         return ControlledIoExecutor("lockout-io-g$generation").also { executor = it }
     }
 
     private fun construct(io: ControlledIoExecutor): LockoutManager {
         val dispatcher = io.asCoroutineDispatcher()
+        val owner = generation
+        val recovery = RecoverySetup(
+            timer = checkNotNull(recoveryTimer) { "no recovery timer for g$owner" },
+            listener = { event ->
+                if (recordingGeneration == owner) ledger.action(owner, event.ledgerName(), event.ledgerDetail(), clocks)
+            },
+        )
         return LockoutManager(
             storage = storageDecorator(store.open(generation)),
             clock = clocks::wallMs,
             elapsedRealtime = clocks::elapsedMs,
             ioDispatcher = dispatcher,
             scope = CoroutineScope(SupervisorJob() + dispatcher),
+            recovery = recovery,
         )
     }
 
@@ -229,9 +255,23 @@ class LockoutHarness(
         return state
     }
 
+    /**
+     * Moves both clocks by [ms]. In a live process, it then fires every retry that is due at the new time and settles.
+     * The firing never waits for a storage hold or a parked callback, so a retry can join the queue behind a held
+     * write.
+     */
     fun advance(ms: Long) {
-        clocks.advance(ms)
-        ledger.action(generation, "ADVANCE", "$ms", clocks)
+        if (executor == null) {
+            clocks.advance(ms)
+            ledger.action(generation, "ADVANCE", "$ms", clocks)
+            return
+        }
+        paused {
+            clocks.advance(ms)
+            ledger.action(generation, "ADVANCE", "$ms", clocks)
+            recoveryTimer?.fireDue()
+        }
+        settle()
     }
 
     fun jumpWall(ms: Long) {
@@ -342,6 +382,7 @@ class LockoutHarness(
             assertEquals("S5: every admitted write finished", 0, model.pendingWrites)
         }
         assertTrue("S5: one ordered writer", store.maxConcurrentWrites() <= 1)
+        assertEquals("S11: the live process has the expected retry events", model.retryEventsExpected, retryEvents())
         assertTrue("escaped task failures: ${executor?.escaped}", executor?.escaped.isNullOrEmpty())
         if (!model.reseedRequested) {
             assertEquals("S8: lockout state", model.state(), live.currentState())
@@ -364,6 +405,12 @@ class LockoutHarness(
             assertEquals("S9: outcome of write#${op.writeIndex}", expected, actual)
         }
     }
+
+    // The number of retry events that the ledger holds for the live process.
+    private fun retryEvents(): Int =
+        ledger.snapshot().count { event ->
+            event is LedgerEvent.Action && event.generation == generation && event.name.startsWith(RETRY_PREFIX)
+        }
 
     // ---- Quiescence and model feed ---------------------------------------------------------------
 
@@ -415,3 +462,27 @@ class LockoutHarness(
         const val CALLBACK_LIMIT_MS = 30_000L
     }
 }
+
+private const val RETRY_PREFIX = "RETRY_"
+
+// The ledger action name of a retry event, for example RETRY_SCHEDULED.
+private fun RecoveryEvent.ledgerName(): String = RETRY_PREFIX + when (this) {
+    is RecoveryEvent.Scheduled -> "SCHEDULED"
+    is RecoveryEvent.Fired -> "FIRED"
+    is RecoveryEvent.Cancelled -> "CANCELLED"
+    is RecoveryEvent.Ignored -> "IGNORED"
+    is RecoveryEvent.Started -> "STARTED"
+    is RecoveryEvent.Ended -> "ENDED"
+}
+
+// The ledger detail of a retry event, for example "seq=3 kind=WRITE attempt=2 delay=2000".
+private fun RecoveryEvent.ledgerDetail(): String = when (this) {
+    is RecoveryEvent.Scheduled -> "seq=$sequence kind=$kind attempt=$attempt delay=$delayMs"
+    is RecoveryEvent.Fired -> "seq=$sequence"
+    is RecoveryEvent.Cancelled -> "seq=$sequence reason=${reason.label()}"
+    is RecoveryEvent.Ignored -> "seq=$sequence reason=${reason.label()}"
+    is RecoveryEvent.Started -> "seq=$sequence"
+    is RecoveryEvent.Ended -> "seq=$sequence outcome=${outcome.label()}"
+}
+
+private fun Enum<*>.label(): String = name.lowercase().replace('_', '-')

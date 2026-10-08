@@ -4,6 +4,27 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 base branch with the shared retry scheduler   (2026-10-08)
+------------------------------------------------------------------------------------
+The P3 base branch adds a shared retry scheduler to the lockout manager, but no code starts a retry. In phase P3,
+candidate fixes for the R-007 lockout storage weaknesses are compared with the current app.
+- The new RecoveryScheduler class gives the candidate fixes one mechanism for storage retries.
+- A new RecoveryTimer interface and its production class measure the delay before each retry.
+- The LockoutManager class gets a constructor parameter for the timer, the delays, and the event listener of the
+  scheduler.
+- The shutdown function of the manager now also stops the scheduler.
+- The new VirtualRecoveryTimer class lets the test harness run due retries on its virtual clock.
+- The LockoutHarness test class writes each retry event to the event log of the harness.
+- A new rule in the LockoutModel test class expects no retry events.
+- Twenty-five new tests in the RecoverySchedulerTest class cover the scheduler, its delays, and both timers.
+- The settings.gradle.kts script now moves the project data of the Kotlin plugin into the .gradle folder. A compiler
+  session file in the default .kotlin folder made some test runs report a changed source tree.
+- The local gate ran 493 unit tests with no failures and no skipped tests.
+- In the same gate run, the detekt, assembleProdDebug, and compileProdDebugAndroidTestKotlin tasks passed.
+- A separate gate run passed all 70 R-007 test cases and the detekt task.
+- The event traces of these cases match those of the current app.
+
+
 M7/WP2 (F2 hardening): P3 candidate specifications and comparison criteria   (2026-10-07)
 -----------------------------------------------------------------------------------------
 Four new documents specify the first fixes that phase P3 tests, and the project plan records the comparison
