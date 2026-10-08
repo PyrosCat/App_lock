@@ -4,7 +4,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
@@ -155,9 +157,11 @@ class LockoutManager(
 
     private val lock = Any()
 
-    // Retries join the same writer queue as the durable writes, behind the work already queued.
+    // Retries join the same writer queue as the durable writes, behind the work already queued. The atomic start lets
+    // a retry that fired before a cancellation of [scope] still run its entry check and free the scheduler slot.
+    @OptIn(DelicateCoroutinesApi::class)
     private val recoveryScheduler =
-        RecoveryScheduler(lock, recovery) { block -> scope.launch(ioDispatcher) { block() } }
+        RecoveryScheduler(lock, recovery) { block -> scope.launch(ioDispatcher, CoroutineStart.ATOMIC) { block() } }
 
     // Assigned under [lock]. The first mutation is revision 1; the construction seed is revision 0.
     private var nextRevision = 1L

@@ -4,6 +4,25 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 base retries of a cancelled manager job   (2026-10-08)
+--------------------------------------------------------------------------------
+The P3 retry scheduler now ends a retry that starts after the coroutine job of the lockout manager was cancelled. In
+phase P3, candidate fixes for the R-007 lockout storage weaknesses are compared with the current app.
+- Such a retry used to stay queued, or ran one storage operation after the cancellation.
+- The RecoveryScheduler class now checks the manager job before it prepares a retry, and records the new event
+  reason job-cancelled.
+- The LockoutManager class now starts each retry task atomically, so that a retry that fired earlier still runs this
+  check.
+- The RecoveryListener interface now states that a listener must not throw.
+- The 2026-10-07_R007_F2_HARDENING_P3_SCHEDULER_SPEC.md specification gets the new transitions and the limit for
+  throwing callbacks.
+- Three new tests in the RecoverySchedulerTest class cover cancellations before a retry starts.
+- The local gate ran 496 unit tests with no failures and no skipped tests.
+- That gate run also passed the detekt, assembleProdDebug, and compileProdDebugAndroidTestKotlin tasks.
+- A second run of the 70 R-007 test cases and the detekt task had no failures.
+- A comparison with the test run of the current app at commit 7b0a8df found identical event traces.
+
+
 M7/WP2 (F2 hardening): P3 base branch with the shared retry scheduler   (2026-10-08)
 ------------------------------------------------------------------------------------
 The P3 base branch adds a shared retry scheduler to the lockout manager, but no code starts a retry. In phase P3,

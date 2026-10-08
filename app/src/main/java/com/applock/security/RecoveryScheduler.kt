@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
+import kotlin.coroutines.CoroutineContext
 
 /** The kind of a retry chain: a retried storage read or a retried storage write. */
 enum class RecoveryKind { READ, WRITE }
@@ -59,7 +60,7 @@ sealed interface RecoveryEvent {
     }
 
     data class Ignored(override val sequence: Long, val reason: Reason) : RecoveryEvent {
-        enum class Reason { STALE, NOT_WANTED }
+        enum class Reason { STALE, NOT_WANTED, JOB_CANCELLED }
     }
 
     data class Started(override val sequence: Long) : RecoveryEvent
@@ -69,7 +70,10 @@ sealed interface RecoveryEvent {
     }
 }
 
-/** Receives the [RecoveryEvent]s of a scheduler, under the manager lock or on the timer thread. */
+/**
+ * Receives the [RecoveryEvent]s of a scheduler, under the manager lock or on the timer thread. It must not throw: the
+ * scheduler does not recover from a listener exception, and the affected chain can keep its slot until the next start.
+ */
 fun interface RecoveryListener {
     fun onEvent(event: RecoveryEvent)
 
@@ -120,7 +124,9 @@ class RecoverySetup(
  * Every scheduled retry gets the next sequence number, and only the newest one owns the scheduler state. [start],
  * [cancel], and [stop] make the previous number stale. A stale retry never changes the state. A queued one is ignored
  * before `prepare`. A running one finishes its I/O, because blocking I/O cannot be interrupted safely, but never
- * reaches `complete`.
+ * reaches `complete`. A retry that reaches the writer after a cancellation of the manager job is ignored before
+ * `prepare`, frees its slot, and does no storage I/O. A later cancellation cannot stop a running storage operation,
+ * but the run then ends before `complete`, so its result is not published.
  *
  * The wait runs on the [RecoveryTimer]. A firing takes no lock and reads no scheduler state: it only appends the retry
  * to the writer queue through [launchOnWriter], behind the writes already there. On the writer, `prepare` and
@@ -132,7 +138,8 @@ class RecoverySetup(
 class RecoveryScheduler(
     private val lock: Any,
     private val setup: RecoverySetup,
-    // Runs a block on the manager's single writer, behind the work already queued there.
+    // Runs a block on the manager's single writer, behind the work already queued there. The block must start even
+    // when the manager job was cancelled first (CoroutineStart.ATOMIC), so that the run can free the slot.
     private val launchOnWriter: (suspend () -> Unit) -> Unit,
 ) {
     // The mutable fields are guarded by [lock].
@@ -219,7 +226,7 @@ class RecoveryScheduler(
     @Suppress("TooGenericExceptionCaught") // every throwable ends the run, and each one is rethrown
     private suspend fun runOnWriter(sequence: Long) {
         val context = currentCoroutineContext()
-        val (chain, operation) = synchronized(lock) { begin(sequence) } ?: return
+        val (chain, operation) = synchronized(lock) { begin(sequence, context) } ?: return
         val succeeded = try {
             perform(operation)
         } catch (e: Throwable) {
@@ -243,17 +250,22 @@ class RecoveryScheduler(
         if (cancelled) context.ensureActive()
     }
 
-    // Under [lock]: ignores a stale retry. Otherwise it asks the action for the operation of this attempt.
-    private fun begin(sequence: Long): Pair<Chain, RecoveryOperation>? {
+    // Under [lock]: ignores a stale retry first, so that a newer chain keeps its slot. An owning retry whose manager
+    // job was cancelled ends without `prepare` and without storage I/O. Otherwise it asks the action for the operation
+    // of this attempt.
+    private fun begin(sequence: Long, context: CoroutineContext): Pair<Chain, RecoveryOperation>? {
         val chain = current
         if (stopped || chain == null || chain.sequence != sequence) {
             emit(RecoveryEvent.Ignored(sequence, RecoveryEvent.Ignored.Reason.STALE))
             return null
         }
-        val operation = chain.action.prepare()
+        val jobActive = context.isActive
+        val operation = if (jobActive) chain.action.prepare() else null
         if (operation == null) {
             current = null
-            emit(RecoveryEvent.Ignored(sequence, RecoveryEvent.Ignored.Reason.NOT_WANTED))
+            val reason =
+                if (jobActive) RecoveryEvent.Ignored.Reason.NOT_WANTED else RecoveryEvent.Ignored.Reason.JOB_CANCELLED
+            emit(RecoveryEvent.Ignored(sequence, reason))
             return null
         }
         chain.running = true

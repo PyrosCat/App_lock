@@ -4,6 +4,8 @@ import com.applock.security.harness.VirtualClocks
 import com.applock.security.harness.VirtualRecoveryTimer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
@@ -19,6 +21,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 
 /**
@@ -302,6 +305,79 @@ class RecoverySchedulerTest {
     }
 
     @Test
+    fun `a retry that fired before a cancellation of the manager job is ignored and frees its slot`() {
+        RealWriter().use { realWriter ->
+            val realScheduler = newScheduler(realWriter::launch)
+            val action = ScriptedAction()
+            val writerRelease = occupyWriter(realWriter)
+            synchronized(lock) { realScheduler.start(RecoveryKind.WRITE, action) }
+            advance(1_000)
+
+            realWriter.scope.cancel()
+            writerRelease.countDown()
+            awaitEvent { it is RecoveryEvent.Ignored }
+
+            assertEquals("the cancelled retry never prepares", 0, action.prepares)
+            assertEquals(listOf("SCHEDULED 1 WRITE 1 1000", "FIRED 1", "IGNORED 1 JOB_CANCELLED"), trace())
+            assertNull(synchronized(lock) { realScheduler.pendingKind() })
+        }
+    }
+
+    @Test
+    fun `a retry that waits for the manager lock during a cancellation of the manager job is ignored before prepare`() {
+        RealWriter().use { realWriter ->
+            val realScheduler = newScheduler(realWriter::launch)
+            val storageReached = AtomicBoolean(false)
+            val action = ScriptedAction(io = {
+                storageReached.set(true)
+                true
+            })
+            synchronized(lock) { realScheduler.start(RecoveryKind.WRITE, action) }
+
+            synchronized(lock) {
+                advance(1_000)
+                awaitBlocked(checkNotNull(realWriter.thread))
+                realWriter.scope.cancel()
+            }
+            awaitEvent { it is RecoveryEvent.Ignored }
+
+            assertEquals("the cancelled retry never prepares", 0, action.prepares)
+            assertFalse("the cancelled retry runs no storage operation", storageReached.get())
+            assertEquals(listOf("SCHEDULED 1 WRITE 1 1000", "FIRED 1", "IGNORED 1 JOB_CANCELLED"), trace())
+            assertNull(synchronized(lock) { realScheduler.pendingKind() })
+        }
+    }
+
+    @Test
+    fun `a cancelled retry without ownership leaves the newer chain pending`() {
+        RealWriter().use { realWriter ->
+            val realScheduler = newScheduler(realWriter::launch)
+            val writerRelease = occupyWriter(realWriter)
+            synchronized(lock) { realScheduler.start(RecoveryKind.WRITE, ScriptedAction()) }
+            advance(1_000)
+            synchronized(lock) { realScheduler.start(RecoveryKind.WRITE, ScriptedAction()) }
+
+            realWriter.scope.cancel()
+            writerRelease.countDown()
+            awaitEvent { it is RecoveryEvent.Ignored }
+
+            assertEquals(
+                listOf(
+                    "SCHEDULED 1 WRITE 1 1000",
+                    "FIRED 1",
+                    "CANCELLED 1 REPLACED",
+                    "SCHEDULED 2 WRITE 1 1000",
+                    "IGNORED 1 STALE",
+                ),
+                trace(),
+            )
+            val pendingKind = synchronized(lock) { realScheduler.pendingKind() }
+            assertEquals("the newer chain keeps its slot", RecoveryKind.WRITE, pendingKind)
+            assertEquals(1, timer.pendingCount())
+        }
+    }
+
+    @Test
     fun `an error from the storage operation ends the chain and clears its state`() {
         val action = ScriptedAction(io = { throw AssertionError("storage error") })
         start(action)
@@ -506,6 +582,18 @@ class RecoverySchedulerTest {
         }
     }
 
+    // Occupies the writer until the returned latch counts down, so that a fired retry queues behind that work.
+    private fun occupyWriter(realWriter: RealWriter): CountDownLatch {
+        val writerBusy = CountDownLatch(1)
+        val writerRelease = CountDownLatch(1)
+        realWriter.launch {
+            writerBusy.countDown()
+            writerRelease.await(TIMEOUT_S, TimeUnit.SECONDS)
+        }
+        assertTrue("the writer is occupied", writerBusy.await(TIMEOUT_S, TimeUnit.SECONDS))
+        return writerRelease
+    }
+
     // Waits until [thread] blocks on a monitor, here the manager lock that the test thread holds.
     private fun awaitBlocked(thread: Thread) {
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_S)
@@ -565,15 +653,19 @@ class RecoverySchedulerTest {
         }
     }
 
-    /** A real single-thread writer named `lockout-io`, as the manager's default writer. */
+    /** A real single-thread writer named `lockout-io` that starts each block atomically, as the manager does. */
     private class RealWriter : AutoCloseable {
+        @Volatile
+        var thread: Thread? = null
+            private set
         private val executor = Executors.newSingleThreadExecutor { runnable ->
-            Thread(runnable, "lockout-io").apply { isDaemon = true }
+            Thread(runnable, "lockout-io").apply { isDaemon = true }.also { thread = it }
         }
         val scope = CoroutineScope(SupervisorJob() + executor.asCoroutineDispatcher())
 
+        @OptIn(DelicateCoroutinesApi::class)
         fun launch(block: suspend () -> Unit) {
-            scope.launch { block() }
+            scope.launch(start = CoroutineStart.ATOMIC) { block() }
         }
 
         override fun close() {
