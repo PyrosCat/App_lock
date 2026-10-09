@@ -6,6 +6,8 @@ import com.applock.security.LockoutSnapshot
 import com.applock.security.LockoutState.Available
 import com.applock.security.LockoutState.LockedOut
 import com.applock.security.LockoutStorage
+import com.applock.security.RecoveryEvent
+import com.applock.security.RecoveryKind
 import com.applock.security.harness.FaultPlan
 import com.applock.security.harness.GatedCaller
 import com.applock.security.harness.ReadScript
@@ -222,26 +224,28 @@ class CrossCuttingTest : BaselineCase() {
         harness.record("X08-waiter", "durable" to harness.store.durableState())
     }
 
+    // B2 spec: T1, T5.
     @Test
-    fun `X08 - cancelling the resolved Deferred before its write starts drops the admitted write`() {
+    fun `X08 - cancelling the resolved Deferred before its write starts still runs its write and calls back once`() {
         val harness = harness(Z, FaultPlan().write(WriteScript.HoldBeforeCommit(), generation = 1, index = 0))
         harness.start()
         harness.fail()
         val callbacks = AtomicInteger()
         val secondFailure = harness.fail { callbacks.incrementAndGet() }
-        secondFailure.resolved.cancel()
+        harness.cancelResult(secondFailure)
 
         harness.release(StorageOp.WRITE, 0)
-        assertEquals("the second write never ran", 1, harness.store.writeCount(1))
-        assertEquals(LockoutSnapshot(1, 0L), harness.store.durableState())
+        harness.check()
+        assertEquals("the second write ran", 2, harness.store.writeCount(1))
+        assertEquals(LockoutSnapshot(2, 0L), harness.store.durableState())
         assertEquals("memory keeps both failures", 2, harness.manager.failureCount())
         assertTrue(secondFailure.resolved.isCancelled)
-        assertEquals(0, callbacks.get())
+        assertEquals("the manager calls back once", 1, callbacks.get())
 
         harness.restart()
         harness.check()
-        assertEquals("the restart loses the second failure", 1, harness.manager.failureCount())
-        harness.record("X08-cancel-before-start", "lost_failures" to 1)
+        assertEquals("the restart keeps the second failure", 2, harness.manager.failureCount())
+        harness.record("X08-cancel-before-start", "lost_failures" to 0, "callbacks" to 1)
     }
 
     @Test
@@ -260,39 +264,49 @@ class CrossCuttingTest : BaselineCase() {
         harness.record("X08-cancel-while-running", "callbacks" to 1, "await" to "CancellationException")
     }
 
+    // B2 spec: T2, T16.
     @Test
-    fun `X08 - a failure write that throws a cancellation arms no fallback and skips its callback`() {
+    fun `X08 - a failure write that throws a cancellation is a failed write, arms the fallback, and calls back once`() {
         val harness = harness(Z, FaultPlan().write(WriteScript.ThrowCancellation, generation = 1, index = 0))
         harness.start()
         val callbacks = AtomicInteger()
         val failure = harness.fail { callbacks.incrementAndGet() }
-        assertEquals("no fallback for the failed write", Available, harness.manager.currentState())
+        harness.check()
+        assertEquals("the fallback of a failed write", LockedOut(T, degraded = true), harness.manager.currentState())
         assertEquals(1, harness.manager.failureCount())
-        assertEquals(0, callbacks.get())
-        assertTrue(failure.resolved.isCancelled)
+        assertEquals("the manager calls back once", 1, callbacks.get())
+        val degradedOutcome = FailureOutcome(LockedOut(T, degraded = true), 1)
+        assertEquals(degradedOutcome, runBlocking { failure.resolved.await() })
         assertEquals(Z, harness.store.durableState())
+        val chainStart = RecoveryEvent.Scheduled(1L, RecoveryKind.WRITE, 1, 1_000L)
+        assertEquals("a retry chain starts", listOf(chainStart), harness.retryEvents())
 
-        // A direct submission: the model armed the fallback that the baseline skips, so harness admissions would fail.
-        harness.manager.submitFailure()
-        harness.awaitQuiescent()
+        harness.fail()
+        harness.check()
+        val chainEnd = RecoveryEvent.Cancelled(1L, RecoveryEvent.Cancelled.Reason.CANCELLED)
+        assertEquals("the next admission ends the chain", listOf(chainStart, chainEnd), harness.retryEvents())
         assertEquals("the writer still runs", LockoutSnapshot(2, 0L), harness.store.durableState())
-        harness.record("X08-write-cancellation", "fallback" to "none", "callbacks" to 0)
+        harness.record("X08-write-cancellation", "fallback" to "armed", "callbacks" to 1)
     }
 
+    // B2 spec: T2.
     @Test
-    fun `X08 - a clear that throws a cancellation skips its callback, so the failed clear is not reported`() {
+    fun `X08 - a clear that throws a cancellation is reported as a failed clear`() {
         val harness = harness(L5, FaultPlan().write(WriteScript.ThrowCancellation, generation = 1, index = 0))
         harness.start()
         val reported = AtomicReference<Boolean>()
         val reset = harness.succeed { committed -> reported.set(committed) }
+        harness.check()
         assertEquals(Available, harness.manager.currentState())
-        assertEquals("no report", null, reported.get())
-        assertTrue(reset.resolved.isCancelled)
+        assertEquals("the failed clear is reported", false, reported.get())
+        assertEquals(false, runBlocking { reset.resolved.await() })
+        val chainStart = RecoveryEvent.Scheduled(1L, RecoveryKind.WRITE, 1, 1_000L)
+        assertEquals("a retry chain starts", listOf(chainStart), harness.retryEvents())
 
-        harness.restart()
+        harness.restart() // before the first retry
         harness.check()
         assertEquals(LockedOut(T, degraded = false), harness.manager.currentState())
-        harness.record("X08-clear-cancellation", "reported" to null)
+        harness.record("X08-clear-cancellation", "reported" to false)
     }
 
     // ---- X13 completion callbacks under the manager lock ---------------------------------------

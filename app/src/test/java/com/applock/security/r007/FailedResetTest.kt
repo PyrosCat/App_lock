@@ -3,6 +3,8 @@ package com.applock.security.r007
 import com.applock.security.LockoutSnapshot
 import com.applock.security.LockoutState.Available
 import com.applock.security.LockoutState.LockedOut
+import com.applock.security.RecoveryEvent
+import com.applock.security.RecoveryKind
 import com.applock.security.harness.FaultPlan
 import com.applock.security.harness.GatedCaller
 import com.applock.security.harness.LockoutHarness
@@ -12,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * P2 baseline, residual R-007/4 (test plan §8): a failed reset brings stale enforcement back on restart, R4.1 to R4.4.
@@ -21,8 +24,9 @@ class FailedResetTest : BaselineCase() {
 
     // ---- R4.1 a failed clear and a stale pair on restart ----------------------------------------
 
+    // B2 spec: T2, T19.
     @Test
-    fun `R4_1 - a failed clear keeps the old lockout in storage and a restart enforces it again`() {
+    fun `R4_1 - a failed clear keeps the old lockout stored and a restart before the first retry enforces it again`() {
         listOf(WriteScript.ReturnFalse, WriteScript.Throw, WriteScript.HoldBeforeCommit()).forEach { script ->
             val harness = harness(L5, FaultPlan().write(script, generation = 1, index = 0))
             harness.start()
@@ -39,23 +43,25 @@ class FailedResetTest : BaselineCase() {
             }
             assertEquals(1, harness.store.readCount(1))
 
-            harness.advance(5_000L)
+            harness.advance(BEFORE_FIRST_RETRY_MS)
             harness.restart()
             harness.check()
             assertEquals("$script", L5, harness.store.durableState())
-            val staleLock = LockedOut(T - 5_000L, degraded = false)
+            val staleLock = LockedOut(T - BEFORE_FIRST_RETRY_MS, degraded = false)
             assertEquals("$script: the old lockout is back", staleLock, harness.manager.currentState())
-            harness.record("R4.1-$script", "stale_lock_ms" to T - 5_000L, "stale_count" to 5)
+            harness.record("R4.1-$script", "stale_lock_ms" to T - BEFORE_FIRST_RETRY_MS, "stale_count" to 5)
         }
     }
 
+    // B2 spec: T2, T19.
     @Test
     fun `R4_1 - after the stale deadline ends, the old count makes the next wrong PIN lock at once`() {
         val harness = harness(L5, FaultPlan().write(WriteScript.ReturnFalse, generation = 1, index = 0))
         harness.start()
         harness.succeed()
-        harness.advance(STALL_MS)
+        harness.advance(BEFORE_FIRST_RETRY_MS)
         harness.restart()
+        harness.advance(STALL_MS)
         harness.check()
         assertEquals(Available, harness.manager.currentState())
         assertEquals(5, harness.manager.failureCount())
@@ -87,25 +93,40 @@ class FailedResetTest : BaselineCase() {
 
     // ---- R4.2 a transient clear failure --------------------------------------------------------
 
+    // B2 spec: T2, T7, T8, T10.
     @Test
-    fun `R4_2 - a failed clear is never retried, so the stale pair stays until the next committed write`() {
-        val harness = harness(L5, FaultPlan().write(WriteScript.ReturnFalse, generation = 1, index = 0))
-        harness.start()
-        harness.succeed()
-        harness.advance(1_000L) // the storage is healthy from here: only write 0 fails
-        harness.advance(4_000L)
-        harness.check()
-        assertEquals("no retry", 1, harness.store.writeCount(1))
-        assertEquals(L5, harness.store.durableState())
+    fun `R4_2 - a failed clear is retried after 1 s and a restart after the retry loads Z`() {
+        listOf(WriteScript.ReturnFalse, WriteScript.Throw).forEach { script ->
+            val harness = harness(L5, FaultPlan().write(script, generation = 1, index = 0))
+            harness.start()
+            val callbacks = AtomicInteger()
+            val reset = harness.succeed { callbacks.incrementAndGet() }
+            harness.check()
+            assertEquals("$script: the clear reports its failure", false, runBlocking { reset.resolved.await() })
+            assertEquals("$script", L5, harness.store.durableState())
+            assertEquals("$script: memory clears at once", Available, harness.manager.currentState())
 
-        harness.restart()
-        harness.check()
-        assertEquals(LockedOut(T - 5_000L, degraded = false), harness.manager.currentState())
-        harness.advance(T - 5_000L)
-        assertTrue(GatedCaller(harness).correctPin())
-        harness.check()
-        assertEquals("the next committed write clears it", Z, harness.store.durableState())
-        harness.record("R4.2", "retries" to 0, "cleared_by" to "the next accepted success")
+            harness.advance(FIRST_RETRY_DELAY_MS) // the storage is healthy from here: only write 0 fails
+            harness.check()
+            assertEquals("$script: the retry stores the clear", Z, harness.store.durableState())
+            assertEquals("$script: the clear and one retry write", 2, harness.store.writeCount(1))
+            assertEquals("$script: memory stays cleared", Available, harness.manager.currentState())
+            assertEquals("$script", 0, harness.manager.failureCount())
+            assertEquals("$script: one callback, and none for the retry", 1, callbacks.get())
+            val retryEvents = listOf(
+                RecoveryEvent.Scheduled(1L, RecoveryKind.WRITE, 1, FIRST_RETRY_DELAY_MS),
+                RecoveryEvent.Fired(1L),
+                RecoveryEvent.Started(1L),
+                RecoveryEvent.Ended(1L, RecoveryEvent.Ended.Outcome.SUCCESS),
+            )
+            assertEquals("$script", retryEvents, harness.retryEvents())
+
+            harness.restart()
+            harness.check()
+            assertEquals("$script: the restart loads Z", Available, harness.manager.currentState())
+            assertEquals("$script", 0, harness.manager.failureCount())
+            harness.record("R4.2-$script", "retries" to 1, "durable_after_retry" to Z)
+        }
     }
 
     // ---- R4.3 the baseline order of a failed clear and later failures --------------------------
@@ -189,5 +210,11 @@ class FailedResetTest : BaselineCase() {
 
     private companion object {
         const val POLLS_AFTER_RESET = 10
+
+        /** The delay of the first retry of a failed write. */
+        const val FIRST_RETRY_DELAY_MS = 1_000L
+
+        /** A death or restart before the first retry. */
+        const val BEFORE_FIRST_RETRY_MS = 500L
     }
 }

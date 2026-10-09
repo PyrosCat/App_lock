@@ -34,12 +34,14 @@ import java.util.concurrent.TimeUnit
  * operations wake and end. `shutdown()` is called on the dead manager only to silence its callbacks.
  *
  * [check] compares the model with the durable state, the process cache, the public manager API, the resolved
- * operation outcomes, the read count, the retry events, and the one-writer maximum. While a re-seed is requested,
- * [check] does not call `currentState()`, because that call starts a re-seed read; [poll] is the observation that does.
+ * operation outcomes, the read and write counts, the retry events, and the one-writer maximum. While a re-seed is
+ * requested, [check] does not call `currentState()`, because that call starts a re-seed read; [poll] is the
+ * observation that does.
  *
  * Each process gets its own [VirtualRecoveryTimer] for the retry scheduler of the manager, and the retry events go to
- * the ledger while the process lives. [advance] fires the retries that are due at the new time, also while a storage
- * operation or a callback is held, and then settles. A dead process fires no retry and records no retry event.
+ * the ledger while the process lives. The model reads them together with the storage events, in ledger order.
+ * [advance] fires the retries that are due at the new time, also while a storage operation or a callback is held, and
+ * then settles. A dead process fires no retry and records no retry event.
  */
 class LockoutHarness(
     initial: LockoutSnapshot = LockoutSnapshot(0, 0L),
@@ -49,7 +51,10 @@ class LockoutHarness(
 ) : AutoCloseable {
 
     /** An admitted operation of the live process and its result: a FailureOutcome or a reset commit Boolean. */
-    private class LiveOp(val writeIndex: Int, val resolved: Deferred<Any>)
+    private class LiveOp(val writeIndex: Int, val resolved: Deferred<Any>) {
+        // Set by [cancelResult]: the test cancelled the result, as a caller can.
+        var cancelledByTest = false
+    }
 
     /** The hold of one completion callback from [parkedCallback]. */
     private class CallbackHold {
@@ -98,8 +103,8 @@ class LockoutHarness(
     private var syncedSeq = 0
     private val liveOps = ArrayList<LiveOp>()
 
-    /** The write index that the next admission of the live process receives. */
-    val nextWriteIndex: Int get() = model.writesAdmitted
+    /** The store write index that the next admission of the live process receives. Retry writes take indexes too. */
+    val nextWriteIndex: Int get() = model.nextWriteIndex
 
     // ---- Process lifecycle ---------------------------------------------------------------------
 
@@ -192,7 +197,9 @@ class LockoutHarness(
         val recovery = RecoverySetup(
             timer = checkNotNull(recoveryTimer) { "no recovery timer for g$owner" },
             listener = { event ->
-                if (recordingGeneration == owner) ledger.action(owner, event.ledgerName(), event.ledgerDetail(), clocks)
+                if (recordingGeneration == owner) {
+                    ledger.action(owner, event.ledgerName(), event.ledgerDetail(), clocks, recovery = event)
+                }
             },
         )
         return LockoutManager(
@@ -214,7 +221,7 @@ class LockoutHarness(
     fun fail(
         onResolved: ((LockoutManager.FailureOutcome) -> Unit)? = null,
     ): LockoutManager.Pending<LockoutManager.FailureOutcome> {
-        val writeIndex = model.writesAdmitted
+        val writeIndex = model.nextWriteIndex
         val pending = paused {
             val pending = manager.submitFailure(onResolved)
             val expected = model.admitFailure()
@@ -229,7 +236,7 @@ class LockoutHarness(
 
     /** Admits one reset at manager level (an accepted success). [onResolved] goes to the manager as with [fail]. */
     fun succeed(onResolved: ((Boolean) -> Unit)? = null): LockoutManager.Pending<Boolean> {
-        val writeIndex = model.writesAdmitted
+        val writeIndex = model.nextWriteIndex
         val pending = paused {
             val pending = manager.submitSuccess(onResolved)
             val expected = model.admitReset()
@@ -333,13 +340,36 @@ class LockoutHarness(
     }
 
     /**
-     * Calls `shutdown()` on the live manager, as its owner does. The model has no rule for a stopped manager, so a test
-     * checks the later results directly.
+     * Calls `shutdown()` on the live manager, as its owner does. The model then expects the end of the retry chain and
+     * no further completion effect (S12). The model has no rule for a submission after the stop, so a test checks
+     * such a submission directly.
      */
     fun shutdown() {
         ledger.action(generation, "SHUTDOWN", "", clocks)
         manager.shutdown()
+        model.stop()
     }
+
+    /**
+     * Cancels the result of an admission of the live process, as a caller can. The manager still runs the write, so
+     * [check] treats this result as cancelled and does not await it. The ledger records the cancellation.
+     */
+    fun cancelResult(pending: LockoutManager.Pending<*>) {
+        val op = liveOps.single { it.resolved === pending.resolved }
+        ledger.action(generation, "CANCEL_RESULT", "write#${op.writeIndex}", clocks)
+        op.cancelledByTest = true
+        pending.resolved.cancel()
+    }
+
+    /** The retry events of [generation], in ledger order. */
+    fun retryEvents(generation: Int = this.generation): List<RecoveryEvent> =
+        ledger.snapshot()
+            .filterIsInstance<LedgerEvent.Action>()
+            .filter { it.generation == generation }
+            .mapNotNull { it.recovery }
+
+    /** The retries of the live process that wait on its timer. */
+    fun pendingRetryCount(): Int = recoveryTimer?.pendingCount() ?: 0
 
     /**
      * Drops the queued persistence work of the live process without killing it. Only the negative control uses it,
@@ -362,8 +392,8 @@ class LockoutHarness(
     /**
      * Compares the model with every observation that has no side effect on the process. While a write is parked,
      * later work can wait in the queue, so the counts may lag behind the admissions. When the executor is idle,
-     * nothing can still run: every requested read and every admitted write must have run, and every admitted
-     * operation must have resolved.
+     * nothing can still run: every requested read, every admitted write, and every fired retry must have run, and every
+     * admitted operation must have resolved. A retry that is due must have fired.
      */
     fun check() {
         val live = manager
@@ -375,14 +405,18 @@ class LockoutHarness(
         val reads = store.readCount(generation)
         val writes = store.writeCount(generation)
         assertTrue("S10: no read without a request", reads <= model.readsExpected)
-        assertTrue("S5: no write without an admission", writes <= model.writesAdmitted)
+        assertTrue("S5: no write without an admission or a started retry", writes <= model.writesExpected)
         if (idle) {
             assertEquals("S10: every requested read ran", model.readsExpected, reads)
-            assertEquals("S5: every admitted write ran", model.writesAdmitted, writes)
+            assertEquals("S5: every admitted write and every started retry wrote", model.writesExpected, writes)
             assertEquals("S5: every admitted write finished", 0, model.pendingWrites)
+            assertEquals("S12: every fired retry reached the writer", 0, model.queuedRetries)
         }
         assertTrue("S5: one ordered writer", store.maxConcurrentWrites() <= 1)
-        assertEquals("S11: the live process has the expected retry events", model.retryEventsExpected, retryEvents())
+        assertEquals("S11-S13: the live process has the expected retry events", model.retryEventsExpected, retryCount())
+        model.retryDueElapsed?.let { dueMs ->
+            assertTrue("S11: a retry fires when it falls due", dueMs > clocks.elapsedMs())
+        }
         assertTrue("escaped task failures: ${executor?.escaped}", executor?.escaped.isNullOrEmpty())
         if (!model.reseedRequested) {
             assertEquals("S8: lockout state", model.state(), live.currentState())
@@ -392,7 +426,11 @@ class LockoutHarness(
 
     private fun checkOutcomes(idle: Boolean) {
         liveOps.forEach { op ->
-            val expected = model.outcome(op.writeIndex)
+            if (op.cancelledByTest) {
+                assertTrue("S9: the result of write#${op.writeIndex} stays cancelled", op.resolved.isCancelled)
+                return@forEach
+            }
+            assertFalse("S9: only the test cancels the result of write#${op.writeIndex}", op.resolved.isCancelled)
             if (!op.resolved.isCompleted) {
                 assertFalse("S9: write#${op.writeIndex} is unresolved with nothing left to run", idle)
                 return@forEach
@@ -402,15 +440,12 @@ class LockoutHarness(
                 is Boolean -> ExpectedOutcome.Reset(result)
                 else -> error("unexpected outcome type $result")
             }
-            assertEquals("S9: outcome of write#${op.writeIndex}", expected, actual)
+            assertEquals("S9: outcome of write#${op.writeIndex}", model.outcome(op.writeIndex), actual)
         }
     }
 
     // The number of retry events that the ledger holds for the live process.
-    private fun retryEvents(): Int =
-        ledger.snapshot().count { event ->
-            event is LedgerEvent.Action && event.generation == generation && event.name.startsWith(RETRY_PREFIX)
-        }
+    private fun retryCount(): Int = retryEvents().size
 
     // ---- Quiescence and model feed ---------------------------------------------------------------
 
@@ -446,12 +481,17 @@ class LockoutHarness(
     private fun isParked(thread: String): Boolean =
         store.isParked(thread) || callbackHolds.values.any { it.thread == thread && it.isParked() }
 
+    // Feeds the new storage and retry events of the live process to the model, in ledger order.
     private fun sync() {
         val events = ledger.snapshot()
         events.drop(syncedSeq)
-            .filterIsInstance<LedgerEvent.Storage>()
             .filter { it.generation == generation }
-            .forEach(model::onStorageEvent)
+            .forEach { event ->
+                when (event) {
+                    is LedgerEvent.Storage -> model.onStorageEvent(event)
+                    is LedgerEvent.Action -> event.recovery?.let { model.onRetryEvent(it, event.elapsedMs) }
+                }
+            }
         syncedSeq = events.size
     }
 

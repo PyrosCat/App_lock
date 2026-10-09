@@ -8,8 +8,9 @@ import kotlin.random.Random
  * The same seed gives the same ledger trace, so a failing seed can be replayed exactly.
  *
  * The actions are manager-level: failures, resets, polls, clock changes, releases of held writes, restarts, and
- * reboots, with scripted storage faults. The driver does not apply caller gating, so it also submits failures during
- * a lockout. That is valid for the manager contract, not a claim about a caller.
+ * reboots, with scripted storage faults. Before each clock advance, the driver also scripts a fault for the next
+ * write, so a retry that falls due in that advance gets one. The driver does not apply caller gating, so it also
+ * submits failures during a lockout. That is valid for the manager contract, not a claim about a caller.
  *
  * The startup and each step (one action and its check) run inside [reported]. Any failure there, an assertion in the
  * action or the check, a quiescence timeout, or a startup fault, ends the run with the seed, the step, the action,
@@ -24,6 +25,9 @@ class ScheduleDriver(
 
     fun run(): List<String> {
         val random = Random(seed)
+        // A separate stream for the faults of retry writes, so each seed keeps the action sequence it had without
+        // retries.
+        val retryRandom = Random(seed xor RETRY_STREAM_SALT)
         val faults = FaultPlan()
         val clocks = VirtualClocks(wallMs = DRIVER_WALL_START_MS)
         return LockoutHarness(clocks = clocks, faults = faults, storageDecorator = storageDecorator).use { harness ->
@@ -34,7 +38,7 @@ class ScheduleDriver(
             }
             repeat(steps) { step ->
                 reported(harness, step) {
-                    act(harness, faults, random)
+                    act(harness, faults, random, retryRandom)
                     harness.check()
                 }
             }
@@ -58,7 +62,7 @@ class ScheduleDriver(
         return AssertionError("seed=$seed step=$step action=$action: $cause\n$tail", cause)
     }
 
-    private fun act(harness: LockoutHarness, faults: FaultPlan, random: Random) {
+    private fun act(harness: LockoutHarness, faults: FaultPlan, random: Random, retryRandom: Random) {
         when (random.nextInt(PERCENT)) {
             in 0 until 30 -> {
                 action = "fail"
@@ -76,6 +80,8 @@ class ScheduleDriver(
             }
             in 55 until 70 -> {
                 action = "advance"
+                // While a retry waits, no admitted write waits in the queue, so the retry takes the next write index.
+                faults.write(writeScript(retryRandom), harness.generation, harness.nextWriteIndex)
                 harness.advance(random.nextLong(0L, MAX_ADVANCE_MS))
             }
             in 70 until 85 -> {
@@ -127,6 +133,7 @@ class ScheduleDriver(
         private const val MAX_WALL_JUMP_MS = 3_600_000L
         private const val MAX_DOWNTIME_MS = 120_000L
         private const val TRACE_TAIL = 30
+        private const val RETRY_STREAM_SALT = 0x5EED_0F_2E7L
 
         // A realistic epoch time, so wall jumps never reach zero, which the persisted format uses for "no lockout".
         private const val DRIVER_WALL_START_MS = 1_790_000_000_000L

@@ -4,6 +4,32 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 candidate B2 with the write retry   (2026-10-08)
+--------------------------------------------------------------------------
+The lockout manager of candidate B2 retries a failed lockout write and owns every accepted write. In phase P3,
+candidate fixes for the R-007 lockout storage weaknesses are compared with the current app.
+- Each accepted write now runs as a job of the manager, apart from the result that the caller gets.
+- A caller that cancels a write's result therefore leaves the write running.
+- A storage write that throws a cancellation while its job runs now counts as a failed write.
+- When the newest accepted write fails, the manager writes the same values again.
+- These retries use the shared retry scheduler, with delays from 1 s that double up to 60 s.
+- Each failed or successful unlock that the manager accepts cancels the retries of the previous write. The shutdown
+  of the manager also ends them.
+- A committed retry of the write that starts a lockout stores the deadline set when that failure was accepted. The
+  lockout counts as stored only while that deadline covers its in-memory window.
+- Three new rules in the LockoutModel test class predict the retry events and retry writes.
+- The test harness passes each logged retry event to that model.
+- The random test schedules now also script storage faults for retry writes.
+- Seven existing R-007 tests now assert the results that the B2 specification predicts.
+- Eighteen test cases of that specification go into the new WriteRetryTest class.
+- One of these cases records a cost of B2: a retry can overwrite an unreadable stored lockout.
+- In the LockoutManagerTest and LockEngineRuntimeTest classes, the managers get a retry timer that never fires.
+- A new test in the first of these classes covers an Error from a storage write.
+- On the B2 branch, the local gate ran 515 unit tests with no failures and no skipped tests.
+- In this run, the detekt, assembleProdDebug, and compileProdDebugAndroidTestKotlin tasks also passed.
+- A separate run of all 88 R-007 tests passed together with the detekt task.
+
+
 Docs: changelog rules against repeated bullets   (2026-10-08)
 -------------------------------------------------------------
 The writing rules of the repository get two rules against repeated text in changelog entries.

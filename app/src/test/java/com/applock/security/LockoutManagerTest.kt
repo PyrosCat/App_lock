@@ -1,5 +1,11 @@
 package com.applock.security
 
+import com.applock.security.harness.VirtualClocks
+import com.applock.security.harness.VirtualRecoveryTimer
+import kotlinx.coroutines.CoroutineExceptionHandler
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -11,6 +17,7 @@ import org.junit.Test
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -102,8 +109,15 @@ class LockoutManagerTest {
         managers.forEach { it.shutdown() }
     }
 
+    // A failed write starts a write retry. The virtual timer fires only on request, and no test requests it, so no
+    // retry runs and no retry thread starts.
     private fun manager(storage: LockoutStorage): LockoutManager =
-        LockoutManager(storage, clock = { wallNow }, elapsedRealtime = { monoNow }).also { managers += it }
+        LockoutManager(
+            storage,
+            clock = { wallNow },
+            elapsedRealtime = { monoNow },
+            recovery = RecoverySetup(timer = VirtualRecoveryTimer(VirtualClocks())),
+        ).also { managers += it }
 
     // ---- Await helpers on the new async API ----------------------------------------------------
 
@@ -754,6 +768,57 @@ class LockoutManagerTest {
         val outcome = runBlocking { withTimeout(TIMEOUT_MS) { pending.resolved.await() } }
         assertEquals(0, outcome.count) // no mutation
         assertEquals(LockoutState.Available, manager.currentState())
+    }
+
+    // ---- Manager-owned writes ------------------------------------------------------------------
+
+    @Test
+    fun `a storage Error becomes the caller's result with no completion, retry, or escape`() {
+        val storageError = StorageError("disk error")
+        val escaped = CopyOnWriteArrayList<Throwable>()
+        val retryEvents = CopyOnWriteArrayList<RecoveryEvent>()
+        val writer = Executors.newSingleThreadExecutor()
+        try {
+            val dispatcher = writer.asCoroutineDispatcher()
+            val uncaught = CoroutineExceptionHandler { _, e -> escaped += e }
+            val manager = LockoutManager(
+                ErrorStorage(storageError),
+                clock = { wallNow },
+                elapsedRealtime = { monoNow },
+                ioDispatcher = dispatcher,
+                scope = CoroutineScope(SupervisorJob() + dispatcher + uncaught),
+                recovery = RecoverySetup(
+                    timer = VirtualRecoveryTimer(VirtualClocks()),
+                    listener = { event -> retryEvents += event },
+                ),
+            ).also { managers += it }
+            val callbacks = AtomicInteger()
+
+            val pending = manager.submitFailure { callbacks.incrementAndGet() }
+            val thrown = runCatching { runBlocking { withTimeout(TIMEOUT_MS) { pending.resolved.await() } } }
+                .exceptionOrNull()
+            writer.submit(Runnable {}).get(TIMEOUT_MS, TimeUnit.MILLISECONDS) // the manager job has ended
+
+            assertTrue("the result completes with the Error, not $thrown", thrown is StorageError)
+            assertEquals(storageError.message, thrown?.message)
+            assertEquals("no callback", 0, callbacks.get())
+            assertEquals("no completion arms a fallback", LockoutState.Available, manager.currentState())
+            assertEquals("the admission stands", 1, manager.failureCount())
+            assertTrue("no retry starts: $retryEvents", retryEvents.isEmpty())
+            assertTrue("nothing escapes the manager job: $escaped", escaped.isEmpty())
+        } finally {
+            writer.shutdownNow()
+        }
+    }
+
+    /** An Error that a storage write throws, for example from the platform. */
+    private class StorageError(message: String) : Error(message)
+
+    /** A storage whose every write throws [error]. */
+    private class ErrorStorage(private val error: Error) : LockoutStorage {
+        override fun read(): LockoutSnapshot = LockoutSnapshot(0, 0L)
+
+        override fun write(snapshot: LockoutSnapshot): Boolean = throw error
     }
 
     private companion object {

@@ -1,6 +1,7 @@
 package com.applock.security.harness
 
 import com.applock.security.LockoutSnapshot
+import com.applock.security.RecoveryEvent
 
 enum class StorageOp { READ, WRITE }
 
@@ -62,7 +63,10 @@ sealed interface LedgerEvent {
         val thread: String,
     ) : LedgerEvent
 
-    /** A harness action: a process start or kill, an admission, a poll, a clock change, a release, a fixture. */
+    /**
+     * A harness action: a process start or kill, an admission, a poll, a clock change, a release, a fixture. The
+     * manager's retry events are actions too, with the event in [recovery].
+     */
     data class Action(
         override val seq: Int,
         override val generation: Int,
@@ -70,6 +74,7 @@ sealed interface LedgerEvent {
         val detail: String,
         val wallMs: Long,
         val elapsedMs: Long,
+        val recovery: RecoveryEvent? = null,
     ) : LedgerEvent
 }
 
@@ -94,8 +99,16 @@ class Ledger {
         )
     }
 
-    fun action(generation: Int, name: String, detail: String, clocks: VirtualClocks) = synchronized(lock) {
-        events += LedgerEvent.Action(events.size, generation, name, detail, clocks.wallMs(), clocks.elapsedMs())
+    fun action(
+        generation: Int,
+        name: String,
+        detail: String,
+        clocks: VirtualClocks,
+        recovery: RecoveryEvent? = null,
+    ) = synchronized(lock) {
+        events += LedgerEvent.Action(
+            events.size, generation, name, detail, clocks.wallMs(), clocks.elapsedMs(), recovery,
+        )
     }
 
     fun snapshot(): List<LedgerEvent> = synchronized(lock) { events.toList() }

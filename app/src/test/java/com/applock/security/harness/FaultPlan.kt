@@ -48,9 +48,8 @@ sealed interface WriteScript : StorageScript {
     data object Throw : WriteScript
 
     /**
-     * Throws a `CancellationException` before any change. The manager and kotlinx.coroutines treat it as a
-     * cancellation, not as a storage fault. The model rules do not cover it, so a test that uses it checks the result
-     * directly.
+     * Throws a `CancellationException` before any change. While the write's manager job is active, the manager treats
+     * it as a failed write, retry writes included. The model treats every THREW event the same way.
      */
     data object ThrowCancellation : WriteScript
 

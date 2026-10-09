@@ -19,8 +19,9 @@ class DegradedRestartTest : BaselineCase() {
 
     // ---- R2.1 below-threshold failure, then death ----------------------------------------------
 
+    // B2 spec: T2, T10, T19.
     @Test
-    fun `R2_1 - a restart erases the degraded fallback of a failed below-threshold write`() {
+    fun `R2_1 - a failed below-threshold write is retried, so a later restart keeps its count but not its fallback`() {
         listOf(WriteScript.ReturnFalse, WriteScript.Throw).forEach { script ->
             listOf(0L, 5_000L, T - 1).forEach { deathMs -> restartAfterFailedWrite(script, deathMs, reboot = false) }
             restartAfterFailedWrite(script, 5_000L, reboot = true)
@@ -43,13 +44,17 @@ class DegradedRestartTest : BaselineCase() {
 
         if (reboot) harness.reboot(REBOOT_DOWNTIME_MS) else harness.restart()
         harness.check()
-        assertEquals(label, Z, harness.store.durableState())
-        assertEquals(label, Available, harness.manager.currentState())
+        // Only write 0 fails, so the first retry, 1 s after the failed write, commits the count.
+        val durable = if (deathMs >= FIRST_RETRY_DELAY_MS) LockoutSnapshot(1, 0L) else Z
+        assertEquals(label, durable, harness.store.durableState())
+        assertEquals("$label: the restart loads the stored count", durable.failureCount, harness.manager.failureCount())
+        assertEquals("$label: the fallback is lost", Available, harness.manager.currentState())
         assertTrue("$label: the restart gives a verifier entry at once", caller.wrongPin())
         harness.record(
             "R2.1-$script-death$deathMs-${if (reboot) "reboot" else "restart"}",
             "lost_enforcement_ms" to T - deathMs,
             "verifier_entries" to caller.verifierEntries,
+            "durable_count" to durable.failureCount,
         )
     }
 
@@ -143,6 +148,9 @@ class DegradedRestartTest : BaselineCase() {
 
     private companion object {
         const val REBOOT_DOWNTIME_MS = 1_000L
+
+        /** The delay of the first retry of a failed write. */
+        const val FIRST_RETRY_DELAY_MS = 1_000L
 
         /** A write held before its commit that then returns false. */
         val HELD_FALSE = WriteScript.HoldBeforeCommit(WriteScript.ReturnFalse)

@@ -9,7 +9,8 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
-import kotlinx.coroutines.async
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -77,6 +78,13 @@ sealed interface LockoutState {
  * deadline while its streak still equals the current streak, even if its revision is now stale, so an older failure
  * in the same streak still blocks the next attempt. A successful reset advances the streak, which fences off an
  * older failed write so it cannot reinstate a lockout after the reset.
+ *
+ * ## Manager-owned writes and the write retry (R-007 hardening, P3 candidate B2)
+ * The manager runs each admitted write as its own job. [Pending.resolved] is only the caller's view, so cancelling it
+ * doesn't cancel the write. When the write of the latest admission fails, the manager retries it on the
+ * [RecoveryScheduler], through the same single writer. A new admission or [shutdown] ends the retries. A retry changes
+ * no count, fallback, or outcome, and it never calls back. The contract is in
+ * `2026-10-07_R007_F2_HARDENING_P3_B2_SPEC.md`.
  */
 @Suppress("TooManyFunctions") // one cohesive lockout boundary: the read, the two mutations, and the lifecycle
 class LockoutManager(
@@ -92,12 +100,13 @@ class LockoutManager(
     private val ioDispatcher: CoroutineDispatcher =
         Executors.newSingleThreadExecutor { r -> Thread(r, "lockout-io").apply { isDaemon = true } }
             .asCoroutineDispatcher(),
-    // The scope that owns the write and re-seed coroutines. [shutdown] sets `stopped` but does NOT cancel it, so an
-    // in-flight write drains to completion (its completion effect is dropped by the stopped check). Defaulted for
-    // production.
+    // The scope that owns the write, retry, and re-seed coroutines. [shutdown] sets `stopped` but does not cancel it,
+    // so an in-flight write drains to completion (its completion effect is dropped by the stopped check). Cancelling
+    // the scope ends each manager job without its completion and cancels the caller's result. Production never cancels
+    // it. Defaulted for production.
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + ioDispatcher),
-    // The timer, delays, and listener of the [RecoveryScheduler]. No code path of this manager starts a retry, and the
-    // default timer starts its thread only at the first retry.
+    // The timer, delays, and listener of the [RecoveryScheduler], which retries a failed write. The default timer
+    // starts its thread only at the first retry.
     recovery: RecoverySetup = RecoverySetup(),
 ) {
 
@@ -152,7 +161,10 @@ class LockoutManager(
     /** The [state] of a recorded failure and the [count] that produced it, read as one observation. */
     data class FailureOutcome(val state: LockoutState, val count: Int)
 
-    /** An admission result: the [immediate] snapshot state for enforcement, and the [resolved] durable outcome. */
+    /**
+     * An admission result: the [immediate] snapshot state for enforcement, and the [resolved] durable outcome.
+     * Cancelling [resolved] doesn't cancel the write, which the manager owns.
+     */
     data class Pending<T>(val immediate: LockoutState, val resolved: Deferred<T>)
 
     private val lock = Any()
@@ -263,6 +275,7 @@ class LockoutManager(
                 Pending(outcome.state, CompletableDeferred(outcome))
             } else {
                 wantReseed = false // the first local mutation makes the snapshot authoritative
+                recoveryScheduler.cancel() // an admission ends the retry chain: its own write carries the newer state
                 val write = admitFailure()
                 val resolved = enqueueWrite(write, onResolved)
                 Pending(stateOf(snapshot.get()), resolved)
@@ -275,9 +288,9 @@ class LockoutManager(
      * streak, fencing off any older in-flight failure so it cannot reinstate a lockout after this success. The
      * in-memory reset is applied at admission regardless of the durable outcome, so a failed clear never re-locks an
      * authenticated user; [Pending.resolved] surfaces the failure so a caller can report it (a failed clear can
-     * leave the pre-reset deadline in storage, an R-007 residual cleared by the next successful unlock). [onResolved],
-     * when given, is invoked once off the caller thread with the commit result, for the synchronous legacy callers
-     * that cannot await.
+     * leave the pre-reset deadline in storage until a write retry or the next committed write replaces it, an R-007
+     * residual). [onResolved], when given, is invoked once off the caller thread with the commit result, for the
+     * synchronous legacy callers that cannot await.
      */
     fun submitSuccess(onResolved: ((Boolean) -> Unit)? = null): Pending<Boolean> =
         synchronized(lock) {
@@ -287,6 +300,7 @@ class LockoutManager(
                 Pending(LockoutState.Available, CompletableDeferred(true))
             } else {
                 wantReseed = false
+                recoveryScheduler.cancel() // as in submitFailure
                 val write = admitReset()
                 val resolved = enqueueReset(write, onResolved)
                 Pending(LockoutState.Available, resolved)
@@ -381,35 +395,84 @@ class LockoutManager(
     }
 
     // Enqueues a failure write on the dispatcher (FIFO, admission order) and returns its own resolved outcome (this
-    // operation's count and durability, not the latest global snapshot). The completion publish and the callback are
-    // gated together under [lock] by [stopped], so no effect runs once the manager has stopped.
+    // operation's count and durability, not the latest global snapshot).
     private fun enqueueWrite(write: PendingWrite, onResolved: ((FailureOutcome) -> Unit)?): Deferred<FailureOutcome> =
-        scope.async(ioDispatcher) {
-            val committed = runWrite(write.persist)
-            val outcome = opOutcome(write, committed)
-            synchronized(lock) {
-                if (!stopped) {
-                    applyCompletion(write, committed)
-                    onResolved?.invoke(outcome)
-                }
+        launchWrite(write, onResolved) { committed -> opOutcome(write, committed) }
+
+    // Enqueues a reset write on the dispatcher and resolves whether the durable clear committed, so an awaiting caller
+    // can report a failed clear. A storage exception resolves as false.
+    private fun enqueueReset(write: PendingWrite, onResolved: ((Boolean) -> Unit)?): Deferred<Boolean> =
+        launchWrite(write, onResolved) { committed -> committed }
+
+    /**
+     * Runs one admitted write as a manager job and returns the caller's result. The manager never hands out the job.
+     * After [shutdown], the job still completes the result, so an awaiting caller never hangs, but it skips the
+     * completion, the retry start, and the callback.
+     */
+    @Suppress("TooGenericExceptionCaught") // an Error from storage must not escape the job
+    private fun <T> launchWrite(
+        write: PendingWrite,
+        onResolved: ((T) -> Unit)?,
+        resultOf: (Boolean) -> T,
+    ): Deferred<T> {
+        val resolved = CompletableDeferred<T>()
+        scope.launch(ioDispatcher) {
+            val committed = try {
+                writeInManagerJob(write.persist)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                // A throwable that runWrite doesn't contain, such as an Error, becomes the caller's result. The write
+                // gets no completion, no retry, and no callback.
+                resolved.completeExceptionally(e)
+                return@launch
             }
-            outcome
+            val result = resultOf(committed)
+            // Blocking I/O can return after the job was cancelled, and the job can be cancelled while it waits for the
+            // lock, so the job is checked under the lock.
+            val callbackFault = synchronized(lock) {
+                ensureActive()
+                if (stopped) null else completeWrite(write, committed, result, onResolved)
+            }
+            if (callbackFault == null) resolved.complete(result) else resolved.completeExceptionally(callbackFault)
+        }.invokeOnCompletion { resolved.cancel() } // a cancelled job, even one that never started, cancels the result
+        return resolved
+    }
+
+    // A cancellation that storage throws while the job is active counts as a failed write, like a storage fault. A
+    // cancellation of the job itself ends the work.
+    private fun CoroutineScope.writeInManagerJob(persist: LockoutSnapshot): Boolean =
+        try {
+            runWrite(persist)
+        } catch (e: CancellationException) {
+            if (isActive) false else throw e
         }
 
-    // Enqueues a reset write on the dispatcher and resolves whether the durable clear committed. The completion
-    // publish and the callback are gated together under [lock] by [stopped], so no effect runs once the manager has
-    // stopped; the Deferred still resolves the commit result so an awaiting caller never hangs and can report a
-    // failed clear (a write throw is contained by [runWrite] as a false result, never a thrown Deferred).
-    private fun enqueueReset(write: PendingWrite, onResolved: ((Boolean) -> Unit)?): Deferred<Boolean> =
-        scope.async(ioDispatcher) {
-            val committed = runWrite(write.persist)
-            synchronized(lock) {
-                if (!stopped) {
-                    applyCompletion(write, committed)
-                    onResolved?.invoke(committed)
-                }
-            }
-            committed
+    /**
+     * Completes one admitted write under [lock] while the manager runs. It applies the completion and, if the write
+     * qualifies, starts a retry. Only then does it call back, so a throwing or blocking callback can't prevent the
+     * retry. Returns the callback's exception, if any, for the caller's result.
+     */
+    private fun <T> completeWrite(
+        write: PendingWrite,
+        committed: Boolean,
+        result: T,
+        onResolved: ((T) -> Unit)?,
+    ): Throwable? {
+        applyCompletion(write, committed)
+        if (startsWriteRecovery(write, committed, snapshot.get())) {
+            recoveryScheduler.start(RecoveryKind.WRITE, WriteRecovery(write))
+        }
+        return invokeCallbackCatchingFailure(onResolved, result)
+    }
+
+    @Suppress("TooGenericExceptionCaught") // caller code: any failure becomes the caller's result
+    private fun <T> invokeCallbackCatchingFailure(onResolved: ((T) -> Unit)?, result: T): Throwable? =
+        try {
+            onResolved?.invoke(result)
+            null
+        } catch (e: Throwable) {
+            e
         }
 
     // Builds this operation's resolved outcome from its own admission-time facts and its write result. A recorded
@@ -461,9 +524,72 @@ class LockoutManager(
                 val fallback = maxOf(current.fallbackMonoDeadline, elapsedRealtime() + write.fallbackDurationMs)
                 snapshot.set(current.copy(fallbackMonoDeadline = fallback))
             }
-            // A failed reset leaves the in-memory cleared state as-is; storage keeps the old deadline (residual).
+            // A failed reset leaves the in-memory cleared state as-is; storage keeps the old deadline until a write
+            // retry or the next committed write replaces it (residual).
         }
     }
+
+    // ---- Write retry ---------------------------------------------------------------------------
+
+    /**
+     * Retries the failed write [target]. Each attempt writes only while [target] is still the latest admission. A newer
+     * admission also makes the chain's sequence number stale, so this check is a second guard. A failed attempt
+     * schedules the next one, and a committed attempt ends the chain. Retries don't admit new failures, don't change
+     * the count or the fallback, and don't call back.
+     */
+    private inner class WriteRecovery(private val target: PendingWrite) : RecoveryAction {
+        // Under [lock] on the writer, right before the storage I/O.
+        override fun prepare(): RecoveryOperation? {
+            val current = snapshot.get()
+            if (!stillWanted(current)) return null
+            val payload = buildRetrySnapshot(target, current)
+            return object : RecoveryOperation {
+                override fun perform(): Boolean = runWrite(payload)
+
+                // Under [lock], before anything is published.
+                override fun complete(succeeded: Boolean): RecoveryStep {
+                    val latest = snapshot.get()
+                    return when {
+                        !stillWanted(latest) -> RecoveryStep.ABANDON
+                        succeeded -> {
+                            snapshot.set(applyRetryCommit(target, payload, latest))
+                            RecoveryStep.SUCCESS
+                        }
+                        else -> RecoveryStep.RETRY
+                    }
+                }
+            }
+        }
+
+        // Every admission, a reset included, advances the revision, so this check also covers the streak.
+        private fun stillWanted(current: Snapshot): Boolean = !stopped && current.revision == target.revision
+    }
+
+    // Candidate B3 changes the three retry rules below in place.
+
+    // Eligibility, checked under [lock] at each ordinary completion: a failed write of the latest admission. No older
+    // write is queued then, and no chain exists, because each admission ended the previous chain.
+    private fun startsWriteRecovery(write: PendingWrite, committed: Boolean, current: Snapshot): Boolean =
+        !committed && write.revision == current.revision
+
+    // Payload, built in prepare() under [lock]: the target's own payload (its count and admission-time wall deadline,
+    // or (0, 0) for a reset). Both fields are absolute, so writing them again adds no count and moves no deadline.
+    @Suppress("UnusedParameter") // candidate B3 uses [current]
+    private fun buildRetrySnapshot(target: PendingWrite, current: Snapshot): LockoutSnapshot = target.persist
+
+    // Publication, in complete() under [lock]: a committed retry of a threshold write records that write's
+    // admission-time deadlines. Persisting the count doesn't clear the fallback, which keeps its original expiry, so
+    // the lockout reads as degraded until the stored deadline covers it.
+    @Suppress("UnusedParameter") // candidate B3 uses [persisted]
+    private fun applyRetryCommit(target: PendingWrite, persisted: LockoutSnapshot, current: Snapshot): Snapshot =
+        if (!target.wasThreshold) {
+            current
+        } else {
+            current.copy(
+                recordedWallDeadline = target.recordedWallDeadline,
+                recordedMonoDeadline = target.recordedMonoDeadline,
+            )
+        }
 
     // ---- Cold-start re-seed --------------------------------------------------------------------
 
@@ -520,7 +646,8 @@ class LockoutManager(
      * effect is dropped by the [stopped] check. It is non-suspend and holds no lock across IO, so it never blocks on
      * disk. The manager is a process-lifetime singleton, so production rarely calls this. Stopping the manager is not
      * how one runtime stops: a runtime cancels its own scope and leaves this shared manager up. It also stops the retry
-     * scheduler, which then refuses every retry.
+     * scheduler, which then refuses every retry: a waiting retry is cancelled, a queued one writes nothing, and a
+     * running one finishes its write without publishing it.
      */
     fun shutdown() {
         synchronized(lock) {
