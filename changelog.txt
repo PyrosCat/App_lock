@@ -4,6 +4,18 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 candidate B3 model rules for the stored fallback deadline   (2026-10-08)
+--------------------------------------------------------------------------------------------------
+The lockout test harness gets the expected behaviour of candidate B3, which keeps an in-memory lockout across a
+restart. Phase P3 compares such candidate fixes for the R-007 lockout storage weaknesses with the current app.
+- A new DeadlineRetryRules object in the harness says when a B3 retry starts, what it writes, and what it records.
+- The new DeadlineRetryRulesTest class checks these rules against the worked examples of the B3 specification.
+- The first B3 test case goes into the new DeadlineRetryTest class and checks that successful writes start no retry.
+- The local gate ran 506 unit tests, 10 of them new, with no failures and no skipped tests.
+- In the same gate run, the detekt, assembleProdDebug, and compileProdDebugAndroidTestKotlin tasks passed.
+- A second run of the 71 R-007 test cases and the detekt task had no failures.
+
+
 M7/WP2 (F2 hardening): P3 candidate B2 with the write retry   (2026-10-08)
 --------------------------------------------------------------------------
 The lockout manager of candidate B2 retries a failed lockout write and owns every accepted write. In phase P3,
