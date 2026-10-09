@@ -1,5 +1,12 @@
 package com.applock.security
 
+import com.applock.security.harness.VirtualClocks
+import com.applock.security.harness.VirtualRecoveryTimer
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -11,6 +18,7 @@ import org.junit.Test
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -20,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * Lockout tests (FR-174, R-007). The manager keeps an in-memory authoritative snapshot, persists off the caller
  * thread, and enforces a degraded in-memory fallback when a durable write fails. These tests cover the ordinary
  * lockout math (on the async API), the degraded fallback, the completion-handling rules, the reset persistence
- * outcome, the cold-start re-seed, and the lifecycle.
+ * outcome, the cold-start recovery read, and the lifecycle.
  *
  * The concurrency-sensitive tests use [GatedStorage], whose writes can be held at a per-write gate on the manager's
  * real single-thread persistence dispatcher, so a second admission can publish while a first write is still parked.
@@ -51,8 +59,8 @@ class LockoutManagerTest {
         private val index = AtomicInteger(0)
         private val gates = ConcurrentHashMap<Int, CountDownLatch>()
 
-        // Optional latches to park a READ in flight (used for the re-seed shutdown test). The construction seed
-        // read runs before a test sets these, so only a later re-seed read parks.
+        // Optional latches to park a read in flight (used for the recovery read tests). The construction seed read
+        // runs before a test sets these, so only a later recovery read parks.
         @Volatile
         var readEntered: CountDownLatch? = null
 
@@ -93,6 +101,52 @@ class LockoutManagerTest {
             started.poll(2, TimeUnit.SECONDS) ?: error("a write never started")
     }
 
+    /**
+     * A virtual retry timer and the retry events of one manager. [fireNext] fires the pending retry on the test thread.
+     * The retry then runs on the manager's real writer, so a test waits for it with [awaitEnded]. No real
+     * `lockout-retry` thread runs.
+     */
+    private class RetryDriver {
+        private val clocks = VirtualClocks()
+        val timer = VirtualRecoveryTimer(clocks)
+        val events = CopyOnWriteArrayList<RecoveryEvent>()
+        val setup = RecoverySetup(timer = timer, listener = { event -> events += event })
+        private var endedSeen = 0
+
+        /** Fires the pending retry and returns how many retries fired. A step of the cap reaches any delay. */
+        fun fireNext(): Int {
+            clocks.advance(RecoveryBackoff.CAP_MS)
+            return timer.fireDue()
+        }
+
+        /**
+         * Waits for the next end of a retry run and returns it. The scheduler records a RETRY end before it puts the
+         * next attempt on the timer, so for a RETRY end this also waits for that attempt. Otherwise a later [fireNext]
+         * could move the clock first.
+         */
+        fun awaitEnded(): RecoveryEvent.Ended {
+            val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(TIMEOUT_MS)
+            while (true) {
+                val ended = events.filterIsInstance<RecoveryEvent.Ended>()
+                if (ended.size > endedSeen) {
+                    val end = ended[endedSeen++]
+                    if (end.outcome == RecoveryEvent.Ended.Outcome.RETRY) awaitPlanned(deadline)
+                    return end
+                }
+                check(System.nanoTime() < deadline) { "no retry run ended: $events" }
+                Thread.sleep(1L)
+            }
+        }
+
+        // Waits until the scheduler has put the next attempt on the timer.
+        private fun awaitPlanned(deadline: Long) {
+            while (timer.pendingCount() == 0) {
+                check(System.nanoTime() < deadline) { "no next attempt was planned: $events" }
+                Thread.sleep(1L)
+            }
+        }
+    }
+
     private var wallNow = 1_000_000L
     private var monoNow = 5_000_000L
     private val managers = mutableListOf<LockoutManager>()
@@ -102,8 +156,9 @@ class LockoutManagerTest {
         managers.forEach { it.shutdown() }
     }
 
-    private fun manager(storage: LockoutStorage): LockoutManager =
-        LockoutManager(storage, clock = { wallNow }, elapsedRealtime = { monoNow }).also { managers += it }
+    private fun manager(storage: LockoutStorage, recovery: RecoverySetup = RecoverySetup()): LockoutManager =
+        LockoutManager(storage, clock = { wallNow }, elapsedRealtime = { monoNow }, recovery = recovery)
+            .also { managers += it }
 
     // ---- Await helpers on the new async API ----------------------------------------------------
 
@@ -429,85 +484,115 @@ class LockoutManagerTest {
         assertEquals(LockoutState.Available, manager.currentState())
     }
 
-    // ---- Cold-start re-seed --------------------------------------------------------------------
+    // ---- Cold-start recovery read --------------------------------------------------------------
 
     @Test
-    fun `a failed seed read degrades to Available then an off-main re-seed picks up the persisted lockout`() {
+    fun `a failed seed read degrades to Available then an off-main recovery read picks up the persisted lockout`() {
         val persisted = LockoutSnapshot(LockoutManager.FAILURE_THRESHOLD, wallNow + LockoutManager.BASE_LOCKOUT_MS)
         val storage = GatedStorage(seed = persisted)
         storage.readError = RuntimeException("decrypt boom") // the construction seed read fails
-        val manager = manager(storage)
+        val retries = RetryDriver()
+        val manager = manager(storage, retries.setup)
 
-        assertEquals(LockoutState.Available, manager.currentState()) // seed failed; re-seed read also still fails
+        assertEquals(1, retries.fireNext()) // the first recovery read also fails
+        assertEquals(RecoveryEvent.Ended.Outcome.RETRY, retries.awaitEnded().outcome)
+        assertEquals(LockoutState.Available, manager.currentState())
 
         storage.readError = null // storage recovers
-        runBlocking {
-            withTimeout(TIMEOUT_MS) {
-                manager.currentState() // triggers the lazy re-seed
-                while (manager.currentState() is LockoutState.Available) delay(10)
-            }
-        }
+        assertEquals(1, retries.fireNext())
+        assertEquals(RecoveryEvent.Ended.Outcome.SUCCESS, retries.awaitEnded().outcome)
         val state = locked(manager.currentState())
-        assertFalse("a re-seeded persisted lockout is recorded, not degraded", state.degraded)
+        assertFalse("a recovered persisted lockout is recorded, not degraded", state.degraded)
     }
 
     @Test
-    fun `re-seed is disabled after any local mutation so a failed reset is not resurrected`() {
+    fun `the recovery read is disabled after any local mutation so a failed reset is not resurrected`() {
         val persisted = LockoutSnapshot(LockoutManager.FAILURE_THRESHOLD, wallNow + LockoutManager.BASE_LOCKOUT_MS)
         val storage = GatedStorage(seed = persisted)
         storage.readError = RuntimeException("decrypt boom")
-        val manager = manager(storage)
+        val retries = RetryDriver()
+        val manager = manager(storage, retries.setup)
         assertEquals(LockoutState.Available, manager.currentState())
 
         storage.readError = null
         storage.queueResults(false) // the reset's own write fails, so storage keeps the old lockout
-        manager.succeed() // a local mutation: the snapshot is now authoritative, re-seed is disabled
+        manager.succeed() // a local mutation: the snapshot is now authoritative, and the recovery read ends
 
-        // A re-seed WOULD read the still-persisted lockout, but the local mutation disabled it, so the reset is
-        // not resurrected. Give any (disabled) re-seed a chance to run, then confirm it stayed Available.
-        runBlocking {
-            withTimeout(TIMEOUT_MS) {
-                repeat(5) {
-                    manager.currentState()
-                    delay(10)
-                }
-            }
-        }
+        // A recovery read would read the still-persisted lockout, but the local mutation cancelled its retry, so the
+        // reset is not resurrected.
+        assertEquals("no retry is left to fire", 0, retries.fireNext())
+        assertTrue(retries.events.last() is RecoveryEvent.Cancelled)
         assertEquals(LockoutState.Available, manager.currentState())
     }
 
     @Test
-    fun `an in-flight re-seed does not publish after shutdown`() {
-        // shutdown() does not cancel the scope, so a re-seed read in flight when shutdown returns must still not
+    fun `an in-flight recovery read does not publish after shutdown`() {
+        // shutdown() does not cancel the scope, so a recovery read in flight when shutdown returns must still not
         // publish to the stopped manager.
         val persisted = LockoutSnapshot(LockoutManager.FAILURE_THRESHOLD, wallNow + LockoutManager.BASE_LOCKOUT_MS)
         val storage = GatedStorage(seed = persisted)
         storage.readError = RuntimeException("decrypt boom") // the construction seed read fails
-        val manager = manager(storage)
-        assertEquals(0, manager.failureCount()) // seed degraded to empty (no re-seed triggered yet)
+        val retries = RetryDriver()
+        val manager = manager(storage, retries.setup)
+        assertEquals(0, manager.failureCount()) // seed degraded to empty (no retry fired yet)
 
-        // Storage recovers, but the next re-seed read is gated so it parks in flight.
+        // Storage recovers, but the recovery read is gated so it parks in flight.
         val entered = CountDownLatch(1)
         val proceed = CountDownLatch(1)
         storage.readEntered = entered
         storage.readProceed = proceed
         storage.readError = null
 
-        manager.currentState() // triggers the lazy re-seed, which parks in the gated read
-        assertTrue("re-seed read never started", entered.await(2, TimeUnit.SECONDS))
+        retries.fireNext() // the retry starts the recovery read, which parks in the gated read
+        assertTrue("the recovery read starts", entered.await(2, TimeUnit.SECONDS))
 
         manager.shutdown() // stopped; the scope is not cancelled
-        proceed.countDown() // the re-seed read completes; its publication must be skipped
+        proceed.countDown() // the recovery read completes; its publication must be skipped
 
-        // The re-seed must not publish to a stopped manager: the state stays Available across the window.
-        runBlocking {
-            withTimeout(TIMEOUT_MS) {
-                repeat(20) {
-                    assertEquals("re-seed published after shutdown", LockoutState.Available, manager.currentState())
-                    assertEquals(0, manager.failureCount())
-                    delay(25)
-                }
-            }
+        // The read ends without ownership, so it publishes nothing to the stopped manager.
+        assertEquals(RecoveryEvent.Ended.Outcome.ABANDONED, retries.awaitEnded().outcome)
+        assertEquals("no recovery read publishes after shutdown", LockoutState.Available, manager.currentState())
+        assertEquals(0, manager.failureCount())
+    }
+
+    @Test
+    fun `a recovery read that throws a cancellation after its scope was cancelled ends the chain`() {
+        val persisted = LockoutSnapshot(LockoutManager.FAILURE_THRESHOLD, wallNow + LockoutManager.BASE_LOCKOUT_MS)
+        val storage = GatedStorage(seed = persisted)
+        storage.readError = RuntimeException("decrypt boom") // the construction seed read fails
+        val executor = Executors.newSingleThreadExecutor { r -> Thread(r, "lockout-io").apply { isDaemon = true } }
+        try {
+            val dispatcher = executor.asCoroutineDispatcher()
+            val scope = CoroutineScope(SupervisorJob() + dispatcher)
+            val retries = RetryDriver()
+            val manager = LockoutManager(
+                storage,
+                clock = { wallNow },
+                elapsedRealtime = { monoNow },
+                ioDispatcher = dispatcher,
+                scope = scope,
+                recovery = retries.setup,
+            ).also { managers += it }
+
+            // The recovery read parks. The manager scope is then cancelled, and the read throws a cancellation.
+            val entered = CountDownLatch(1)
+            val proceed = CountDownLatch(1)
+            storage.readEntered = entered
+            storage.readProceed = proceed
+            storage.readError = CancellationException("adapter cancellation")
+            retries.fireNext()
+            assertTrue("the recovery read starts", entered.await(2, TimeUnit.SECONDS))
+            scope.cancel()
+            proceed.countDown()
+
+            assertEquals(RecoveryEvent.Ended.Outcome.THREW, retries.awaitEnded().outcome)
+            assertEquals("no retry is pending after the throw", 0, retries.timer.pendingCount())
+            assertEquals("only the first retry was planned", 1, retries.events.count { it is RecoveryEvent.Scheduled })
+            assertEquals(LockoutState.Available, manager.currentState())
+            assertEquals(0, manager.failureCount())
+            assertTrue("nothing was written", storage.committed.isEmpty())
+        } finally {
+            executor.shutdownNow()
         }
     }
 

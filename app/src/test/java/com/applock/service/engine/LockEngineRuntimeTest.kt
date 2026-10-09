@@ -8,6 +8,9 @@ import com.applock.security.LockoutManager
 import com.applock.security.LockoutSnapshot
 import com.applock.security.LockoutState
 import com.applock.security.LockoutStorage
+import com.applock.security.RecoverySetup
+import com.applock.security.harness.VirtualClocks
+import com.applock.security.harness.VirtualRecoveryTimer
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -320,20 +323,7 @@ class LockEngineRuntimeTest {
         val dispatcher = StandardTestDispatcher(scheduler)
         val scope = CoroutineScope(dispatcher)
         runtimeScope = scope
-        // By default the manager persists on the SAME test dispatcher, so idle() drives its writes deterministically.
-        // The lifecycle barrier test needs real thread blocking, so it opts into a real single-thread dispatcher.
-        val lockoutManager =
-            if (realLockoutIo) {
-                LockoutManager(
-                    storage,
-                    clock = { nowMs },
-                    elapsedRealtime = { nowMs },
-                    ioDispatcher = Executors.newSingleThreadExecutor { r -> Thread(r).apply { isDaemon = true } }
-                        .asCoroutineDispatcher(),
-                )
-            } else {
-                LockoutManager(storage, clock = { nowMs }, elapsedRealtime = { nowMs }, ioDispatcher = dispatcher)
-            }
+        val lockoutManager = buildLockoutManager(storage, dispatcher, realLockoutIo)
         lockoutManagerRef = lockoutManager
         val sessionManager = LockSessionManager(policyProvider = { RelockPolicy.IMMEDIATE }, clock = { nowMs })
         val runtime = LockEngineRuntime(
@@ -359,6 +349,30 @@ class LockEngineRuntimeTest {
         return Harness(
             runtime, policyFlow, presenter, navigator, timer, audit, intruder, health, lockoutManager,
             sessionManager, home, diagnostics, scheduler, scope, log,
+        )
+    }
+
+    // By default the manager persists on the same test dispatcher, so idle() drives its writes deterministically.
+    // The lifecycle barrier test needs real thread blocking, so it opts into a real single-thread dispatcher. A storage
+    // that throws at construction starts recovery-read retries. Their virtual timer never fires, so no real
+    // `lockout-retry` thread queues work on the test dispatcher.
+    private fun buildLockoutManager(
+        storage: LockoutStorage,
+        testDispatcher: CoroutineDispatcher,
+        realLockoutIo: Boolean,
+    ): LockoutManager {
+        val ioDispatcher: CoroutineDispatcher =
+            if (realLockoutIo) {
+                Executors.newSingleThreadExecutor { r -> Thread(r).apply { isDaemon = true } }.asCoroutineDispatcher()
+            } else {
+                testDispatcher
+            }
+        return LockoutManager(
+            storage,
+            clock = { nowMs },
+            elapsedRealtime = { nowMs },
+            ioDispatcher = ioDispatcher,
+            recovery = RecoverySetup(timer = VirtualRecoveryTimer(VirtualClocks())),
         )
     }
 

@@ -100,8 +100,8 @@ class ScheduleDriver(
         }
     }
 
-    // The construction read of a process fails in about one start of four; each of its re-seed reads fails or
-    // succeeds with equal chance.
+    // The construction read of a process fails in about one start of four. The recovery reads of the process all fail
+    // or all succeed, with equal chance.
     private fun planProcess(faults: FaultPlan, random: Random, generation: Int) {
         val seedRead = if (random.nextInt(PERCENT) < 25) ReadScript.Throw else ReadScript.Normal
         val reseedRead = if (random.nextBoolean()) ReadScript.Throw else ReadScript.Normal

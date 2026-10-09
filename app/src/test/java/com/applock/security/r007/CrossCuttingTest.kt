@@ -8,6 +8,7 @@ import com.applock.security.LockoutState.LockedOut
 import com.applock.security.LockoutStorage
 import com.applock.security.harness.FaultPlan
 import com.applock.security.harness.GatedCaller
+import com.applock.security.harness.Phase
 import com.applock.security.harness.ReadScript
 import com.applock.security.harness.StorageOp
 import com.applock.security.harness.VirtualClocks
@@ -118,63 +119,118 @@ class CrossCuttingTest : BaselineCase() {
         harness.record("X04-fallback", "state" to harness.manager.currentState())
     }
 
-    // ---- X05 poll-driven re-seed with no budget ------------------------------------------------
+    // ---- X05 recovery retries with no budget ---------------------------------------------------
 
+    // B1 spec: T9.
     @Test
-    fun `X05 - under a persistent read fault every poll starts one read, with no budget and no backoff`() {
+    fun `X05 - under a persistent read fault polls start no read, and the retries back off to one every 60 s`() {
         val faults = FaultPlan().read(ReadScript.Throw)
         val harness = harness(L5, faults)
         harness.start()
         repeat(POLL_BURST) { harness.poll() }
-        assertEquals("a burst at one instant", 1 + POLL_BURST, harness.store.readCount(1))
-        repeat(POLLS_60_S) {
-            harness.poll()
-            harness.advance(POLL_MS)
-        }
+        assertEquals("a burst at one instant starts no read", 1, harness.store.readCount(1))
+
+        // Steps of 1 s end at every due time, so each retry fires at its due time.
+        repeat(STEPS_10_MIN) { harness.advance(STEP_MS) }
         harness.check()
-        assertEquals("60 s at 250 ms", 1 + POLL_BURST + POLLS_60_S, harness.store.readCount(1))
+        val delays = harness.retryTrace(1)
+            .filter { it.startsWith("RETRY_SCHEDULED") }
+            .map { it.substringAfter("delay=").toLong() }
+        assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 32_000L) + List(9) { 60_000L }, delays)
+        val failedReadSeconds = harness.ledger.storageEvents(1)
+            .filter { it.op == StorageOp.READ && it.index > 0 && it.phase == Phase.THREW }
+            .map { (it.elapsedMs - E0) / STEP_MS }
+        assertEquals(
+            "14 retries in 10 min",
+            listOf(1L, 3L, 7L, 15L, 31L, 63L, 123L, 183L, 243L, 303L, 363L, 423L, 483L, 543L),
+            failedReadSeconds,
+        )
+        assertEquals(15, harness.store.readCount(1))
+        assertEquals(0, harness.manager.failureCount())
 
         faults.clearReads()
-        harness.poll()
+        repeat(3) { harness.advance(STEP_MS) }
         harness.check()
-        assertEquals("no exhaustion: the next poll recovers", 5, harness.manager.failureCount())
-        harness.record("X05", "reads_per_poll" to 1, "reads" to harness.store.readCount(1), "budget" to "none")
+        assertEquals("no exhaustion: the retry at 603 s recovers", 5, harness.manager.failureCount())
+        assertEquals("the stored window ended long ago", Available, harness.manager.currentState())
+        assertEquals(16, harness.store.readCount(1))
+        harness.record(
+            "X05",
+            "reads_per_poll" to 0,
+            "retries_10_min" to failedReadSeconds.size,
+            "delays_ms" to delays,
+            "budget" to "none",
+        )
     }
 
-    // ---- X06 manager shutdown and the re-seed ---------------------------------------------------
+    // ---- X06 manager shutdown and the recovery read --------------------------------------------
 
+    // B1 spec: T7.
     @Test
-    fun `X06 - a re-seed read queued before shutdown still runs after it, and its value is not published`() {
+    fun `X06 - a recovery retry queued before shutdown skips its read, and no retry follows`() {
         val harness = harness(L5, FaultPlan().read(ReadScript.Throw, generation = 1, index = 0))
         harness.start()
         harness.holdIo()
-        harness.poll()
+        harness.advance(FIRST_RETRY_MS)
         harness.shutdown()
         harness.resumeIo()
-        assertEquals("the queued read ran after the stop", 2, harness.store.readCount(1))
+        assertEquals("the queued retry skips its read after the stop", 1, harness.store.readCount(1))
         assertEquals(0, harness.manager.failureCount())
 
         repeat(BURST) { assertEquals(Available, harness.manager.currentState()) }
-        harness.awaitQuiescent()
-        assertEquals("no read starts after the stop", 2, harness.store.readCount(1))
-        harness.record("X06-queued-reseed", "reads_after_stop" to 1)
+        harness.advance(TEN_MIN_MS)
+        assertEquals("no read starts after the stop", 1, harness.store.readCount(1))
+        assertEquals(L5, harness.store.durableState())
+        assertEquals(
+            listOf(
+                "RETRY_SCHEDULED seq=1 kind=READ attempt=1 delay=1000",
+                "RETRY_FIRED seq=1",
+                "RETRY_CANCELLED seq=1 reason=stopped",
+                "RETRY_IGNORED seq=1 reason=stale",
+            ),
+            harness.retryTrace(1),
+        )
+        harness.record("X06-queued-reseed", "reads_after_stop" to 0)
     }
 
+    // B1 spec: T13.
     @Test
-    fun `X06 - a re-seed read in flight at shutdown finishes, and its value is not published`() {
+    fun `X06 - a recovery read in flight at shutdown finishes unpublished, and no retry follows`() {
         val faults = FaultPlan()
             .read(ReadScript.Throw, generation = 1, index = 0)
             .read(ReadScript.HoldThenRead(), generation = 1, index = 1)
         val harness = harness(L5, faults)
         harness.start()
-        harness.poll()
+        harness.advance(FIRST_RETRY_MS)
         harness.awaitHeld(StorageOp.READ, 1)
         harness.shutdown()
         harness.release(StorageOp.READ, 1)
         assertEquals(2, harness.store.readCount(1))
         assertEquals(0, harness.manager.failureCount())
         assertEquals(Available, harness.manager.currentState())
-        harness.record("X06-running-reseed", "published" to false)
+
+        harness.advance(TEN_MIN_MS)
+        assertEquals("no read starts after the stop", 2, harness.store.readCount(1))
+        assertEquals("RETRY_ENDED seq=1 outcome=abandoned", harness.retryTrace(1).last())
+        harness.record("X06-running-reseed", "published" to false, "reads_after_stop" to 0)
+    }
+
+    // B1 spec: T16.
+    @Test
+    fun `X06 - shutdown cancels a pending recovery retry, and no read follows`() {
+        val harness = harness(L5, FaultPlan().read(ReadScript.Throw, generation = 1, index = 0))
+        harness.start()
+        harness.shutdown()
+        harness.advance(TEN_MIN_MS)
+        assertEquals("no read starts after the stop", 1, harness.store.readCount(1))
+        assertEquals(0, harness.manager.failureCount())
+        assertEquals(Available, harness.manager.currentState())
+        assertEquals(L5, harness.store.durableState())
+        assertEquals(
+            listOf("RETRY_SCHEDULED seq=1 kind=READ attempt=1 delay=1000", "RETRY_CANCELLED seq=1 reason=stopped"),
+            harness.retryTrace(1),
+        )
+        harness.record("X06-pending-retry", "reads_after_stop" to 0)
     }
 
     @Test
@@ -476,7 +532,9 @@ class CrossCuttingTest : BaselineCase() {
 
     private companion object {
         const val POLL_BURST = 1_000
-        const val POLLS_60_S = 240
+        const val FIRST_RETRY_MS = 1_000L
+        const val STEP_MS = 1_000L
+        const val STEPS_10_MIN = 600
         const val OVERFLOW_TRIES = 100
         const val TEN_MIN_MS = 600_000L
         const val WAIT_S = 5L

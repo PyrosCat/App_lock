@@ -164,13 +164,13 @@ class LockoutHarnessTest {
     }
 
     @Test
-    fun `a re-seed read parked with its value is not applied after a local admission`() {
+    fun `a recovery read parked with its value is not applied after a local admission`() {
         val faults = FaultPlan()
             .read(ReadScript.Throw, generation = 1, index = 0)
             .read(ReadScript.ReadThenHold, generation = 1, index = 1)
         val harness = harness(initial = L5, faults = faults)
         harness.start()
-        harness.poll()
+        harness.advance(1_000) // the first retry starts the recovery read
         harness.awaitHeld(StorageOp.READ, 1)
 
         harness.fail() // queues its write behind the parked read

@@ -12,7 +12,6 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -92,12 +91,12 @@ class LockoutManager(
     private val ioDispatcher: CoroutineDispatcher =
         Executors.newSingleThreadExecutor { r -> Thread(r, "lockout-io").apply { isDaemon = true } }
             .asCoroutineDispatcher(),
-    // The scope that owns the write and re-seed coroutines. [shutdown] sets `stopped` but does NOT cancel it, so an
+    // The scope that owns the write and retry coroutines. [shutdown] sets `stopped` but does not cancel it, so an
     // in-flight write drains to completion (its completion effect is dropped by the stopped check). Defaulted for
     // production.
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + ioDispatcher),
-    // The timer, delays, and listener of the [RecoveryScheduler]. No code path of this manager starts a retry, and the
-    // default timer starts its thread only at the first retry.
+    // The timer, delays, and listener of the [RecoveryScheduler]. Only a failed construction read starts a retry, and
+    // the default timer starts its thread only at the first retry.
     recovery: RecoverySetup = RecoverySetup(),
 ) {
 
@@ -169,34 +168,32 @@ class LockoutManager(
     // Set true by [shutdown] under [lock]. A completion that observes it publishes nothing and starts nothing.
     private var stopped = false
 
-    // True while a cold-start re-seed is still wanted: the construction seed read failed and no local mutation
-    // has made the snapshot authoritative. Read lock-free (a hint) and re-checked under [lock] before applying.
-    @Volatile
+    // True while the recovery read is wanted (see [RecoveryRead]). After construction, only code under [lock] reads or
+    // writes it.
     private var wantReseed = false
-    private val reseedInFlight = AtomicBoolean(false)
 
     // The historical fact that the construction seed read failed. It is never auto-cleared, so a consumer (the
-    // runtime seed) can report the degraded cold start once. A re-seed clears the enforcement gap, not this fact.
+    // runtime seed) can report the degraded cold start once. A recovery read clears the enforcement gap, not this
+    // fact.
     @Volatile
     private var seedFailed = false
 
     private val snapshot: AtomicReference<Snapshot> = AtomicReference(seedSnapshot())
 
-    /** Seeds the snapshot from storage at construction. A read failure degrades to Available and arms a re-seed. */
+    init {
+        // A failed construction read starts the recovery-read retries. A healthy read starts none, so the production
+        // timer creates no thread.
+        if (seedFailed) synchronized(lock) { recoveryScheduler.start(RecoveryKind.READ) { prepareRecoveryRead() } }
+    }
+
+    /**
+     * Seeds the snapshot from storage at construction. A read failure degrades to Available, and the init block then
+     * starts the recovery read.
+     */
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // seed read failure: degrade, never crash construction
     private fun seedSnapshot(): Snapshot =
         try {
-            val persisted = storage.read()
-            // A persisted lockout is a wall deadline. Its monotonic mirror cannot be reconstructed across a restart,
-            // so a recovered lockout is recorded and enforces on the wall deadline alone.
-            Snapshot(
-                revision = 0L,
-                streak = 0L,
-                failureCount = persisted.failureCount,
-                recordedWallDeadline = persisted.lockoutUntil,
-                recordedMonoDeadline = NOT_LOCKED,
-                fallbackMonoDeadline = NOT_LOCKED,
-            )
+            seededFrom(storage.read())
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -205,6 +202,19 @@ class LockoutManager(
             EMPTY_SNAPSHOT
         }
 
+    // The snapshot of a successful read of storage at the cold start. A persisted lockout is a wall deadline. Its
+    // monotonic mirror cannot be reconstructed across a restart, so a recovered lockout is recorded and enforces on
+    // the wall deadline alone.
+    private fun seededFrom(persisted: LockoutSnapshot): Snapshot =
+        Snapshot(
+            revision = 0L,
+            streak = 0L,
+            failureCount = persisted.failureCount,
+            recordedWallDeadline = persisted.lockoutUntil,
+            recordedMonoDeadline = NOT_LOCKED,
+            fallbackMonoDeadline = NOT_LOCKED,
+        )
+
     /** Whether the construction seed read failed (a cold-start degrade). Lock-free; for the consumer's diagnostics. */
     fun seedReadFailed(): Boolean = seedFailed
 
@@ -212,15 +222,12 @@ class LockoutManager(
 
     /**
      * The current lockout state, read from the published snapshot without the lock, so it stays responsive even
-     * while a durable write is stalled. It does not re-read storage, so an in-memory reset is never resurrected. It
-     * returns the longer remaining of the recorded and fallback windows, as remaining durations, so a backwards
-     * wall-clock jump cannot shorten enforcement, and it marks the state degraded only when the recorded
-     * (persisted-backed) window does not cover the active lockout.
+     * while a durable write is stalled. It neither reads storage nor starts a read. It returns the longer remaining of
+     * the recorded and fallback windows, as remaining durations, so a backwards wall-clock jump cannot shorten
+     * enforcement, and it marks the state degraded only when the recorded (persisted-backed) window does not cover the
+     * active lockout.
      */
-    fun currentState(): LockoutState {
-        if (wantReseed) triggerReseed()
-        return stateOf(snapshot.get())
-    }
+    fun currentState(): LockoutState = stateOf(snapshot.get())
 
     /** The consecutive failure count since the last success (drives FR-081 capture). Lock-free. */
     fun failureCount(): Int = snapshot.get().failureCount
@@ -262,7 +269,9 @@ class LockoutManager(
                 val outcome = FailureOutcome(stateOf(snap), snap.failureCount)
                 Pending(outcome.state, CompletableDeferred(outcome))
             } else {
-                wantReseed = false // the first local mutation makes the snapshot authoritative
+                // The first local mutation ends the recovery read.
+                wantReseed = false
+                recoveryScheduler.cancel()
                 val write = admitFailure()
                 val resolved = enqueueWrite(write, onResolved)
                 Pending(stateOf(snapshot.get()), resolved)
@@ -287,6 +296,7 @@ class LockoutManager(
                 Pending(LockoutState.Available, CompletableDeferred(true))
             } else {
                 wantReseed = false
+                recoveryScheduler.cancel()
                 val write = admitReset()
                 val resolved = enqueueReset(write, onResolved)
                 Pending(LockoutState.Available, resolved)
@@ -465,51 +475,52 @@ class LockoutManager(
         }
     }
 
-    // ---- Cold-start re-seed --------------------------------------------------------------------
+    // ---- Cold-start recovery read --------------------------------------------------------------
+
+    // Under [lock]. Only an admission changes the revision, so its check repeats [wantReseed] on purpose, as a guard
+    // against later changes to admission.
+    private fun recoveryWanted(): Boolean = !stopped && wantReseed && snapshot.get().revision == 0L
+
+    // Called by the scheduler on the writer, under [lock].
+    private fun prepareRecoveryRead(): RecoveryOperation? = if (recoveryWanted()) RecoveryRead() else null
 
     /**
-     * A lazy off-main re-seed after a failed construction read. It wholesale-seeds only while initialization is
-     * untouched (no local mutation has made the snapshot authoritative). The first local mutation clears [wantReseed]
-     * permanently, so a re-seed can never read a stale durable deadline and resurrect a reset whose write failed. It
-     * checks [stopped] under [lock] at both admission and publication, so a re-seed in flight when [shutdown] returns
-     * cannot publish to a stopped manager.
+     * One attempt of the recovery read, which the scheduler retries on its delays until a read succeeds. The first
+     * local mutation or [shutdown] ends the retries under [lock], and no read applies after that point, so a stale read
+     * can't overwrite newer state or resurrect a reset whose write failed.
      */
-    private fun triggerReseed() {
-        if (!wantReseed) return
-        val start = synchronized(lock) {
-            if (stopped || !wantReseed) false else reseedInFlight.compareAndSet(false, true)
-        }
-        if (!start) return
-        scope.launch(ioDispatcher) {
-            val persisted = runRead()
-            synchronized(lock) {
-                if (!stopped && wantReseed && persisted != null) {
-                    snapshot.set(
-                        snapshot.get().copy(
-                            failureCount = persisted.failureCount,
-                            recordedWallDeadline = persisted.lockoutUntil,
-                            recordedMonoDeadline = NOT_LOCKED,
-                            fallbackMonoDeadline = NOT_LOCKED,
-                        )
-                    )
-                    wantReseed = false // the persisted lockout is picked up; stop retrying
-                }
-                // A read that still fails, a local mutation, or a shutdown leaves the snapshot as-is (a still-set
-                // wantReseed retries later; a stopped manager never re-seeds again).
+    private inner class RecoveryRead : RecoveryOperation {
+        private var persisted: LockoutSnapshot? = null
+
+        // A storage fault is a failed read. A cancellation goes to the scheduler: with the manager job active it is a
+        // failed read, otherwise it ends the chain.
+        @Suppress("TooGenericExceptionCaught", "SwallowedException") // read fault: a failed attempt, retried later
+        override fun perform(): Boolean {
+            persisted = try {
+                storage.read()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                null
             }
-            reseedInFlight.set(false)
+            return persisted != null
+        }
+
+        // Applies a read pair as the construction read would have, and ends the chain. A failed read schedules the
+        // next retry. A retry that is no longer wanted ends the chain with no change.
+        override fun complete(succeeded: Boolean): RecoveryStep {
+            val value = persisted.takeIf { succeeded }
+            return when {
+                !recoveryWanted() -> RecoveryStep.ABANDON
+                value == null -> RecoveryStep.RETRY
+                else -> {
+                    snapshot.set(seededFrom(value))
+                    wantReseed = false
+                    RecoveryStep.SUCCESS
+                }
+            }
         }
     }
-
-    @Suppress("TooGenericExceptionCaught", "SwallowedException") // re-seed read fault: retry later, never crash
-    private fun runRead(): LockoutSnapshot? =
-        try {
-            storage.read()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            null
-        }
 
     // ---- Lifecycle -----------------------------------------------------------------------------
 

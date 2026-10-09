@@ -14,8 +14,9 @@ sealed interface ReadScript : StorageScript {
     data object Throw : ReadScript
 
     /**
-     * Throws a `CancellationException`. The manager and kotlinx.coroutines treat it as a cancellation, not as a storage
-     * fault. The model rules do not cover it, so a test that uses it checks the result directly.
+     * Throws a `CancellationException`. In a recovery read with the manager job active, the manager and the model
+     * treat it as a failed read. In the construction read it makes the constructor throw. No model rule covers that
+     * case, so a test checks the result directly.
      */
     data object ThrowCancellation : ReadScript
 

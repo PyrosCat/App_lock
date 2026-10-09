@@ -34,12 +34,13 @@ import java.util.concurrent.TimeUnit
  * operations wake and end. `shutdown()` is called on the dead manager only to silence its callbacks.
  *
  * [check] compares the model with the durable state, the process cache, the public manager API, the resolved
- * operation outcomes, the read count, the retry events, and the one-writer maximum. While a re-seed is requested,
- * [check] does not call `currentState()`, because that call starts a re-seed read; [poll] is the observation that does.
+ * operation outcomes, the read count, the retry events, and the one-writer maximum. Calling `currentState()` starts no
+ * read, so [check] compares the state at every step.
  *
  * Each process gets its own [VirtualRecoveryTimer] for the retry scheduler of the manager, and the retry events go to
- * the ledger while the process lives. [advance] fires the retries that are due at the new time, also while a storage
- * operation or a callback is held, and then settles. A dead process fires no retry and records no retry event.
+ * the ledger while the process lives. The model checks each retry event in ledger order, together with the storage
+ * events. [advance] fires the retries that are due at the new time, also while a storage operation or a callback is
+ * held, and then settles. A dead process fires no retry and records no retry event.
  */
 class LockoutHarness(
     initial: LockoutSnapshot = LockoutSnapshot(0, 0L),
@@ -242,7 +243,7 @@ class LockoutHarness(
         return pending
     }
 
-    /** Reads `currentState()` as a caller poll does. At baseline this can start a re-seed read (S10). */
+    /** Reads `currentState()` as a caller poll does. A poll starts no read (S10). */
     fun poll(): LockoutState {
         val state = paused {
             val expected = model.poll()
@@ -333,12 +334,13 @@ class LockoutHarness(
     }
 
     /**
-     * Calls `shutdown()` on the live manager, as its owner does. The model has no rule for a stopped manager, so a test
-     * checks the later results directly.
+     * Calls `shutdown()` on the live manager, as its owner does. The model then expects no further retry, but it has
+     * no other rule for a stopped manager, so a test checks the later results directly.
      */
     fun shutdown() {
         ledger.action(generation, "SHUTDOWN", "", clocks)
         manager.shutdown()
+        model.stopManager()
     }
 
     /**
@@ -382,11 +384,9 @@ class LockoutHarness(
             assertEquals("S5: every admitted write finished", 0, model.pendingWrites)
         }
         assertTrue("S5: one ordered writer", store.maxConcurrentWrites() <= 1)
-        assertEquals("S11: the live process has the expected retry events", model.retryEventsExpected, retryEvents())
+        model.checkRetries(idle)
         assertTrue("escaped task failures: ${executor?.escaped}", executor?.escaped.isNullOrEmpty())
-        if (!model.reseedRequested) {
-            assertEquals("S8: lockout state", model.state(), live.currentState())
-        }
+        assertEquals("S8: lockout state", model.state(), live.currentState())
         checkOutcomes(idle)
     }
 
@@ -406,11 +406,14 @@ class LockoutHarness(
         }
     }
 
-    // The number of retry events that the ledger holds for the live process.
-    private fun retryEvents(): Int =
-        ledger.snapshot().count { event ->
-            event is LedgerEvent.Action && event.generation == generation && event.name.startsWith(RETRY_PREFIX)
-        }
+    /** The retry events of [generation] in ledger order, with their clock values. */
+    fun retryEvents(generation: Int = this.generation): List<LedgerEvent.Action> =
+        ledger.snapshot().filterIsInstance<LedgerEvent.Action>()
+            .filter { it.generation == generation && it.isRetryEvent() }
+
+    /** The retry events of [generation] in ledger order, for example `RETRY_FIRED seq=1`. */
+    fun retryTrace(generation: Int = this.generation): List<String> =
+        retryEvents(generation).map { "${it.name} ${it.detail}" }
 
     // ---- Quiescence and model feed ---------------------------------------------------------------
 
@@ -446,12 +449,17 @@ class LockoutHarness(
     private fun isParked(thread: String): Boolean =
         store.isParked(thread) || callbackHolds.values.any { it.thread == thread && it.isParked() }
 
+    // Feeds the new storage and retry events of the live process to the model, in ledger order.
     private fun sync() {
         val events = ledger.snapshot()
         events.drop(syncedSeq)
-            .filterIsInstance<LedgerEvent.Storage>()
             .filter { it.generation == generation }
-            .forEach(model::onStorageEvent)
+            .forEach { event ->
+                when {
+                    event is LedgerEvent.Storage -> model.onStorageEvent(event)
+                    event is LedgerEvent.Action && event.isRetryEvent() -> model.onRetryEvent(event)
+                }
+            }
         syncedSeq = events.size
     }
 
@@ -464,6 +472,8 @@ class LockoutHarness(
 }
 
 private const val RETRY_PREFIX = "RETRY_"
+
+private fun LedgerEvent.Action.isRetryEvent(): Boolean = name.startsWith(RETRY_PREFIX)
 
 // The ledger action name of a retry event, for example RETRY_SCHEDULED.
 private fun RecoveryEvent.ledgerName(): String = RETRY_PREFIX + when (this) {

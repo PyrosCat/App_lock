@@ -4,6 +4,25 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 candidate B1 retries of a failed startup read   (2026-10-08)
+--------------------------------------------------------------------------------------
+In candidate fix B1, the lockout manager now retries a failed startup read until the stored lockout loads. In phase
+P3, candidate fixes for the R-007 lockout storage weaknesses are compared with the current app.
+- The read retries wait 1 s at first, and each later wait doubles up to 60 s.
+- A state read of the manager no longer starts a storage read.
+- An accepted wrong or correct PIN now ends the read retries of the manager.
+- The old read that each state poll started is removed, together with its in-flight flag.
+- In the LockoutModel test class, one B1 rule replaces the polled-read rule and the no-retry rule.
+- The test harness now checks each logged retry event against that rule.
+- Fourteen of the 70 R-007 test cases now expect the B1 results, and four new cases cover the retry chain.
+- The startup tests of the LockoutManagerTest class now fire their retries on a virtual timer. A new test there
+  covers a retried read that throws after the coroutine scope of the manager was cancelled.
+- Managers built in the LockEngineRuntimeTest class get such a timer too, so that no real retry thread starts.
+- The local gate on the B1 branch ran 501 unit tests with no failures and no skipped tests.
+- The detekt, assembleProdDebug, and compileProdDebugAndroidTestKotlin tasks of that gate run also passed.
+- A separate run of all 74 R-007 test cases, with detekt again, had no failures.
+
+
 Docs: changelog rules against repeated bullets   (2026-10-08)
 -------------------------------------------------------------
 The writing rules of the repository get two rules against repeated text in changelog entries.
