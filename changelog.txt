@@ -4,6 +4,26 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): NucBox report for the P2 device lanes   (2026-10-08)
+---------------------------------------------------------------------------
+The reports folder gets the NucBox G5 report for phase P2 of the R-007 hardening work. In phase P2, the current
+app is tested on devices before any fix is chosen.
+- The new report is campaigns/2026-10-08_m7-wp2-f2h-p2-device_nucbox-g5.md.
+- The test runs used two emulators on the NucBox G5: Android 16 (API 36) and Android 11 (API 30).
+- On Android 16, 499 of 503 test repetitions gave the predicted result, and on Android 11, 427 of 429 did.
+- The PIN screen over a protected app closes itself after a screen-off and after a repeated lock request.
+- Each repetition without the predicted result traces to this closing. The closing is an app weakness outside the
+  storage faults of the R-007 work.
+- On both emulators, all four known weaknesses of the PIN lockout appear with both PIN screens of the app.
+- A graphics fault of the Android 11 emulator ended one app process during a reboot test. A rerun of these reboot
+  tests gave the predicted result 11 times out of 11.
+- Report tables give both verdicts per test case and emulator, with Moto G phone values where they differ.
+- The report's findings cover the closing PIN screen, four test harness fixes, a log parser defect, and emulator
+  facts.
+- An appendix lists the SHA-256 of the 23 evidence files, including the 7 checks of the device harness.
+- The NucBox row of the fleet table in reports/README.md links to the new report.
+
+
 Docs: changelog rules against repeated bullets   (2026-10-08)
 -------------------------------------------------------------
 The writing rules of the repository get two rules against repeated text in changelog entries.
