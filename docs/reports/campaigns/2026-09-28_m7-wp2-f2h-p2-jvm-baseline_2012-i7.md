@@ -318,3 +318,10 @@ b4622ca264404afbd5e133edcc5da1bed3182cf6edb076e6282e825e2dc0ef2f  UndurableDeath
 bc7c05baa9a0fe3d077e0134b70bee39488f313a615743818629b94352e498f8  UndurableDeathTest/R3_4_-_a_false_acknowledgement_of_a_threshold_write_gives_a_-2e374d04.txt
 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  untracked.sha256
 ```
+
+## Corrections
+
+- **2026-10-09, later report.** The
+  [2026-10-09 rerun report](2026-10-09_m7-wp2-f2h-p2-jvm-rerun_2012-i7.md) records a clean run at `3da7b10`. That
+  revision includes the test changes of `05c69b7`: 20 full restart cycles in R1.2, R2.4, and R4.4, and the new name
+  of the X14 deadline test.

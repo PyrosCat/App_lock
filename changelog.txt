@@ -4,6 +4,24 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 exit record and clean JVM rerun   (2026-10-09)
+------------------------------------------------------------------------
+The M7_PLAN.md project plan now records the end of phase P2 of the R-007 lockout hardening work. Phase P2 tested
+the current app on the JVM and on devices, before any fix.
+- The new P2 exit section lists the reports of the JVM tests, the Moto G phone, and the NucBox emulators.
+- The exit record holds the lead's approval of all seven skips that the device test plan proposed.
+- For the case of a false storage acknowledgement, a device pass covers the stored values only, not the audit records.
+- The risk register holds the self-closing legacy lock screen as defect P2-F1, until step G deletes that screen.
+- Step G of the plan gets tests for this defect, after a screen-off and after a repeated lock request.
+- The new rerun report is 2026-10-09_m7-wp2-f2h-p2-jvm-rerun_2012-i7.md.
+- The rerun ran at commit 3da7b10, after a commit changed four of the 70 JVM tests of phase P2.
+- At 3da7b10, the local gate passed 468 unit tests, and a second run passed the 70 phase P2 tests again.
+- The two runs wrote 72 evidence files each, and both sets are byte-identical.
+- Without the lines that name the source, 66 of the 70 test evidence files match the 2026-09-28 run.
+- The JVM report of 2026-09-28 gets a corrections entry that links the rerun report.
+- In the fleet table of reports/README.md, the 2012 i7 row now points to the rerun report.
+
+
 M7/WP2 (F2 hardening): NucBox report for the P2 device lanes   (2026-10-08)
 ---------------------------------------------------------------------------
 The reports folder gets the NucBox G5 report for phase P2 of the R-007 hardening work. In phase P2, the current

@@ -936,8 +936,8 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     2. **F2** R-007 degraded-storage lockout enforcement: done (`b9e7c53`; residuals `dbfb86b`; report `520f15d`).
     3. **F3** HomeResolver tri-state and episode revalidation: done (`30529e2`; device check `8ad3b4c`; R-008).
     4. **F4** observational adapters: done (`f828a71`; not wired).
-    5. **F2 hardening** R-007 residual treatment: in progress (P0 decisions and P1 exit recorded; P2 JVM lane done
-       at `1c38037`, report `d6a0b80`; P2 device decisions recorded; no mechanism selected).
+    5. **F2 hardening** R-007 residual treatment: in progress (P0 decisions, P1 exit, and P2 exit recorded; P3
+       started on 2026-10-07; no mechanism selected).
     6. **F5** graph wiring, not visible, with a fleet checkpoint: pending.
     7. **F6** activation and RTM flip: pending.
     8. **Fleet close-out**: pending.
@@ -1127,6 +1127,29 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         because the AVDs have no screen lock.
       - Verifier entries: the app does not change. The count is exact from the wrapper write lines while no write is
         held. Otherwise it is inferred from the gate state in a UI dump. The evidence labels each count.
+    - **P2 exit (lead, 2026-10-09).** P2 is complete. Each of the four R-007 residuals has an observed reproduction
+      on the JVM, on the Moto G, and on the NucBox emulators at API 36 and API 30. The device lanes ran both live
+      callers.
+      - JVM: the JVM report of 2026-09-28 (`2026-09-28_m7-wp2-f2h-p2-jvm-baseline_2012-i7.md`) at `1c38037`. Commit
+        `05c69b7` changed the P2 JVM tests after that report. The JVM rerun report of 2026-10-09
+        (`2026-10-09_m7-wp2-f2h-p2-jvm-rerun_2012-i7.md`) shows a clean run at `3da7b10`: all 70 P2 tests passed,
+        and the local gate ran 468 unit tests with no failures.
+      - Moto G 2025 (API 35): the Moto G report of 2026-10-04 (`2026-10-04_m7-wp2-f2h-p2-device_moto-g-2025.md`)
+        shows 558 of 559 case repeats as predicted at `ca57786`, with reruns at `6f28d8a` and `8d1c28b`.
+      - NucBox: the NucBox report of 2026-10-08 (`2026-10-08_m7-wp2-f2h-p2-device_nucbox-g5.md`) shows 499 of 503
+        repeats as predicted on API 36 (at `2ce71df` and `c47d642`) and 427 of 429 on API 30 (at `4864c4f`). Every
+        miss traces to the self-closing legacy lock screen, which lies outside R-007.
+      - Approved skips: all seven proposed skips of the device plan. The NucBox emulators ran the screen-off steps
+        of H06 and R3.3, so that skip applies to the Moto G only. The Moto G background restrictions, load, low free
+        space, and condition records move to P4.
+      - Gaps that stay: the cases that the device plan lists as not run on the device lanes, each with its reason
+        there. On API 30, R3.1a and R3.1c did not run, because Android 11 denies the harness kill through `run-as`.
+      - R3.4 objective: on the devices, "met" says only that the stored pair kept every admitted change. The JVM
+        verdict "not met" for the accounting of a false acknowledgement stands.
+      - The self-closing legacy lock screen is defect P2-F1 in `RISK_REGISTER.md`. Step G is expected to resolve it.
+      - Open harness follow-ups, not exit criteria: the harness needs a kill path for R3.1a and R3.1c on Android 11
+        before a later lane below API 35. The harness must read the five-field `am_kill` event line of Android 11.
+        The lead decides whether a sweep trial without a kill fails the run.
     - **P3 criteria and start (lead, 2026-10-07).** The criteria are frozen before any formal comparison, that is,
       any recorded run whose results enter the P3 comparison report, the evidence matrix, or the ranking.
       - Unknown lockout state: fail-closed. PIN verification is not admitted until the lockout state is trusted. A
@@ -1229,7 +1252,9 @@ extensions land here because Phase 2 is the first phase with a state-observing s
 - **G — retire the old path (this box).** Delete `LockScreenActivity.kt` + its manifest `<activity>` +
   `ApplicationLockEngine.kt`. **Remove** (not reshape) the `service/ApplicationLockEngine.kt -> presentation`
   R2 baseline row (`ArchitectureRulesTest.kt`); the `IntruderCaptureManager -> presentation` row stays. Do
-  this only after F's replacement smoke is green. Gate: R2 + full suite green. (The `platform.spike` package
+  this only after F's replacement smoke is green. The tests of G must show that a screen-off or a repeated lock
+  request never leaves the protected app in the foreground without the lock (defect P2-F1 in
+  `RISK_REGISTER.md`). Gate: R2 + full suite green. (The `platform.spike` package
   + its manifest block + the OV-4 UIAutomator test are deleted in **Phase 3** with the harness repoint, not
   here.)
 

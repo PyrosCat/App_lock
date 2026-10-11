@@ -30,6 +30,7 @@ M6 → M10. Frozen M2–M6 remain the 2.0.0 lineage.*
 **Defects — not tracked as risks** (2026-08-11 review, decision 2026-08-11): CR-005 biometric failure
 accounting (Major, M2) · CR-006 orphaned vault/intruder blob on delete (Major, M3/M5). Held pending a
 defect-record convention (owed — ROADMAP M1 gate / TS_GAP G-04). See the defects section below.
+Decision 2026-10-09: P2-F1 self-closing legacy lock screen (Major, M7 WP2 step G) is held there too.
 
 ## Severity scoring — Likelihood × Impact
 
@@ -608,11 +609,15 @@ recorded here as an interim holding place **until a defect-record convention exi
 `ROADMAP.md` M1-gate scope; TS_GAP G-04, "decide at the M1 gate"). Authoritative detail is the review
 evidence `docs/reports/reviews/2026-08-11_formal-code-review.md`.
 
+Decision 2026-10-09 (P2 exit of the F2 hardening work): the device-test finding P2-F1 is a Major defect outside
+R-007, held here in the same way. Authoritative detail is finding 1 of `2026-10-08_m7-wp2-f2h-p2-device_nucbox-g5.md`.
+
 | Defect | Finding | Severity | Affected gate |
 |---|---|---|---|
 | CR-005 | Biometric non-matches skip product lockout / intruder / audit accounting (`LockScreenActivity.kt:208-212` — not routed to `ApplicationLockEngine.onUnlockFailure`, `:90-103`). Platform biometric lockout + counted PIN fallback are partial compensating controls; the residual 1.0.0 gap is cross-method failure accounting (intruder capture itself left 1.0.0 scope). | **Major** | **M9** (1.0.0 auth hardening; re-pointed 2026-08-14, was M2) |
 | CR-006 | Vault/intruder delete removes the index row before (and ignoring) blob deletion → orphaned ciphertext reported as success (`VaultRepository.kt:78-81`; `IntruderLogViewModel.kt:35-40`). Data-lifecycle / secure-delete consistency gap; the blob stays encrypted (no confidentiality breach). | **Major** | **M8** — expected to resolve by elimination: vault/intruder code is removed from the 1.0.0 line there (decision 2026-08-14). If 2.0.0 reinstates the code, this defect reopens with it. |
+| P2-F1 | The legacy lock screen closes itself. `LockScreenActivity.onPause()` calls `finish()` unless the PIN or biometric check succeeded, the activity is finishing, or a biometric prompt is open. A screen-off pauses it. A second lock request reaches the running `singleTop` activity as a new intent and pauses it first. The protected app then stays in the foreground with no lock screen until the next detection event: up to 162 s on the API 36 emulator. | **Major** | **M7**: expected to resolve by elimination at WP2 step G, which deletes `LockScreenActivity`. The tests of step G must show that a screen-off or a repeated lock request never leaves the protected app in the foreground without the lock. |
 
-Related requirements: CR-005 → FR-009/010/014/081/174; CR-006 → FR-085/115.
+Related requirements: CR-005 → FR-009/010/014/081/174; CR-006 → FR-085/115; P2-F1 → FR-027.
 When the defect-record convention lands, migrate these (and future defects) into it and retire this
 interim section.
