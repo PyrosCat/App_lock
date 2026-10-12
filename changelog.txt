@@ -4,6 +4,26 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): B3 specification for changed tests, clock limits, and the loss window   (2026-10-09)
+-----------------------------------------------------------------------------------------------------------
+The 2026-10-07_R007_F2_HARDENING_P3_B3_SPEC.md specification of candidate fix B3 now predicts four more changed tests
+and states two more clock limits. It also redefines the loss window: the time in which a restart loses a lockout held
+only in memory.
+- The table of changed tests adds the CrossCuttingTest test of a failure write that throws a cancellation.
+- Its prediction now includes a retry for the earlier lockout deadline, scheduled but not run before the test ends.
+- The WriteRetryTest table adds the reset-cancellation test (X01) and the blocked-retry test (I3), which expect such a
+  retry too.
+- New names for two WriteRetryTest tests state what the retry now stores.
+- Three long test names now match the shorter names in the code, which fit the line limit.
+- For the harness self-test that injects a stale write, the specification now predicts detection one step earlier.
+- A new limit states that after a backward clock change, a retry can leave part of a lockout unstored.
+- A second limit covers a retry that stores the deadline the failed write already carried, as without B3.
+- The specification now starts the loss window at the first failed write completion that leaves the lockout unstored.
+- The new definition keeps that start fixed for later failures and new retry chains.
+- For two queued writes (X02), the specification now predicts an 11 s window from the first write's failed completion.
+- A new notation table explains the shorthand of the specification, from the state fields to the case IDs.
+
+
 M7/WP2 (F2 hardening): P2 exit record and clean JVM rerun   (2026-10-09)
 ------------------------------------------------------------------------
 The M7_PLAN.md project plan now records the end of phase P2 of the R-007 lockout hardening work. Phase P2 tested

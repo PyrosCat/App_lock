@@ -12,6 +12,31 @@ and the comparison measures it against B2 alone.
 Statements about the current code are INSPECTED at `c47d642`. All B3 behaviour in this document is PREDICTED, in the
 evidence labels of `2026-09-23_R007_F2_HARDENING_TEST_PLAN.md`.
 
+**Notation.** The rules and tables of this document use this shorthand.
+
+| Notation | Meaning |
+|---|---|
+| M | The memory and public state of the manager. Its fields (c, rw, rm, f, rev, streak) are the failure count, the recorded wall and elapsed deadlines, the fallback deadline on the elapsed clock, the revision of the latest admission, and the reset streak. In the tables, "M" followed by a state gives the public state. |
+| D | The stored pair (c, w): the durable count and the wall deadline. "D Z" means that D equals `Z`. |
+| V | The verifier entries: the PINs that reached verification. "V + 1" is one more entry. |
+| A | The outcomes and the completion callbacks of the admitted operations. |
+| R | The retry events (scheduled, fired, started, ended, cancelled, ignored) and the retry writes. |
+| `Z`, `C4`, `L5`, `L8` | The stored-pair fixtures of the test plan: (0, 0), (4, 0), (5, W0 + T), and (8, W0 + 240 s). |
+| W0, E0, T | The start of the wall clock (1,000,000 ms) and of the elapsed clock (5,000,000 ms) in the JVM tests, and the base lockout window of 30 s. |
+| Fn | The failure admission that brings the count to n. F5 reaches the threshold of 5 failures. |
+| Gate | The `GatedCaller` stand-in for the live callers. It verifies a PIN only while the state is Available. "Gate blocked" means that the next wrong PIN does not reach verification. |
+| Manager-only | A failure or a reset that the test submits to the manager directly, not through the gate. |
+| Recorded, degraded | "`LockedOut(x)` recorded" means `LockedOut(x, degraded = false)`: the recorded wall deadline or its elapsed mirror covers the lockout, including any fallback. The elapsed mirror lives in memory only, so a restart can lose its cover (X04). "Degraded" means `degraded = true`: the fallback outlasts both recorded deadlines, which is a gap (section 3.1). |
+| D1 to D14 | The B3 transitions of section 3.2. |
+| B2-A1 to B2-A11 | The properties of B2 that B3 depends on (section 2). |
+| B2 T1 to T20 | The transitions of the B2 specification. |
+| S11 to S13 | The B2 rules of the reference model in the test harness. S11 expects one retry chain after a failed write of the latest admission. S12 cancels that chain at every admission. S13 checks the payload, the commit, and the next attempt of each retry. |
+| I1 to I9 | The constraints of the test plan that every candidate keeps. Section 8 names all nine, for example I5 event accounting and I8 deadline integrity. |
+| P0, P3, P5 | Phases of the test plan. P0 set the policies, P3 compares the candidates, and P5 recommends a mechanism and a disposition for each residual. |
+| Case IDs | The test-plan cases: H01 to H06 (healthy storage), R1.1 to R4.4 (one group for each R-007 residual), and X01 to X15 (cross-cutting cases). A test name starts with its case ID, for example `R2_1` for R2.1. |
+| `holdIo`, `resumeIo`, `jumpWall` | Harness calls. `holdIo` holds the writer between tasks, so later work waits in the queue until `resumeIo`. `jumpWall` moves the wall clock only. |
+| WRITE chain | A retry chain of the kind WRITE, from B2 or B3. B1 uses READ chains. |
+
 ## 1. Purpose, target residual, and limits
 
 B3 targets R-007/2. At baseline, a failed failure write arms an in-memory fallback (`fallbackMonoDeadline`, on the
@@ -26,12 +51,15 @@ B3 converts the remaining fallback to a wall deadline in the retry payload and r
 B3 preserves the fallback after a retry commits. A restart before that commit can still lose it. P5 must resolve these
 remaining R-007/2 risks:
 
-- **Loss window.** The window starts at the failed completion (D1) or at the count commit that leaves a gap (D2). It
-  ends at the first converted commit. The first attempt comes 1 s after the window starts, and the scheduler
-  specification sets the later delays. An admission during a retry write opens the window again (D9). Each test case
-  records the window (section 6).
+- **Loss window.** The window starts at the first failed completion that leaves the fallback outside storage. This
+  can be the completion of an older write while a newer write still waits. A count commit that leaves a gap (D2), a
+  later failure that extends the fallback, and a chain that replaces an earlier chain do not restart an open window.
+  The window ends at the first converted commit. The first attempt comes 1 s after the chain starts (D1 or D2), and the
+  scheduler specification sets the later delays. An admission during a retry write opens a new window at the count
+  commit that replaces the stored deadline (D9). Each test case records the window (section 6).
 - **Persistent write fault.** No retry commits, so each restart still gives one verified guess (R2.4).
-- **Wall clock.** After the conversion, a backward wall change lengthens a below-threshold lockout (section 3.5).
+- **Wall clock.** After the conversion, a backward wall change lengthens a below-threshold lockout. A backward change
+  can also leave the fallback of a late failed threshold write unstored (section 3.5).
 - **Unread stored pair (R1.3).** Over an unreadable seed, a B2 retry already overwrites the unknown stored pair. B3
   adds its converted deadline to that payload. The unread count stays lost. An unread longer deadline can become the
   shorter converted one, for example `L8` with a 30 s window.
@@ -66,8 +94,8 @@ the last column.
 
 ### 3.1 Terms and conversion
 
-The notation of the test plan applies: M = (c, rw, rm, f, rev, streak) and D = (c, w). Wf is the wall time of the
-failed completion that armed f. For a retry prepared at wall time Wb and elapsed time Eb:
+M and D follow the notation table at the top of this document. Wf is the wall time of the failed completion that armed
+f. For a retry prepared at wall time Wb and elapsed time Eb:
 
 - rem = `remainingOf(f, Eb)`, clamped to 0..`MAX_LOCKOUT_MS`.
 - rec = max(`remainingOf(rw, Wb)`, `remainingOf(rm, Eb)`), the recorded remaining of `stateOf`.
@@ -170,6 +198,17 @@ clears it.
   recorded as an availability regression (X04), measured until the gate is Available again. B3 has no startup clamp,
   because a clamp at the seed would not cover the running process. Before B3 can ship, a clock policy must cover
   running processes, restarts, and reboots.
+- **Retry commit over a longer stored deadline.** After a backward wall change, the recorded window can outlast the
+  fallback of a threshold write that failed late. The retry of that write then finds no gap and stores the B2
+  payload, whose deadline has already passed. The fallback still enforces the remaining lockout, as degraded. No
+  chain stores the fallback deadline, so a restart loses the remaining lockout. An ordinary commit in that state
+  starts a deadline chain (D2), but a retry commit does not. B3 keeps this limit, and the clock policy of P5 must
+  cover it.
+- **Converted deadline equal to the target's.** After a backward wall change between the failed write and the retry,
+  Wb + rem can be earlier than t. The converted payload then equals the B2 payload, so storage holds the same pair
+  as under B2. Because the stored deadline equals t, `applyRetryCommit` records the target's deadlines by the B2 rule
+  (section 3.3) and does not raise rm to max(rm, f). After a later forward wall change, the remaining fallback can
+  therefore read as degraded.
 - **What B3 cannot do.** B3 cannot tell a restart from a reboot. It cannot detect a wall change across a restart, and
   it has no trusted time after a reboot. The C6 boot-aware alternative of the test plan stores a boot identity and an
   elapsed deadline. That needs a new key, which P0 excludes for B3. A recorded window that only the elapsed mirror
@@ -239,7 +278,7 @@ and nothing else, unless a row says otherwise. V is unchanged unless a row names
 | `R2_1 - after the retry commits a restart keeps the remainder of the fallback` | D1, D4, D7, D14 | Z; write 0 `ReturnFalse`, then `Throw`; advance 1 s, then 4 s; restart | Retry write 1 stores (1, W0+T) at 1 s. M `LockedOut(25 s, degraded = false)` at 5 s. A: (`LockedOut(T, degraded = true)`, 1), 1 callback. R: scheduled, fired, started, ended success. After restart `LockedOut(25 s)` recorded, count 1, gate blocked. Loss window 1 s. |
 | `R2_1 - a reboot after the retry commit enforces the stored deadline less the downtime` | D7, D14 | As above; reboot at 5 s with 10 s downtime | Boot 2. `LockedOut(15 s)` recorded, count 1, gate blocked. |
 | `R2_1 - a death before the retry commit loses the fallback and a death after it keeps it` | D13 | As above: kill at 500 ms; retry write `HoldBeforeCommit`, then kill; retry write `CommitThenHold`, then kill | First two: D Z, Available, V + 1. Third: D (1, W0+T), recorded remainder after restart, no write in the new process. |
-| `R2_2 - a committed count after the failed write starts a retry that stores the fallback` | D2, D4, D7 | Order A: F1 held then false while F2 waits, so F1 is not the latest admission. Order B: F1 false, then F2 cancels the B2 chain. F2 commits (2, 0); advance 1 s, then 9 s; restart | Retry stores (2, W0+T) at 1 s. M `LockedOut(20 s, degraded = false)` at 10 s. A: F1 (`LockedOut(T, degraded = true)`, 1), F2 (Available, 2). After restart `LockedOut(20 s)` recorded, count 2. Loss window 1 s from F2's commit. |
+| `R2_2 - a committed count after the failed write starts a retry that stores the fallback` | D2, D4, D7 | Order A: F1 held then false while F2 waits, so F1 is not the latest admission. Order B: F1 false, then F2 cancels the B2 chain. F2 commits (2, 0); advance 1 s, then 9 s; restart | Retry stores (2, W0+T) at 1 s. M `LockedOut(20 s, degraded = false)` at 10 s. A: F1 (`LockedOut(T, degraded = true)`, 1), F2 (Available, 2). After restart `LockedOut(20 s)` recorded, count 2. Loss window 1 s from F1's failed completion. |
 | `R2_2 - ordinary writes after a converted commit keep or replace the stored deadline, and a reset clears it` | D7, D14, D12 | Z; write 0 false; advance 1 s; manager-only F2; restart at 2 s; manager-only F3, F4, F5; manager-only reset | D (1, W0+T), then (2, W0+T). After restart `LockedOut(28 s)` recorded, count 2. F3 and F4 store (3, W0+T) and (4, W0+T). F5 stores (5, W0+32 s), `LockedOut(30 s)` recorded. The reset stores Z. |
 | `R2_3 - a retry stores the remainder of a fallback that outlasts an expired threshold commit` | D2, D4, D7 | (3, 0); F4 held 40 s, then false; F5 commits (5, W0+T); advance 1 s; restart | Retry stores (5, W0+70 s). M `LockedOut(29 s, degraded = false)`. A: F4 (`LockedOut(T, degraded = true)`, 4), F5 (`LockedOut(T, degraded = false)`, 5). After restart `LockedOut(29 s)` recorded. |
 | `R2_4 - failed retries store the original deadline until it passes and none after it` | D10, D5 | Z; all writes `ReturnFalse`; advance 1, 2, 4, 8, 16 s | Retries at 1, 3, 7, and 15 s carry (1, W0+T). The retry at 31 s carries (1, 0). f stays E0+T: degraded until T, then Available. D Z. After restart Available, gate open. |
@@ -247,10 +286,10 @@ and nothing else, unless a row says otherwise. V is unchanged unless a row names
 | `X03 - a deadline retry that runs at or after the end of the fallback writes nothing` | D6, D11 | Order B above; `holdIo`; the retry fires at T - 1 ms; resume at T - 1 ms, T, T + 1 ms, or 10 min | Resume at T - 1 ms: stores (2, W0+T), `LockedOut(1 ms)` recorded. Otherwise `IGNORED`, no I/O, D (2, 0), Available. |
 | `X03 - a retry write that commits after the fallback ends brings no lockout back` | D4, D7, D11 | Z; write 0 false; retry write 1 `HoldBeforeCommit`; advance 1 s; advance to T + 1 ms; release; restart | Stores (1, W0+T) after the expiry. M Available before and after the commit. After restart Available, count 1. |
 | `X03 - a retry keeps a longer recorded deadline` | D5, D8 | (3, W0+10 min), the stored form of a converted deadline after a backward wall change; manager-only failure, write 0 false; advance 1 s | No gap. Retry stores the B2 payload (4, W0+10 min). M `LockedOut(10 min - 1 s)` recorded. |
-| `X02 - a fallback extended without a new revision is stored with its extended deadline` | D1, D4 | Z; writes 0 and 1 `HoldBeforeCommit(ReturnFalse)`; F1, F2; release write 0; advance 10 s; release write 1; advance 1 s; restart | No chain while write 1 waits. f moves to E0+40 s without a new revision, then the chain starts. Retry stores (2, W0+40 s). After restart `LockedOut(29 s)` recorded. |
+| `X02 - a fallback extended without a new revision is stored with its extended deadline` | D1, D4 | Z; writes 0 and 1 `HoldBeforeCommit(ReturnFalse)`; F1, F2; release write 0; advance 10 s; release write 1; advance 1 s; restart | No chain while write 1 waits. f moves to E0+40 s without a new revision, then the chain starts. Retry stores (2, W0+40 s). After restart `LockedOut(29 s)` recorded. Loss window 11 s from the failed completion of write 0. |
 | `X02 - an admission during the retry write blocks the recording and the next chain stores the deadline` | D9, D2, D7 | Z; write 0 false; advance 1 s with retry write 1 held; manager-only F2; release; advance 1 s | Disk order (1, W0+T), (2, 0), (2, W0+T). M degraded until the last commit, then `LockedOut(28 s)` recorded. R: ended abandoned, then a deadline chain that ends in success. |
 | `X04 - a wall change between retries moves the stored deadline and keeps the remainder` | D10, D4, D7 | Realistic wall Wr; writes 0 and 1 false; advance 1 s; `jumpWall(+1 h)`; advance 2 s; restart | Retry 1 carries (1, Wr+T). Retry 2 stores (1, Wr + 1 h + T). M `LockedOut(27 s)` recorded. After restart `LockedOut(27 s)` recorded. |
-| `X04 - after a retry commit a backward wall change blocks access until the wall clock reaches the stored deadline, in process and after a restart` | D7, D14 | Commit at 1 s; `jumpWall(+1 h)` or `jumpWall(-1 h)`; read the state. For -1 h, two variants: stay in process, or restart at the jump; then advance to 30 min 29 s, to 1 h 29 s - 1 ms, and to 1 h 29 s after the jump | +1 h: `LockedOut(29 s)` recorded in process, Available after restart. -1 h, both variants: `LockedOut(30 min)` recorded until 30 min 29 s after the jump, then counting down; `LockedOut(1 ms)` at 1 h 29 s - 1 ms; Available at 1 h 29 s. `availability_regression` records 1 h 29 s of blocked access against 29 s. |
+| `X04 - after a retry commit a backward wall change blocks until the stored deadline, also after a restart` | D7, D14 | Commit at 1 s; `jumpWall(+1 h)` or `jumpWall(-1 h)`; read the state. For -1 h, two variants: stay in process, or restart at the jump; then advance to 30 min 29 s, to 1 h 29 s - 1 ms, and to 1 h 29 s after the jump | +1 h: `LockedOut(29 s)` recorded in process, Available after restart. -1 h, both variants: `LockedOut(30 min)` recorded until 30 min 29 s after the jump, then counting down; `LockedOut(1 ms)` at 1 h 29 s - 1 ms; Available at 1 h 29 s. `availability_regression` records 1 h 29 s of blocked access against 29 s. |
 | `R4_3 - a reset drops a queued retry and its clear follows a running retry` | D12, D9 | Z; write 0 false. Queued run: `holdIo`, advance 1 s, manager-only reset, `resumeIo`. Running run: retry write held, reset, release | Queued: `IGNORED`, D Z. Running: D (1, W0+T), then Z, nothing recorded. M Available and count 0 from the reset on. After restart Available. |
 | `R4_3 - a failed clear behind a running retry leaves the stored deadline until the reset retry commits` | D9, D12 | Running run above with the clear `ReturnFalse`; restart at 1.5 s, or advance 1 s | M Available. Restart: D (1, W0+T), `LockedOut(28.5 s)` recorded (R-007/4). Advance: the reset retry stores Z. |
 | `X06 - after shutdown a running retry still commits and nothing is recorded` | D13 | Z; write 0 false; advance 1 s with retry write 1 held; shutdown; release; restart | D (1, W0+T). M stays degraded: no recording, no callback, and no rescheduling. R: `ENDED abandoned` when the held retry finishes after the stop, and no other retry event. After restart `LockedOut(29 s)` recorded. |
@@ -269,20 +308,29 @@ All results of this section are PREDICTED. Each unpredicted change goes to the l
 
 | Class and test | B2 alone | B2+B3 |
 |---|---|---|
-| `DegradedRestartTest` `R2_1 - a restart erases the degraded fallback of a failed below-threshold write` (B2 name: `R2_1 - a failed below-threshold write is retried, so a later restart keeps its count but not its fallback`) | Death at 5 s, at T - 1 ms, and the reboot at 5 s: in process `LockedOut(T - d, degraded = true)`, D (1, 0), after restart Available, count 1, gate open at once. Death at 0 s: D Z, count 0, Available. | Death at 5 s, at T - 1 ms, and the reboot: in process `LockedOut(T - d, degraded = false)`, D (1, W0+T), after restart `LockedOut(T - d)` recorded (reboot: 24 s), count 1, gate blocked, `lost_enforcement_ms` 0. Death at 0 s unchanged. New name: "after the retry commits a restart keeps the remainder of the fallback, and a death before it loses the fallback". |
+| `DegradedRestartTest` `R2_1 - a restart erases the degraded fallback of a failed below-threshold write` (B2 name: `R2_1 - a failed below-threshold write is retried, so a later restart keeps its count but not its fallback`) | Death at 5 s, at T - 1 ms, and the reboot at 5 s: in process `LockedOut(T - d, degraded = true)`, D (1, 0), after restart Available, count 1, gate open at once. Death at 0 s: D Z, count 0, Available. | Death at 5 s, at T - 1 ms, and the reboot: in process `LockedOut(T - d, degraded = false)`, D (1, W0+T), after restart `LockedOut(T - d)` recorded (reboot: 24 s), count 1, gate blocked, `lost_enforcement_ms` 0. Death at 0 s unchanged. New name: "after the retry commits a restart keeps the fallback remainder, and a death before it loses it". |
 | `DegradedRestartTest` `R2_2 - a later committed count keeps the earlier fallback in memory only` | Unchanged from baseline: no chain, D (2, 0), restart at 10 s gives count 2 and Available. | Before the advance unchanged. F2's commit starts a deadline chain, and the retry at 10 s stores (2, W0+T). After restart count 2, `LockedOut(20 s)` recorded. New name: "a later committed count starts a retry that stores the earlier fallback". |
+| `CrossCuttingTest` `X08 - a failure write that throws a cancellation is a failed write, arms the fallback, and calls back once` | The next admission ends the chain: retry events `[Scheduled(1), Cancelled(1)]`, D (2, 0). | F2's commit of (2, 0) leaves the fallback of F1, so it starts a deadline chain (D2). Retry events `[Scheduled(1), Cancelled(1), Scheduled(2)]`. The chain does not fire before the test ends. The other assertions are unchanged. |
 
 ### 7.2 Tests of the B2 specification that change
 
 | Test of `WriteRetryTest` | B2 alone | B2+B3 |
 |---|---|---|
-| `X03 - a retry of a threshold write that failed after its window persists the expired deadline and revives nothing` | D (5, W0+T), already expired. M degraded 29 s. After restart Available, count 5. | D (5, W0+70 s). M `LockedOut(29 s)` recorded. After restart `LockedOut(29 s)` recorded, count 5. |
-| `R3_4 - a retry after a false acknowledgement writes the same pair again and changes nothing in memory` | D (1, 0) before and after. M `LockedOut(T - 1 s, degraded = true)`. | D (1, W0+T) after the retry. M `LockedOut(29 s, degraded = false)`. |
+| `X03 - a retry of a threshold write that failed after its window persists the expired deadline and revives nothing` | D (5, W0+T), already expired. M degraded 29 s. After restart Available, count 5. | D (5, W0+70 s). M `LockedOut(29 s)` recorded. After restart `LockedOut(29 s)` recorded, count 5. New name: "a retry of a threshold write that failed late stores its fallback deadline, not the expired one". |
+| `R3_4 - a retry after a false acknowledgement writes the same pair again and changes nothing in memory` | D (1, 0) before and after. M `LockedOut(T - 1 s, degraded = true)`. | D (1, W0+T) after the retry. M `LockedOut(29 s, degraded = false)`. New name: "a retry after a false acknowledgement adds the fallback deadline to the committed count". |
 | `R1_3 - a retry of the racing failure write erases the unreadable stored lockout that the baseline keeps` | D (1, 0). After restart Available, count 1. The erased `L5` is the cost of the regression. | D (1, W0+T). After restart `LockedOut(29 s)` recorded, count 1. The unread count 5 is still erased. |
+| `X01 - a failure retry cannot persist behind a newer reset or over a newer failure`, the run in which the retry waits for its timer | Retry events `[Scheduled(1), Cancelled(1)]`. No retry write, D Z. | F2's write commits (2, 0) before the reset is admitted. F2 is then the latest admission, so its commit starts a deadline chain (D2), and the reset cancels it. Retry events `[Scheduled(1), Cancelled(1), Scheduled(2), Cancelled(2)]`. No retry write, D Z. |
+| `I3 - a blocked retry write holds no manager lock, so admission and state reads go on` | The last retry event is `Ended(1, ABANDONED)`. | After the abandoned retry, the write of the newer admission commits (2, 0) under the fallback of F1 and starts a deadline chain (D2). The test waits for `Scheduled(2)` and asserts the ordered retry events `[Scheduled(1), Fired(1), Started(1), Ended(1, ABANDONED), Scheduled(2)]`. Admission and state reads still finish while the retry write is blocked. |
 
-The other B2 tests keep their assertions. In `R2_4`, `X05`, and `I3`, the payloads carry a converted deadline while a
-gap exists. `X12` and the running run of `X06` already store (5, W0+T), which equals the conversion. The two
+The other B2 tests keep their assertions. In `R2_4` and `X05`, the payloads carry a converted deadline while a gap
+exists. `X12` and the running run of `X06` already store (5, W0+T), which equals the conversion. The two
 cancellation tests of `WriteRetryTest` involve a reset or no completion, so B3 changes nothing in them.
+
+Outside `r007`, the `LockoutHarnessTest` test `a failure inside a seeded action reports its seed and step` changes.
+With seed 7, the test now detects the replayed stale payload at step 1, which is an `advance`. There the first retry
+writes a converted payload, which differs from the replayed one. Under B2 alone, that retry rewrote the payload of
+write 0, so the replay showed only at a later admission step. The test accepts `advance` and also asserts the payload
+mismatch.
 
 ### 7.3 r007 baseline tests whose assertions B3 does not change
 
@@ -297,9 +345,8 @@ cancellation tests of `WriteRetryTest` involve a reset or no completion, so B3 c
   retry.
 - `FailedResetTest`: all 7 tests. A reset leaves no fallback. The last wrong PIN of `R4_4` starts a B2 chain with no
   advance after it.
-- `CrossCuttingTest`: all 21 tests, with the B2 values of the three X08 tests that B2 changes. In
-  `X08 - a failure write that throws a cancellation ...` the commit of the second admission leaves the fallback of the
-  first. Its trace gains a scheduled deadline chain, which does not fire before the test ends.
+- `CrossCuttingTest`: 20 of the 21 tests, with the B2 values of the X08 tests that B2 changes.
+  `X08 - a failure write that throws a cancellation ...` changes (section 7.1).
   `X08 - cancelling the resolved Deferred before its write starts ...` writes only healthy pairs, and the clear test
   has no fallback. `X03 - ... stalls past its window and fails ...` and
   `X08 - cancelling the resolved Deferred while its write runs ...` start a B2 chain with no advance. In
