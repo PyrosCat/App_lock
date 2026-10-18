@@ -5,7 +5,7 @@
 # Kotlin 2.4.x bump rides the dependabot flow separately. Wrapper -> gradle-8.13 in lockstep.
 [versions]
 agp = "8.13.2"
-kotlin = "2.1.0"
+kotlin = "2.4.10"
 ksp = "2.1.0-1.0.29"
 coreKtx = "1.15.0"
 lifecycle = "2.8.7"
