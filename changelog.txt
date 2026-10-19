@@ -4,6 +4,27 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 decision proposal after P2   (2026-10-19)
+-------------------------------------------------------------------
+The new 2026-10-10_R007_F2_HARDENING_P3_DECISION_PROPOSAL.md document proposes which P3 candidates go forward. Phase
+P3 compares candidate fixes for the R-007 lockout storage weaknesses, after phase P2 tested the current app.
+- The proposal recommends proceeding first with a gate that permits no PIN check until the stored lockout is trusted
+  (C1). It pairs the gate with retries of a failed startup read (B1).
+- The proposal favors count-first C2 to prevent restarts from restoring attempts already used. That design stores the
+  next failure count before each PIN check, in the two existing keys.
+- Another recommendation is to keep the retry of a failed write (B2), mainly for the reset after an accepted unlock.
+- An extra stored attempt record (option A) is proposed only as a comparison and for limits of count-first C2.
+- Two partial alternatives are named, and three more candidates get no priority.
+- After the write of a wrong PIN fails, the app keeps a temporary fallback lock in memory. For storing its deadline
+  (B3), the proposal asks only for a JVM comparison with B2, with no plan to ship.
+- A predicted example restarts the app inside the fallback lock, after a retry has stored the count. In that example,
+  B3 still blocks the next PIN check, and B2 does not.
+- Clock policy (C6) is proposed as separate work, starting with a forward clock-change test (X04) on a device.
+- Six proposed decisions include whether restart protection must preserve temporary lockouts held in memory.
+- Other sections of the proposal list what count-first C2 must still prove, the order of work, and the device runs.
+- A proposed decision text for the M7_PLAN.md project plan closes the proposal.
+
+
 M7/WP2 (F2 hardening): P2 harness fixes for sweep misses, kill events, and a grep crash   (2026-10-09)
 ------------------------------------------------------------------------------------------------------
 The P2 device test harness gets three fixes, two of them from the NucBox report of 2026-10-08. Phase P2 tested the
