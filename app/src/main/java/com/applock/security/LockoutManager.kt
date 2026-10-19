@@ -506,10 +506,10 @@ class LockoutManager(
             return persisted != null
         }
 
-        // Applies a read pair as the construction read would have, and ends the chain. A failed read schedules the
-        // next retry. A retry that is no longer wanted ends the chain with no change.
+        // Each attempt is a new RecoveryRead, so [persisted] holds only this attempt's read, and a failed read leaves
+        // it null. A read pair applies as the construction read would have.
         override fun complete(succeeded: Boolean): RecoveryStep {
-            val value = persisted.takeIf { succeeded }
+            val value = persisted
             return when {
                 !recoveryWanted() -> RecoveryStep.ABANDON
                 value == null -> RecoveryStep.RETRY

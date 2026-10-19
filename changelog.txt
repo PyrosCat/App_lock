@@ -4,6 +4,24 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 candidate B1 test checks and cleanups   (2026-10-19)
+------------------------------------------------------------------------------
+Candidate B1 of phase P3 gets two more test checks and four cleanups. Phase P3 compares candidate fixes for the R-007
+lockout storage weaknesses with the current app.
+- The ColdReadTest test of a restart during a pending retry now checks that neither process admits a PIN attempt. Its
+  evidence file records zero PIN verifications.
+- In the CrossCuttingTest class, the test of a read in flight at shutdown now also checks the stored lockout.
+- A shared helper in the BaselineCase test class now lists the times of the failed retry reads. The test of the 60 s
+  retry cap uses this helper instead of its own copy.
+- The completion of a recovery read in the LockoutManager class drops a redundant check of the read result. Its
+  comment now states why the read result of the attempt is enough.
+- A comment in the LockEngineRuntime class now names the recovery read of the manager.
+- Assertion messages in the R-007 tests that candidate B1 changed now state the expected fact.
+- After these changes, the local gate on the B1 branch passed all 501 unit tests, with none skipped.
+- In that gate run, the detekt, assembleProdDebug, and compileProdDebugAndroidTestKotlin tasks passed.
+- A second run of the 74 R-007 test cases passed together with the detekt task.
+
+
 M7/WP2 (F2 hardening): P3 candidate B1 retries of a failed startup read   (2026-10-08)
 --------------------------------------------------------------------------------------
 In candidate fix B1, the lockout manager now retries a failed startup read until the stored lockout loads. In phase

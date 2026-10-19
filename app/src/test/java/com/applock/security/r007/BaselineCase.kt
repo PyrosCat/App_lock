@@ -5,6 +5,8 @@ import com.applock.security.harness.FaultPlan
 import com.applock.security.harness.GatedCaller
 import com.applock.security.harness.LockoutHarness
 import com.applock.security.harness.LockoutModel
+import com.applock.security.harness.Phase
+import com.applock.security.harness.StorageOp
 import com.applock.security.harness.VirtualClocks
 import org.junit.Rule
 import org.junit.internal.AssumptionViolatedException
@@ -84,6 +86,12 @@ abstract class BaselineCase {
         }
         return RestartEntries(firstProcess, perRestart)
     }
+
+    /** The elapsed times, counted from E0, of the failed recovery reads of the first process. */
+    protected fun LockoutHarness.failedRetryReadTimes(): List<Long> =
+        ledger.storageEvents(1)
+            .filter { it.op == StorageOp.READ && it.index > 0 && it.phase == Phase.THREW }
+            .map { it.elapsedMs - E0 }
 
     private fun save(
         description: Description,

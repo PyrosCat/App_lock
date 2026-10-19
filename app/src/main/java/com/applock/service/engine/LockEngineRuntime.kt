@@ -605,7 +605,7 @@ class LockEngineRuntime(
             LockoutState.Available
         }
         // The manager contains a seed read failure itself (currentState does not throw), so surface the degraded
-        // cold start here, once, for diagnostics. The manager retries the read off-main (its re-seed).
+        // cold start here, once, for diagnostics. The manager retries the read off-main (its recovery read).
         if (lockoutManager.seedReadFailed()) safeReport("lockout_read", "seed_degraded")
         return state
     }

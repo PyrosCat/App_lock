@@ -8,7 +8,6 @@ import com.applock.security.LockoutState.LockedOut
 import com.applock.security.LockoutStorage
 import com.applock.security.harness.FaultPlan
 import com.applock.security.harness.GatedCaller
-import com.applock.security.harness.Phase
 import com.applock.security.harness.ReadScript
 import com.applock.security.harness.StorageOp
 import com.applock.security.harness.VirtualClocks
@@ -137,9 +136,7 @@ class CrossCuttingTest : BaselineCase() {
             .filter { it.startsWith("RETRY_SCHEDULED") }
             .map { it.substringAfter("delay=").toLong() }
         assertEquals(listOf(1_000L, 2_000L, 4_000L, 8_000L, 16_000L, 32_000L) + List(9) { 60_000L }, delays)
-        val failedReadSeconds = harness.ledger.storageEvents(1)
-            .filter { it.op == StorageOp.READ && it.index > 0 && it.phase == Phase.THREW }
-            .map { (it.elapsedMs - E0) / STEP_MS }
+        val failedReadSeconds = harness.failedRetryReadTimes().map { it / STEP_MS }
         assertEquals(
             "14 retries in 10 min",
             listOf(1L, 3L, 7L, 15L, 31L, 63L, 123L, 183L, 243L, 303L, 363L, 423L, 483L, 543L),
@@ -211,6 +208,7 @@ class CrossCuttingTest : BaselineCase() {
 
         harness.advance(TEN_MIN_MS)
         assertEquals("no read starts after the stop", 2, harness.store.readCount(1))
+        assertEquals("the stop leaves L5 stored", L5, harness.store.durableState())
         assertEquals("RETRY_ENDED seq=1 outcome=abandoned", harness.retryTrace(1).last())
         harness.record("X06-running-reseed", "published" to false, "reads_after_stop" to 0)
     }

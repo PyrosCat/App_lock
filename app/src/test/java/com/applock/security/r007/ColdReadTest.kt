@@ -5,8 +5,7 @@ import com.applock.security.LockoutState.Available
 import com.applock.security.LockoutState.LockedOut
 import com.applock.security.harness.FaultPlan
 import com.applock.security.harness.GatedCaller
-import com.applock.security.harness.LockoutHarness
-import com.applock.security.harness.Phase
+import com.applock.security.harness.LedgerEvent
 import com.applock.security.harness.ReadScript
 import com.applock.security.harness.StorageOp
 import com.applock.security.harness.WriteScript
@@ -161,16 +160,16 @@ class ColdReadTest : BaselineCase() {
             val harness = harness(initial, FaultPlan().read(ReadScript.Throw))
             harness.start()
             repeat(POLLS_10_S) {
-                assertEquals(name, Available, harness.poll())
+                assertEquals("$name: the state stays Available", Available, harness.poll())
                 harness.advance(POLL_MS)
             }
             harness.check()
             val failedReadTimes = harness.failedRetryReadTimes()
             assertEquals("$name: the retries fail at 1, 3, and 7 s", listOf(1_000L, 3_000L, 7_000L), failedReadTimes)
-            assertEquals(name, 4, harness.store.readCount(1))
-            assertEquals(name, 0, harness.manager.failureCount())
-            assertEquals(name, 0, harness.store.writeCount(1))
-            assertEquals(name, initial, harness.store.durableState())
+            assertEquals("$name: the first read and three retries", 4, harness.store.readCount(1))
+            assertEquals("$name: the count stays 0", 0, harness.manager.failureCount())
+            assertEquals("$name: nothing is written", 0, harness.store.writeCount(1))
+            assertEquals("$name: the stored pair is unchanged", initial, harness.store.durableState())
             harness.record("R1.2-poll-$name", "reads" to harness.store.readCount(1), "retry_ms" to failedReadTimes)
         }
     }
@@ -265,6 +264,9 @@ class ColdReadTest : BaselineCase() {
         assertEquals(0, harness.manager.failureCount())
         assertEquals(L5, harness.store.durableState())
         assertEquals(1, harness.store.readCount(1))
+        val admissions = harness.ledger.snapshot().filterIsInstance<LedgerEvent.Action>()
+            .filter { it.name.startsWith("ADMIT_") }
+        assertEquals("no admission, so no verifier entry, in either process", emptyList<Any>(), admissions)
         assertEquals(
             "the dead process records no retry event after its kill",
             listOf("RETRY_SCHEDULED seq=1 kind=READ attempt=1 delay=1000"),
@@ -282,7 +284,11 @@ class ColdReadTest : BaselineCase() {
         )
         val firedElapsed = harness.retryEvents(2).first { it.name == "RETRY_FIRED" }.elapsedMs
         assertEquals("the new chain fires 1 s after the restart", restartElapsed + FIRST_RETRY_MS, firedElapsed)
-        harness.record("R1.2-restart-pending-retry", "fired_after_restart_ms" to firedElapsed - restartElapsed)
+        harness.record(
+            "R1.2-restart-pending-retry",
+            "fired_after_restart_ms" to firedElapsed - restartElapsed,
+            "verifier_entries" to 0,
+        )
     }
 
     // ---- R1.3 old recovery read races a local mutation -----------------------------------------
@@ -392,11 +398,12 @@ class ColdReadTest : BaselineCase() {
             harness.check()
             harness.advance(TEN_MIN_MS)
             harness.check()
-            assertEquals(admission, 1, harness.store.readCount(1))
-            assertEquals(admission, count, harness.manager.failureCount())
-            assertEquals(admission, LockoutSnapshot(count, 0L), harness.store.durableState())
+            assertEquals("$admission: no recovery read follows", 1, harness.store.readCount(1))
+            assertEquals("$admission: the admission sets the count", count, harness.manager.failureCount())
+            val admittedPair = LockoutSnapshot(count, 0L)
+            assertEquals("$admission: storage holds the admitted pair", admittedPair, harness.store.durableState())
             assertEquals(
-                admission,
+                "$admission: the admission cancels the pending retry",
                 listOf(
                     "RETRY_SCHEDULED seq=1 kind=READ attempt=1 delay=1000",
                     "RETRY_CANCELLED seq=1 reason=cancelled",
@@ -552,12 +559,6 @@ class ColdReadTest : BaselineCase() {
         assertEquals(LockoutSnapshot(6, W0 + FIRST_RETRY_MS + STALL_MS + 2 * T), harness.store.durableState())
         harness.record("R1.4-recovery-after-window", "count_after_release" to 5, "verifier_entries" to 1)
     }
-
-    // The elapsed times, counted from E0, of the failed recovery reads of the first process.
-    private fun LockoutHarness.failedRetryReadTimes(): List<Long> =
-        ledger.storageEvents(1)
-            .filter { it.op == StorageOp.READ && it.index > 0 && it.phase == Phase.THREW }
-            .map { it.elapsedMs - E0 }
 
     private companion object {
         const val POLLS_10_S = 40
