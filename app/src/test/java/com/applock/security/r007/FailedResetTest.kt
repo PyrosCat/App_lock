@@ -46,7 +46,7 @@ class FailedResetTest : BaselineCase() {
             harness.advance(BEFORE_FIRST_RETRY_MS)
             harness.restart()
             harness.check()
-            assertEquals("$script", L5, harness.store.durableState())
+            assertEquals("$script: storage still holds L5", L5, harness.store.durableState())
             val staleLock = LockedOut(T - BEFORE_FIRST_RETRY_MS, degraded = false)
             assertEquals("$script: the old lockout is back", staleLock, harness.manager.currentState())
             harness.record("R4.1-$script", "stale_lock_ms" to T - BEFORE_FIRST_RETRY_MS, "stale_count" to 5)
@@ -103,7 +103,7 @@ class FailedResetTest : BaselineCase() {
             val reset = harness.succeed { callbacks.incrementAndGet() }
             harness.check()
             assertEquals("$script: the clear reports its failure", false, runBlocking { reset.resolved.await() })
-            assertEquals("$script", L5, harness.store.durableState())
+            assertEquals("$script: storage still holds L5", L5, harness.store.durableState())
             assertEquals("$script: memory clears at once", Available, harness.manager.currentState())
 
             harness.advance(FIRST_RETRY_DELAY_MS) // the storage is healthy from here: only write 0 fails
@@ -111,7 +111,7 @@ class FailedResetTest : BaselineCase() {
             assertEquals("$script: the retry stores the clear", Z, harness.store.durableState())
             assertEquals("$script: the clear and one retry write", 2, harness.store.writeCount(1))
             assertEquals("$script: memory stays cleared", Available, harness.manager.currentState())
-            assertEquals("$script", 0, harness.manager.failureCount())
+            assertEquals("$script: the count stays 0", 0, harness.manager.failureCount())
             assertEquals("$script: one callback, and none for the retry", 1, callbacks.get())
             val retryEvents = listOf(
                 RecoveryEvent.Scheduled(1L, RecoveryKind.WRITE, 1, FIRST_RETRY_DELAY_MS),
@@ -119,12 +119,12 @@ class FailedResetTest : BaselineCase() {
                 RecoveryEvent.Started(1L),
                 RecoveryEvent.Ended(1L, RecoveryEvent.Ended.Outcome.SUCCESS),
             )
-            assertEquals("$script", retryEvents, harness.retryEvents())
+            assertEquals("$script: the first retry attempt commits", retryEvents, harness.retryEvents())
 
             harness.restart()
             harness.check()
             assertEquals("$script: the restart loads Z", Available, harness.manager.currentState())
-            assertEquals("$script", 0, harness.manager.failureCount())
+            assertEquals("$script: the restart loads count 0", 0, harness.manager.failureCount())
             harness.record("R4.2-$script", "retries" to 1, "durable_after_retry" to Z)
         }
     }

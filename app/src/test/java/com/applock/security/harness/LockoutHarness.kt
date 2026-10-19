@@ -489,7 +489,8 @@ class LockoutHarness(
             .forEach { event ->
                 when (event) {
                     is LedgerEvent.Storage -> model.onStorageEvent(event)
-                    is LedgerEvent.Action -> event.recovery?.let { model.onRetryEvent(it, event.elapsedMs) }
+                    is LedgerEvent.Action ->
+                        event.recovery?.let { model.onRetryEvent(it, event.wallMs, event.elapsedMs) }
                 }
             }
         syncedSeq = events.size

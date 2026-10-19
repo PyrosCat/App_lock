@@ -19,9 +19,9 @@ class DegradedRestartTest : BaselineCase() {
 
     // ---- R2.1 below-threshold failure, then death ----------------------------------------------
 
-    // B2 spec: T2, T10, T19.
+    // B2 spec: T2, T10, T19. B3 spec: D1, D4, D7, D13, D14.
     @Test
-    fun `R2_1 - a failed below-threshold write is retried, so a later restart keeps its count but not its fallback`() {
+    fun `R2_1 - after the retry commits a restart keeps the fallback remainder, and a death before it loses it`() {
         listOf(WriteScript.ReturnFalse, WriteScript.Throw).forEach { script ->
             listOf(0L, 5_000L, T - 1).forEach { deathMs -> restartAfterFailedWrite(script, deathMs, reboot = false) }
             restartAfterFailedWrite(script, 5_000L, reboot = true)
@@ -33,35 +33,40 @@ class DegradedRestartTest : BaselineCase() {
         val harness = harness(Z, FaultPlan().write(script, generation = 1, index = 0))
         harness.start()
         val caller = GatedCaller(harness)
-        assertTrue(label, caller.wrongPin())
+        assertTrue("$label: the first wrong PIN reaches verification", caller.wrongPin())
         harness.check()
         val outcome = runBlocking { caller.failures[0].resolved.await() }
-        assertEquals(label, FailureOutcome(LockedOut(T, degraded = true), 1), outcome)
+        assertEquals("$label: the outcome is degraded", FailureOutcome(LockedOut(T, degraded = true), 1), outcome)
 
         harness.advance(deathMs)
-        assertEquals(label, LockedOut(T - deathMs, degraded = true), harness.manager.currentState())
+        // Only write 0 fails, so the first retry, 1 s after the failed write, stores the count and the fallback.
+        val retried = deathMs >= FIRST_RETRY_DELAY_MS
+        val beforeDeath = LockedOut(T - deathMs, degraded = !retried)
+        assertEquals("$label: degraded only before the retry commit", beforeDeath, harness.manager.currentState())
         assertFalse("$label: blocked in the same process", caller.wrongPin())
 
         if (reboot) harness.reboot(REBOOT_DOWNTIME_MS) else harness.restart()
         harness.check()
-        // Only write 0 fails, so the first retry, 1 s after the failed write, commits the count.
-        val durable = if (deathMs >= FIRST_RETRY_DELAY_MS) LockoutSnapshot(1, 0L) else Z
-        assertEquals(label, durable, harness.store.durableState())
+        val durable = if (retried) LockoutSnapshot(1, W0 + T) else Z
+        assertEquals("$label: only a retry commit stores the fallback", durable, harness.store.durableState())
         assertEquals("$label: the restart loads the stored count", durable.failureCount, harness.manager.failureCount())
-        assertEquals("$label: the fallback is lost", Available, harness.manager.currentState())
-        assertTrue("$label: the restart gives a verifier entry at once", caller.wrongPin())
+        val downtimeMs = if (reboot) REBOOT_DOWNTIME_MS else 0L
+        val afterRestart = if (retried) LockedOut(T - deathMs - downtimeMs, degraded = false) else Available
+        assertEquals("$label: the restart enforces a stored fallback", afterRestart, harness.manager.currentState())
+        assertEquals("$label: the gate opens only when no fallback is stored", !retried, caller.wrongPin())
         harness.record(
             "R2.1-$script-death$deathMs-${if (reboot) "reboot" else "restart"}",
-            "lost_enforcement_ms" to T - deathMs,
+            "lost_enforcement_ms" to if (retried) 0L else T - deathMs,
             "verifier_entries" to caller.verifierEntries,
             "durable_count" to durable.failureCount,
         )
     }
 
-    // ---- R2.2 a later healthy count commit does not persist the fallback -----------------------
+    // ---- R2.2 a later healthy count commit starts a retry that stores the fallback ------------
 
+    // B3 spec: D2, D4, D7, D14.
     @Test
-    fun `R2_2 - a later committed count keeps the earlier fallback in memory only`() {
+    fun `R2_2 - a later committed count starts a retry that stores the earlier fallback`() {
         val harness = harness(Z, FaultPlan().write(HELD_FALSE, generation = 1, index = 0))
         harness.start()
         val firstFailure = harness.fail()
@@ -75,11 +80,14 @@ class DegradedRestartTest : BaselineCase() {
         assertEquals("F2 has its own outcome", FailureOutcome(Available, 2), secondOutcome)
 
         harness.advance(10_000L)
+        harness.check()
+        val storedFallback = LockoutSnapshot(2, W0 + T)
+        assertEquals("the retry at 10 s stores the fallback of F1", storedFallback, harness.store.durableState())
         harness.restart()
         harness.check()
         assertEquals(2, harness.manager.failureCount())
-        assertEquals(Available, harness.manager.currentState())
-        harness.record("R2.2", "lost_enforcement_ms" to T - 10_000L, "durable" to harness.store.durableState())
+        assertEquals(LockedOut(T - 10_000L, degraded = false), harness.manager.currentState())
+        harness.record("R2.2", "lost_enforcement_ms" to 0L, "durable" to harness.store.durableState())
     }
 
     // ---- R2.3 a delayed threshold commit older than the fallback --------------------------------

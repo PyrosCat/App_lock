@@ -17,10 +17,10 @@ sealed interface ExpectedOutcome {
 /**
  * The reference model of the lockout contract (FR-174, R-007) that the harness uses as its oracle. It is written
  * from the F2 specification (the M7_PLAN F2 entry and the public LockoutManager contract) and from the write retry of
- * candidate B2 (`2026-10-07_R007_F2_HARDENING_P3_B2_SPEC.md`), not from the manager's code. From the harness actions
- * and the ledger, it predicts the public state of the live process, the position and payload of every write, the
- * value of every read, the outcome of every operation, the retry events, the process cache, and the durable state. An
- * assertion message names the rule it checks.
+ * candidate B2 (`2026-10-07_R007_F2_HARDENING_P3_B2_SPEC.md`) with its B3 extension ([DeadlineRetryRules]), not from
+ * the manager's code. From the harness actions and the ledger, it predicts the public state of the live process, the
+ * position and payload of every write, the value of every read, the outcome of every operation, the retry events, the
+ * process cache, and the durable state. An assertion message names the rule it checks.
  *
  * - S1 Seed: a fresh process takes its count and wall deadline from its first read. A failed first read leaves the
  *   process empty, marks the seed as failed, and asks for a re-seed.
@@ -48,14 +48,19 @@ sealed interface ExpectedOutcome {
  *   only while the request stands: the count and the wall deadline come from storage, with no elapsed mirror and no
  *   fallback.
  * - S11 A failed write of the latest admission starts one retry chain for that admission, with attempt 1 and a delay
- *   of 1 s from its completion. The retry fires when the elapsed clock reaches its due time, and its task then joins
- *   the writer queue.
+ *   of 1 s from its completion. A committed failure write of the latest admission starts a deadline chain in the same
+ *   way when its completion leaves a gap: the fallback outlasts the recorded window (B3 rule D2). The retry fires when
+ *   the elapsed clock reaches its due time, and its task then joins the writer queue.
  * - S12 Every admission cancels the expected chain, and so does a shutdown. A retry task that reaches the writer
  *   afterwards writes nothing, and a retry write that runs at that time publishes nothing. After a shutdown, a write
  *   completion changes no memory and starts no chain.
- * - S13 Each retry write carries the payload of the admission that its chain retries. A commit ends the chain, and it
- *   records the deadlines of a threshold admission while that admission is the latest one. A failure expects the next
- *   attempt, with the delay doubled up to 60 s. A retry changes no count, fallback, outcome, or callback.
+ * - S13 Each retry write carries the payload of the admission that its chain retries. While a gap exists at the
+ *   prepare step, the write carries the count and the remaining fallback as a wall deadline instead, never earlier than
+ *   the deadline of that payload (D4). A deadline chain without a gap writes nothing and ends (D6). A commit ends the
+ *   chain. A commit of a converted payload records its deadline and raises the elapsed mirror to the fallback (D7). Any
+ *   other commit records the deadlines of a threshold admission while that admission is the latest one. A failure
+ *   expects the next attempt, with the delay doubled up to 60 s. A retry changes no count, fallback, outcome, or
+ *   callback.
  */
 class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) {
     @Suppress("LongParameterList") // each field is a distinct admission-time fact that the completion rules need
@@ -72,13 +77,22 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
         val recordedElapsed: Long,
     )
 
-    /** S11 to S13: one expected attempt of the retry chain of [target]. */
-    private class Retry(val sequence: Long, val target: Mutation, val attempt: Int, val dueElapsed: Long) {
+    /** S11 to S13: one expected attempt of the retry chain of [target]. [deadline] marks a deadline chain (D2). */
+    private class Retry(
+        val sequence: Long,
+        val target: Mutation,
+        val attempt: Int,
+        val dueElapsed: Long,
+        val deadline: Boolean,
+    ) {
         // True once the retry fired and its task joined the writer queue.
         var fired = false
 
         // True once the writer started the retry, so that its write runs.
         var started = false
+
+        // The payload that the prepare step built when the writer started the retry (S13, D4).
+        var payload: LockoutSnapshot? = null
     }
 
     /** A task of the writer queue: an admitted write, or the task of a fired retry. */
@@ -89,10 +103,17 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
     }
 
     /**
-     * The write in flight: an admitted write, or the write of [retry] with the payload of its target. The write keeps
-     * the [script] it started with (its BEGIN event), even if the fault plan changes while the write is parked.
+     * The write in flight: an admitted write, or the write of [retry] for its target [mutation]. The write keeps the
+     * [script] it started with (its BEGIN event), even if the fault plan changes while the write is parked, and the
+     * [payload] it began with.
      */
-    private class InFlight(val index: Int, val script: WriteScript, val mutation: Mutation, val retry: Retry?)
+    private class InFlight(
+        val index: Int,
+        val script: WriteScript,
+        val payload: LockoutSnapshot,
+        val mutation: Mutation,
+        val retry: Retry?,
+    )
 
     var durable: LockoutSnapshot = initial
         private set
@@ -270,18 +291,18 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
     }
 
     /**
-     * Applies one retry event of the live process, in ledger order, at the elapsed time [elapsedMs] of the event. The
-     * model predicts each scheduled, cancelled, and ended event. It checks each fired, started, and ignored event
-     * against the writer queue and the chain.
+     * Applies one retry event of the live process, in ledger order, at the clocks [wallMs] and [elapsedMs] of the
+     * event. The model predicts each scheduled, cancelled, and ended event. It checks each fired, started, and ignored
+     * event against the writer queue and the chain.
      */
-    fun onRetryEvent(event: RecoveryEvent, elapsedMs: Long) {
+    fun onRetryEvent(event: RecoveryEvent, wallMs: Long, elapsedMs: Long) {
         retryEventsSeen++
         when (event) {
             is RecoveryEvent.Scheduled, is RecoveryEvent.Cancelled, is RecoveryEvent.Ended ->
                 assertEquals("S11-S13: the next retry event", expectedRetryEvents.removeFirstOrNull(), event)
             is RecoveryEvent.Fired -> onFired(event, elapsedMs)
-            is RecoveryEvent.Started -> onStarted(event)
-            is RecoveryEvent.Ignored -> onIgnored(event)
+            is RecoveryEvent.Started -> onStarted(event, wallMs, elapsedMs)
+            is RecoveryEvent.Ignored -> onIgnored(event, wallMs, elapsedMs)
         }
     }
 
@@ -329,7 +350,7 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
         val write = inFlight?.takeIf { it.index == event.index }
             ?: throw AssertionError("S5: write #${event.index} ${event.phase} is not the write in flight")
         assertEquals("harness: write #${event.index} keeps the script it started with", write.script, event.script)
-        val payload = write.mutation.payload
+        val payload = write.payload
         when (event.phase) {
             Phase.CACHE_UPDATED -> {
                 assertTrue("harness: ${write.script} must not change the cache", write.script.updatesCache())
@@ -343,11 +364,11 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
             }
             Phase.RETURNED -> {
                 assertEquals("harness: result of ${write.script}", write.script.returnValue(), event.result)
-                finishWrite(write, requireNotNull(event.result), event.elapsedMs)
+                finishWrite(write, requireNotNull(event.result), event)
             }
             Phase.THREW -> {
                 assertEquals("harness: ${write.script} must not throw", null, write.script.returnValue())
-                finishWrite(write, false, event.elapsedMs)
+                finishWrite(write, false, event)
             }
             Phase.HELD -> Unit
             else -> throw AssertionError("unexpected write phase ${event.phase} in the live process")
@@ -355,7 +376,7 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
     }
 
     // S5 and S13: a write begins at the next store index. It is the write of the retry that the writer has just
-    // started, with the payload of its target, or else the admitted write at the head of the writer queue.
+    // started, with the payload of its prepare step, or else the admitted write at the head of the writer queue.
     private fun beginWrite(event: LedgerEvent.Storage) {
         assertEquals("S5: write #${event.index} begins after the write before it ended", null, inFlight?.index)
         assertEquals("S5: the store numbers ordinary and retry writes in queue order", writesStarted, event.index)
@@ -363,8 +384,9 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
         val started = startedRetry
         startedRetry = null
         val mutation = started?.target ?: takeAdmittedWrite(event.index)
-        assertEquals("S2/S3/S13: payload of write #${event.index}", mutation.payload, event.value)
-        inFlight = InFlight(event.index, event.script as WriteScript, mutation, started)
+        val payload = if (started == null) mutation.payload else checkNotNull(started.payload)
+        assertEquals("S2/S3/S13: payload of write #${event.index}", payload, event.value)
+        inFlight = InFlight(event.index, event.script as WriteScript, payload, mutation, started)
     }
 
     private fun takeAdmittedWrite(index: Int): Mutation {
@@ -375,18 +397,18 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
         return head.mutation
     }
 
-    private fun finishWrite(write: InFlight, committed: Boolean, completedElapsed: Long) {
+    private fun finishWrite(write: InFlight, committed: Boolean, completion: LedgerEvent.Storage) {
         inFlight = null
         val started = write.retry
         if (started == null) {
-            finishAdmittedWrite(write.mutation, committed, completedElapsed)
+            finishAdmittedWrite(write.mutation, committed, completion)
         } else {
-            finishRetryWrite(started, committed, completedElapsed)
+            finishRetryWrite(started, write.payload, committed, completion.elapsedMs)
         }
     }
 
-    private fun finishAdmittedWrite(mutation: Mutation, committed: Boolean, completedElapsed: Long) {
-        if (!stopped) applyCompletion(mutation, committed, completedElapsed) // S12: no effect after a shutdown
+    private fun finishAdmittedWrite(mutation: Mutation, committed: Boolean, completion: LedgerEvent.Storage) {
+        if (!stopped) applyCompletion(mutation, committed, completion) // S12: no effect after a shutdown
         if (mutation.reset) {
             outcomes[mutation.writeIndex] = ExpectedOutcome.Reset(committed)
             return
@@ -399,24 +421,34 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
         outcomes[mutation.writeIndex] = ExpectedOutcome.Failure(state, mutation.count)
     }
 
-    private fun applyCompletion(mutation: Mutation, committed: Boolean, completedElapsed: Long) {
+    private fun applyCompletion(mutation: Mutation, committed: Boolean, completion: LedgerEvent.Storage) {
         val latest = mutation.admission == latestAdmission
         if (committed) {
             if (mutation.threshold && latest) { // S6
                 recordedWall = mutation.recordedWall
                 recordedElapsed = mutation.recordedElapsed
             }
+            val deadlineChain = DeadlineRetryRules.startsDeadlineChain(
+                committed,
+                latest,
+                memory(),
+                completion.wallMs,
+                completion.elapsedMs,
+            )
+            if (deadlineChain && !mutation.reset) { // D2
+                scheduleRetry(mutation, attempt = 1, completion.elapsedMs, deadline = true)
+            }
             return
         }
         if (!mutation.reset && mutation.epoch == epoch) { // S7: a failed reset changes nothing in memory
-            fallbackElapsed = maxOf(fallbackElapsed, completedElapsed + mutation.windowMs)
+            fallbackElapsed = maxOf(fallbackElapsed, completion.elapsedMs + mutation.windowMs)
         }
-        if (latest) scheduleRetry(mutation, attempt = 1, completedElapsed) // S11
+        if (latest) scheduleRetry(mutation, attempt = 1, completion.elapsedMs, deadline = false) // S11
     }
 
-    // S12 and S13: the end of a retry write. Only a retry that still owns its chain publishes or asks for the next
-    // attempt.
-    private fun finishRetryWrite(started: Retry, committed: Boolean, completedElapsed: Long) {
+    // S12 and S13: the end of a retry write that carried [payload]. Only a retry that still owns its chain publishes or
+    // asks for the next attempt.
+    private fun finishRetryWrite(started: Retry, payload: LockoutSnapshot, committed: Boolean, completedElapsed: Long) {
         if (retry !== started) {
             expectedRetryEvents.addLast(RecoveryEvent.Ended(started.sequence, ENDED_ABANDONED))
             return
@@ -424,21 +456,25 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
         retry = null
         val target = started.target
         if (committed) {
-            if (target.threshold && target.admission == latestAdmission) {
+            if (DeadlineRetryRules.isConverted(target.payload, payload)) { // D7
+                val recorded = DeadlineRetryRules.recordConverted(payload, memory())
+                recordedWall = recorded.recordedWall
+                recordedElapsed = recorded.recordedElapsed
+            } else if (target.threshold && target.admission == latestAdmission) { // S13, D8
                 recordedWall = target.recordedWall
                 recordedElapsed = target.recordedElapsed
             }
             expectedRetryEvents.addLast(RecoveryEvent.Ended(started.sequence, ENDED_SUCCESS))
         } else {
             expectedRetryEvents.addLast(RecoveryEvent.Ended(started.sequence, ENDED_RETRY))
-            scheduleRetry(target, started.attempt + 1, completedElapsed)
+            scheduleRetry(target, started.attempt + 1, completedElapsed, started.deadline) // D10
         }
     }
 
     // S11 and S13: the scheduler plans an attempt of the chain of [target], due its delay after [nowElapsed].
-    private fun scheduleRetry(target: Mutation, attempt: Int, nowElapsed: Long) {
+    private fun scheduleRetry(target: Mutation, attempt: Int, nowElapsed: Long, deadline: Boolean) {
         val delayMs = retryDelay(attempt)
-        val planned = Retry(nextSequence++, target, attempt, nowElapsed + delayMs)
+        val planned = Retry(nextSequence++, target, attempt, nowElapsed + delayMs, deadline)
         expectedRetryEvents.addLast(RecoveryEvent.Scheduled(planned.sequence, RecoveryKind.WRITE, attempt, delayMs))
         retry = planned
     }
@@ -461,24 +497,41 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
         tasks.addLast(Task.RetryRun(event.sequence))
     }
 
-    // S12: the writer starts a retry only while the retry still owns its chain.
-    private fun onStarted(event: RecoveryEvent.Started) {
+    // S12 and S13: the writer starts a retry only while the retry still owns its chain and has a payload to write.
+    private fun onStarted(event: RecoveryEvent.Started, wallMs: Long, elapsedMs: Long) {
         assertNoExpectedEvent(event)
         takeRetryTask(event.sequence)
         val owner = retry?.takeIf { it.sequence == event.sequence }
             ?: throw AssertionError("S12: retry ${event.sequence} started after its chain ended")
+        owner.payload = preparedPayload(owner, wallMs, elapsedMs)
+            ?: throw AssertionError("D6: deadline retry ${event.sequence} started without a gap")
         owner.started = true
         startedRetry = owner
         retryWritesStarted++
     }
 
-    // S12: the writer ignores the task of a retry whose chain ended, and writes nothing for it.
-    private fun onIgnored(event: RecoveryEvent.Ignored) {
+    // S12: the writer ignores the task of a retry whose chain ended, and writes nothing for it. D6: it also ignores a
+    // deadline retry that finds no gap, and that chain ends with no other event.
+    private fun onIgnored(event: RecoveryEvent.Ignored, wallMs: Long, elapsedMs: Long) {
         assertNoExpectedEvent(event)
         takeRetryTask(event.sequence)
-        assertTrue("S12: retry ${event.sequence} is ignored after its chain ended", retry?.sequence != event.sequence)
-        assertEquals("S12: reason for ignoring retry ${event.sequence}", IGNORED_STALE, event.reason)
+        val owner = retry?.takeIf { it.sequence == event.sequence }
+        if (owner == null) {
+            assertEquals("S12: reason for ignoring retry ${event.sequence}", IGNORED_STALE, event.reason)
+            return
+        }
+        val payload = preparedPayload(owner, wallMs, elapsedMs)
+        assertEquals("D6: retry ${event.sequence} has nothing to write", null, payload)
+        assertEquals("D6: reason for ignoring retry ${event.sequence}", IGNORED_NOT_WANTED, event.reason)
+        retry = null
     }
+
+    // S13 and D4 to D6: what the prepare step of [owner] writes at the given clocks, or null for nothing.
+    private fun preparedPayload(owner: Retry, wallMs: Long, elapsedMs: Long): LockoutSnapshot? =
+        DeadlineRetryRules.retryPayload(owner.target.payload, owner.deadline, memory(), wallMs, elapsedMs)
+
+    // The part of the memory that the B3 rules read.
+    private fun memory(): DeadlineMemory = DeadlineMemory(count, recordedWall, recordedElapsed, fallbackElapsed)
 
     // S5: the writer reaches the task of retry [sequence] at the head of the writer queue.
     private fun takeRetryTask(sequence: Long) {
@@ -526,6 +579,7 @@ class LockoutModel(private val clocks: VirtualClocks, initial: LockoutSnapshot) 
         private const val RETRY_STEPS_TO_CAP = 6
 
         private val IGNORED_STALE = RecoveryEvent.Ignored.Reason.STALE
+        private val IGNORED_NOT_WANTED = RecoveryEvent.Ignored.Reason.NOT_WANTED
         private val ENDED_SUCCESS = RecoveryEvent.Ended.Outcome.SUCCESS
         private val ENDED_RETRY = RecoveryEvent.Ended.Outcome.RETRY
         private val ENDED_ABANDONED = RecoveryEvent.Ended.Outcome.ABANDONED

@@ -100,9 +100,9 @@ class WriteRetryTest : BaselineCase() {
             committedRetryHarness.restart()
             committedRetryHarness.check()
             val label = "restart $restartNumber after the retry commit"
-            assertEquals(label, Z, committedRetryHarness.store.durableState())
-            assertEquals(label, Available, committedRetryHarness.manager.currentState())
-            assertEquals(label, 0, committedRetryHarness.manager.failureCount())
+            assertEquals("$label: Z stays stored", Z, committedRetryHarness.store.durableState())
+            assertEquals("$label: the gate stays open", Available, committedRetryHarness.manager.currentState())
+            assertEquals("$label: the count stays 0", 0, committedRetryHarness.manager.failureCount())
             val newProcessWrites = committedRetryHarness.store.writeCount(committedRetryHarness.generation)
             assertEquals("$label: the new process writes nothing", 0, newProcessWrites)
         }
@@ -287,7 +287,7 @@ class WriteRetryTest : BaselineCase() {
 
     // ---- X01 a failure retry and newer admissions ------------------------------------------------
 
-    // B2 spec: T16, T9, T3.
+    // B2 spec: T16, T9, T3. B3 spec: D2.
     @Test
     fun `X01 - a failure retry cannot persist behind a newer reset or over a newer failure`() {
         val waitingHarness = harness(Z, FaultPlan().write(WriteScript.ReturnFalse, generation = 1, index = 0))
@@ -296,7 +296,9 @@ class WriteRetryTest : BaselineCase() {
         waitingHarness.fail()
         waitingHarness.succeed()
         waitingHarness.advance(TWO_MINUTES_MS)
-        assertNoRetryWrite(waitingHarness, "X01-waiting-retry", listOf(scheduled(1), cancelled(1)))
+        // F2 commits while the fallback of F1 runs, so it starts a deadline chain, which the reset cancels.
+        val waitingEvents = listOf(scheduled(1), cancelled(1), scheduled(2), cancelled(2))
+        assertNoRetryWrite(waitingHarness, "X01-waiting-retry", waitingEvents)
 
         val queuedHarness = harness(Z, FaultPlan().write(WriteScript.ReturnFalse, generation = 1, index = 0))
         queuedHarness.start()
@@ -325,17 +327,17 @@ class WriteRetryTest : BaselineCase() {
     // Checks one X01 run: Z is stored, no retry wrote, and the run has exactly [events] as its retry events.
     private fun assertNoRetryWrite(harness: LockoutHarness, case: String, events: List<RecoveryEvent>) {
         harness.check()
-        assertEquals(case, Z, harness.store.durableState())
-        assertEquals(case, events, harness.retryEvents())
+        assertEquals("$case: Z is stored", Z, harness.store.durableState())
+        assertEquals("$case: exactly these retry events", events, harness.retryEvents())
         assertTrue("$case: no retry write", harness.retryEvents().none { it is Started })
         harness.record(case, "durable" to Z, "retry_writes" to 0)
     }
 
     // ---- X03 a threshold write that failed after its window --------------------------------------
 
-    // B2 spec: T2, T10.
+    // B2 spec: T2, T10. B3 spec: D1, D4, D7, D14.
     @Test
-    fun `X03 - a retry of a threshold write that failed late persists the expired deadline and revives nothing`() {
+    fun `X03 - a retry of a threshold write that failed late stores its fallback deadline, not the expired one`() {
         val harness = harness(C4, FaultPlan().write(WriteScript.HoldBeforeCommit(WriteScript.ReturnFalse), 1, 0))
         harness.start()
         harness.fail()
@@ -346,17 +348,18 @@ class WriteRetryTest : BaselineCase() {
 
         harness.advance(FIRST_DELAY_MS)
         harness.check()
-        assertEquals("the admission-time deadline, already passed", L5, harness.store.durableState())
-        val fallbackLock = LockedOut(T - FIRST_DELAY_MS, degraded = true)
-        assertEquals("the fallback still governs, with no new window", fallbackLock, harness.manager.currentState())
+        val storedFallback = LockoutSnapshot(5, W0 + STALL_MS + T)
+        assertEquals("the fallback deadline, not the admission-time one", storedFallback, harness.store.durableState())
+        val recordedLock = LockedOut(T - FIRST_DELAY_MS, degraded = false)
+        assertEquals("the fallback is recorded, with no new window", recordedLock, harness.manager.currentState())
         val expected = listOf(scheduled(1), Fired(1), Started(1), Ended(1, Ended.Outcome.SUCCESS))
         assertEquals(expected, harness.retryEvents())
 
         harness.restart()
         harness.check()
         assertEquals(5, harness.manager.failureCount())
-        assertEquals("the expired deadline locks nothing", Available, harness.manager.currentState())
-        harness.record("X03-retry-after-stall", "durable" to L5, "state_after_restart" to Available)
+        assertEquals("the restart keeps the fallback remainder", recordedLock, harness.manager.currentState())
+        harness.record("X03-retry-after-stall", "durable" to storedFallback, "state_after_restart" to recordedLock)
     }
 
     // ---- X05 one chain under a persistent fault --------------------------------------------------
@@ -421,17 +424,17 @@ class WriteRetryTest : BaselineCase() {
             runningHarness.release(StorageOp.WRITE, 1)
             runningHarness.check()
             val stored = if (then == WriteScript.Normal) L5 else C4
-            assertEquals("$then", stored, runningHarness.store.durableState())
+            assertEquals("$then: only a committed held write stores L5", stored, runningHarness.store.durableState())
             val unpublished = LockedOut(T - FIRST_DELAY_MS, degraded = true)
             assertEquals("$then: no promotion", unpublished, runningHarness.manager.currentState())
             assertEquals("$then: one callback", 1, callbacks.get())
             val runningEvents = listOf(scheduled(1), Fired(1), Started(1), Ended(1, Ended.Outcome.ABANDONED))
-            assertEquals("$then", runningEvents, runningHarness.retryEvents())
+            assertEquals("$then: the held retry ends abandoned", runningEvents, runningHarness.retryEvents())
 
             runningHarness.advance(TWO_MINUTES_MS)
             runningHarness.check()
             assertEquals("$then: no rescheduling", runningEvents, runningHarness.retryEvents())
-            assertEquals("$then", 2, runningHarness.store.writeCount(1))
+            assertEquals("$then: no write after the held one", 2, runningHarness.store.writeCount(1))
             runningHarness.record("X06-running-retry-$then", "durable" to stored, "published" to false)
         }
     }
@@ -541,9 +544,9 @@ class WriteRetryTest : BaselineCase() {
 
     // ---- R3.4 a false acknowledgement ------------------------------------------------------------
 
-    // B2 spec: T2, T10.
+    // B2 spec: T2, T10. B3 spec: D1, D4, D7.
     @Test
-    fun `R3_4 - a retry after a false acknowledgement writes the same pair again and changes nothing in memory`() {
+    fun `R3_4 - a retry after a false acknowledgement adds the fallback deadline to the committed count`() {
         val harness = harness(Z, FaultPlan().write(WriteScript.CommitThenReportFalse, generation = 1, index = 0))
         harness.start()
         val failure = harness.fail()
@@ -553,17 +556,19 @@ class WriteRetryTest : BaselineCase() {
 
         harness.advance(FIRST_DELAY_MS)
         harness.check()
-        assertEquals("the same pair twice", listOf(committed, committed), harness.durableCommits())
+        val withDeadline = LockoutSnapshot(1, W0 + T)
+        val commits = listOf(committed, withDeadline)
+        assertEquals("the count, then the count with the fallback deadline", commits, harness.durableCommits())
         assertEquals(1, harness.manager.failureCount())
-        val fallbackLock = LockedOut(T - FIRST_DELAY_MS, degraded = true)
-        assertEquals("the fallback stays", fallbackLock, harness.manager.currentState())
+        val recordedLock = LockedOut(T - FIRST_DELAY_MS, degraded = false)
+        assertEquals("the fallback is recorded", recordedLock, harness.manager.currentState())
         assertEquals(FailureOutcome(LockedOut(T, degraded = true), 1), runBlocking { failure.resolved.await() })
-        harness.record("R3.4-false-ack-retry", "durable" to committed, "state" to fallbackLock)
+        harness.record("R3.4-false-ack-retry", "durable" to withDeadline, "state" to recordedLock)
     }
 
     // ---- R1.3 a retry over an unreadable stored lockout ------------------------------------------
 
-    // B2 spec: T2, T10.
+    // B2 spec: T2, T10. B3 spec: D1, D4, D7, D14.
     @Test
     fun `R1_3 - a retry of the racing failure write erases the unreadable stored lockout that the baseline keeps`() {
         val faults = FaultPlan()
@@ -580,19 +585,20 @@ class WriteRetryTest : BaselineCase() {
 
         harness.advance(FIRST_DELAY_MS)
         harness.check()
-        val retryPayload = LockoutSnapshot(1, 0L)
+        val retryPayload = LockoutSnapshot(1, W0 + T)
         assertEquals("the retry overwrites the unread lockout", retryPayload, harness.store.durableState())
 
         harness.restart()
         harness.check()
-        assertEquals("the stored lockout is lost", Available, harness.manager.currentState())
+        val fallbackLock = LockedOut(T - FIRST_DELAY_MS, degraded = false)
+        assertEquals("only the fallback of the failed write survives", fallbackLock, harness.manager.currentState())
         assertEquals(1, harness.manager.failureCount())
         harness.record("R1.3-retry-erases-lockout", "erased" to L5, "durable_after" to retryPayload)
     }
 
     // ---- I3 no manager lock during retry I/O -----------------------------------------------------
 
-    // B2 spec: T8, T17.
+    // B2 spec: T8, T17. B3 spec: D9, D2.
     @Test
     fun `I3 - a blocked retry write holds no manager lock, so admission and state reads go on`() {
         val run = DirectRun(Z, writeResults = listOf(false), gatedWrite = 1)
@@ -611,8 +617,10 @@ class WriteRetryTest : BaselineCase() {
         } finally {
             run.storage.open()
         }
-        awaitEvent(run.events) { it is Ended }
-        assertEquals("the admission ended the chain", Ended(1, Ended.Outcome.ABANDONED), run.events.last())
+        // The second write commits while the fallback of the first runs, so it starts a deadline chain.
+        awaitEvent(run.events) { it == scheduled(2) }
+        val expected = listOf(scheduled(1), Fired(1), Started(1), Ended(1, Ended.Outcome.ABANDONED), scheduled(2))
+        assertEquals("the admission ended the chain, and a deadline chain followed", expected, run.events.toList())
     }
 
     // ---- Helpers ---------------------------------------------------------------------------------

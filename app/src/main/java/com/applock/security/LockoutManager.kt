@@ -41,10 +41,10 @@ sealed interface LockoutState {
     data object Available : LockoutState
 
     /**
-     * Authentication is blocked for [remainingMs]. [degraded] is true when the lockout is held in memory only,
-     * because its durable write failed or has not resolved yet (R-007). A degraded lockout still blocks, but it is
-     * never audited as a recorded `LOCKOUT_TRIGGERED` and it does not survive process death. The default false is
-     * the ordinary recorded lockout.
+     * Authentication is blocked for [remainingMs]. [degraded] is true when the manager has recorded no stored deadline
+     * that covers the lockout, because its durable write failed or has not resolved yet (R-007). A degraded lockout
+     * still blocks, but it is never audited as a recorded `LOCKOUT_TRIGGERED`. It survives process death only when a
+     * write retry stored its deadline. The default false is the ordinary recorded lockout.
      */
     data class LockedOut(val remainingMs: Long, val degraded: Boolean = false) : LockoutState
 }
@@ -79,22 +79,26 @@ sealed interface LockoutState {
  * in the same streak still blocks the next attempt. A successful reset advances the streak, which fences off an
  * older failed write so it cannot reinstate a lockout after the reset.
  *
- * ## Manager-owned writes and the write retry (R-007 hardening, P3 candidate B2)
+ * ## Manager-owned writes and the write retry (R-007 hardening, P3 candidates B2 and B3)
  * The manager runs each admitted write as its own job. [Pending.resolved] is only the caller's view, so cancelling it
  * doesn't cancel the write. When the write of the latest admission fails, the manager retries it on the
  * [RecoveryScheduler], through the same single writer. A new admission or [shutdown] ends the retries. A retry changes
  * no count, fallback, or outcome, and it never calls back. The contract is in
  * `2026-10-07_R007_F2_HARDENING_P3_B2_SPEC.md`.
+ *
+ * Candidate B3 (`2026-10-07_R007_F2_HARDENING_P3_B3_SPEC.md`) extends the retry so that a restart keeps a degraded
+ * lockout. While the lockout is degraded, a retry also stores the remaining fallback as a wall deadline, and a
+ * committed write can start a deadline chain for it ([startsWriteRecovery]).
  */
 @Suppress("TooManyFunctions") // one cohesive lockout boundary: the read, the two mutations, and the lifecycle
 class LockoutManager(
     private val storage: LockoutStorage,
     private val clock: () -> Long = System::currentTimeMillis,
-    // A monotonic clock for the enforcement deadline, immune to a wall-clock jump. It never persists (R-007
-    // residual: a degrade does not survive process death). The default is JVM-pure for tests. Android callers must
-    // inject a boot-time clock (SystemClock.elapsedRealtime): System.nanoTime pauses during deep sleep, which (with
-    // the longer-remaining rule in stateOf) would keep a lockout alive past its wall deadline after wake. AppModule
-    // injects the sleep-aware clock for production.
+    // A monotonic clock for the enforcement deadline, immune to a wall-clock jump. It never persists: a degraded
+    // fallback survives process death only as a wall deadline that a write retry stored (R-007). The default is
+    // JVM-pure for tests. Android callers must inject a boot-time clock (SystemClock.elapsedRealtime): System.nanoTime
+    // pauses during deep sleep, which (with the longer-remaining rule in stateOf) would keep a lockout alive past its
+    // wall deadline after wake. AppModule injects the sleep-aware clock for production.
     private val elapsedRealtime: () -> Long = { System.nanoTime() / NANOS_PER_MILLI },
     // The durable IO runs here, one task at a time, in admission order. Injected so a test can drive it.
     private val ioDispatcher: CoroutineDispatcher =
@@ -105,7 +109,7 @@ class LockoutManager(
     // the scope ends each manager job without its completion and cancels the caller's result. Production never cancels
     // it. Defaulted for production.
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + ioDispatcher),
-    // The timer, delays, and listener of the [RecoveryScheduler], which retries a failed write. The default timer
+    // The timer, delays, and listener of the [RecoveryScheduler], which retries lockout writes. The default timer
     // starts its thread only at the first retry.
     recovery: RecoverySetup = RecoverySetup(),
 ) {
@@ -116,11 +120,12 @@ class LockoutManager(
      * The recorded (persisted) lockout and the in-memory degraded fallback are tracked separately, so a delayed
      * threshold write whose persisted deadline has already elapsed cannot mislabel the fresher fallback as durable.
      * [recordedWallDeadline] is the persisted deadline in [clock] epoch millis; [recordedMonoDeadline] is its
-     * [elapsedRealtime] mirror, set only when a threshold write commits, so a wall-clock jump cannot break a recorded
-     * lockout. [fallbackMonoDeadline] is the in-memory degraded fallback in [elapsedRealtime] millis (from a failed
-     * write, a below-threshold write failure, or a not-yet-committed threshold failure). The standing lockout is
-     * recorded when the recorded remaining is at least the fallback remaining, else degraded; [degraded] on the
-     * returned state is therefore derived, never stored.
+     * [elapsedRealtime] mirror, set only by a committed threshold write or a committed retry that records a deadline
+     * and cleared by a reset or a re-seed, so a wall-clock jump cannot break a recorded lockout. [fallbackMonoDeadline]
+     * is the in-memory degraded fallback in [elapsedRealtime] millis (from a failed write, a below-threshold write
+     * failure, or a not-yet-committed threshold failure). The standing lockout is recorded when the recorded remaining
+     * is at least the fallback remaining, else degraded; [degraded] on the returned state is therefore derived, never
+     * stored.
      */
     private data class Snapshot(
         val revision: Long,
@@ -461,7 +466,7 @@ class LockoutManager(
     ): Throwable? {
         applyCompletion(write, committed)
         if (startsWriteRecovery(write, committed, snapshot.get())) {
-            recoveryScheduler.start(RecoveryKind.WRITE, WriteRecovery(write))
+            recoveryScheduler.start(RecoveryKind.WRITE, WriteRecovery(write, deadlineChain = committed))
         }
         return invokeCallbackCatchingFailure(onResolved, result)
     }
@@ -476,8 +481,9 @@ class LockoutManager(
         }
 
     // Builds this operation's resolved outcome from its own admission-time facts and its write result. A recorded
-    // lockout requires a committed threshold write; a degraded lockout is in-memory only. currentState() remains the
-    // authoritative answer for enforcement; this per-operation result drives audit and intruder capture.
+    // lockout requires a committed threshold write; any other lockout outcome is degraded, even if a later write retry
+    // stores its deadline. currentState() remains the authoritative answer for enforcement; this per-operation result
+    // drives audit and intruder capture.
     private fun opOutcome(write: PendingWrite, committed: Boolean): FailureOutcome {
         val state = when {
             write.wasThreshold && committed -> LockoutState.LockedOut(write.fallbackDurationMs, degraded = false)
@@ -532,17 +538,20 @@ class LockoutManager(
     // ---- Write retry ---------------------------------------------------------------------------
 
     /**
-     * Retries the failed write [target]. Each attempt writes only while [target] is still the latest admission. A newer
-     * admission also makes the chain's sequence number stale, so this check is a second guard. A failed attempt
-     * schedules the next one, and a committed attempt ends the chain. Retries don't admit new failures, don't change
-     * the count or the fallback, and don't call back.
+     * Retries the write [target]. A [deadlineChain] retries it only for the fallback deadline. Each attempt writes
+     * only while [target] is still the latest admission. A newer admission also makes the chain's sequence number
+     * stale, so this check is a second guard. A failed attempt schedules the next one, and a committed attempt ends the
+     * chain. Retries don't admit new failures, don't change the count or the fallback, and don't call back.
      */
-    private inner class WriteRecovery(private val target: PendingWrite) : RecoveryAction {
+    private inner class WriteRecovery(
+        private val target: PendingWrite,
+        private val deadlineChain: Boolean,
+    ) : RecoveryAction {
         // Under [lock] on the writer, right before the storage I/O.
         override fun prepare(): RecoveryOperation? {
             val current = snapshot.get()
             if (!stillWanted(current)) return null
-            val payload = buildRetrySnapshot(target, current)
+            val payload = buildRetrySnapshot(target, deadlineChain, current) ?: return null
             return object : RecoveryOperation {
                 override fun perform(): Boolean = runWrite(payload)
 
@@ -565,31 +574,66 @@ class LockoutManager(
         private fun stillWanted(current: Snapshot): Boolean = !stopped && current.revision == target.revision
     }
 
-    // Candidate B3 changes the three retry rules below in place.
+    // The write-retry rules: when a chain starts, what each attempt writes, and what a committed attempt records.
 
-    // Eligibility, checked under [lock] at each ordinary completion: a failed write of the latest admission. No older
-    // write is queued then, and no chain exists, because each admission ended the previous chain.
+    // Eligibility, checked under [lock] at each ordinary completion. A failed write of the latest admission starts a
+    // chain. A committed failure write of the latest admission that leaves the lockout degraded starts a deadline
+    // chain. No older write is queued then, and no chain exists, because each admission ended the previous chain.
     private fun startsWriteRecovery(write: PendingWrite, committed: Boolean, current: Snapshot): Boolean =
-        !committed && write.revision == current.revision
+        when {
+            write.revision != current.revision -> false
+            !committed -> true
+            else -> write.kind == Kind.FAILURE && degradedRemainingMs(current, clock(), elapsedRealtime()) > 0L
+        }
 
-    // Payload, built in prepare() under [lock]: the target's own payload (its count and admission-time wall deadline,
-    // or (0, 0) for a reset). Both fields are absolute, so writing them again adds no count and moves no deadline.
-    @Suppress("UnusedParameter") // candidate B3 uses [current]
-    private fun buildRetrySnapshot(target: PendingWrite, current: Snapshot): LockoutSnapshot = target.persist
+    // Payload, built in prepare() under [lock]. While the lockout is degraded, the retry writes the count and the
+    // remaining fallback as a wall deadline, but never a deadline earlier than the target's. Otherwise it writes the
+    // target's own payload (its count and admission-time wall deadline, or (0, 0) for a reset), or nothing (null) for a
+    // deadline chain, whose target is already stored. Both fields are absolute, so writing one payload again adds no
+    // count and moves no deadline.
+    private fun buildRetrySnapshot(target: PendingWrite, deadlineChain: Boolean, current: Snapshot): LockoutSnapshot? {
+        val wallNow = clock()
+        val degradedMs = degradedRemainingMs(current, wallNow, elapsedRealtime())
+        return when {
+            degradedMs > 0L -> {
+                val deadline = maxOf(target.persist.lockoutUntil, wallNow + degradedMs)
+                LockoutSnapshot(current.failureCount, deadline)
+            }
+            deadlineChain -> null
+            else -> target.persist
+        }
+    }
 
-    // Publication, in complete() under [lock]: a committed retry of a threshold write records that write's
-    // admission-time deadlines. Persisting the count doesn't clear the fallback, which keeps its original expiry, so
-    // the lockout reads as degraded until the stored deadline covers it.
-    @Suppress("UnusedParameter") // candidate B3 uses [persisted]
+    // Publication, in complete() under [lock]. A stored deadline that differs from the target's is a converted
+    // fallback: the conversion never moves a deadline earlier, and the count can't change while the retry is wanted.
+    // A converted deadline becomes the recorded wall deadline. Its elapsed mirror rises to the fallback's own deadline,
+    // so a forward wall-clock change can't end the recorded window before the fallback ends. Otherwise, a committed
+    // retry of a threshold write records that write's admission-time deadlines. Any other commit leaves the recorded
+    // deadlines unchanged. The fallback keeps its original expiry, so the lockout reads as degraded until a recorded
+    // deadline covers it.
     private fun applyRetryCommit(target: PendingWrite, persisted: LockoutSnapshot, current: Snapshot): Snapshot =
-        if (!target.wasThreshold) {
-            current
-        } else {
-            current.copy(
+        when {
+            persisted.lockoutUntil != target.persist.lockoutUntil -> current.copy(
+                recordedWallDeadline = persisted.lockoutUntil,
+                recordedMonoDeadline = maxOf(current.recordedMonoDeadline, current.fallbackMonoDeadline),
+            )
+            target.wasThreshold -> current.copy(
                 recordedWallDeadline = target.recordedWallDeadline,
                 recordedMonoDeadline = target.recordedMonoDeadline,
             )
+            else -> current
         }
+
+    // The fallback's remaining time when it outlasts the recorded window, else 0. stateOf reports a degraded lockout
+    // exactly when this is positive.
+    private fun degradedRemainingMs(snap: Snapshot, wallNow: Long, monoNow: Long): Long {
+        val recordedRemaining = maxOf(
+            remainingOf(snap.recordedWallDeadline, wallNow),
+            remainingOf(snap.recordedMonoDeadline, monoNow),
+        )
+        val fallbackRemaining = remainingOf(snap.fallbackMonoDeadline, monoNow)
+        return if (fallbackRemaining > recordedRemaining) fallbackRemaining else 0L
+    }
 
     // ---- Cold-start re-seed --------------------------------------------------------------------
 

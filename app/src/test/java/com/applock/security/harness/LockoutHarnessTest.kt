@@ -298,12 +298,18 @@ class LockoutHarnessTest {
 
     @Test
     fun `a failure inside a seeded action reports its seed and step`() {
-        val error = assertThrows(AssertionError::class.java) {
+        val thrown = assertThrows(AssertionError::class.java) {
             ScheduleDriver(REPORT_SEED, storageDecorator = ::StaleReplayStorage).run()
         }
-        // The stale payload is detected while the admission step runs, before its check.
-        val context = Regex("^seed=$REPORT_SEED step=\\d+ action=(fail|succeed): ")
-        assertTrue(error.message.orEmpty(), context.containsMatchIn(error.message.orEmpty()))
+        val message = thrown.message.orEmpty()
+        // With this seed, write 0 fails, and its retry, write 1, begins in the advance of step 1. The model detects the
+        // replayed payload of write 0 when write 1 begins, before the check of that step.
+        val staleRetryWrite = Regex(
+            "seed=$REPORT_SEED step=1 action=advance: java\\.lang\\.AssertionError: S2/S3/S13: payload of write #1 " +
+                "expected:<LockoutSnapshot\\(failureCount=1, lockoutUntil=\\d+\\)> " +
+                "but was:<LockoutSnapshot\\(failureCount=1, lockoutUntil=0\\)>",
+        )
+        assertTrue(message, staleRetryWrite.matches(message.lineSequence().first()))
     }
 
     @Test

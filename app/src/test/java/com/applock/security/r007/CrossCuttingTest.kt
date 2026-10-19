@@ -264,7 +264,7 @@ class CrossCuttingTest : BaselineCase() {
         harness.record("X08-cancel-while-running", "callbacks" to 1, "await" to "CancellationException")
     }
 
-    // B2 spec: T2, T16.
+    // B2 spec: T2, T16. B3 spec: D2.
     @Test
     fun `X08 - a failure write that throws a cancellation is a failed write, arms the fallback, and calls back once`() {
         val harness = harness(Z, FaultPlan().write(WriteScript.ThrowCancellation, generation = 1, index = 0))
@@ -284,7 +284,12 @@ class CrossCuttingTest : BaselineCase() {
         harness.fail()
         harness.check()
         val chainEnd = RecoveryEvent.Cancelled(1L, RecoveryEvent.Cancelled.Reason.CANCELLED)
-        assertEquals("the next admission ends the chain", listOf(chainStart, chainEnd), harness.retryEvents())
+        val deadlineChainStart = RecoveryEvent.Scheduled(2L, RecoveryKind.WRITE, 1, 1_000L)
+        assertEquals(
+            "the next admission ends the chain, and its commit starts a deadline chain",
+            listOf(chainStart, chainEnd, deadlineChainStart),
+            harness.retryEvents(),
+        )
         assertEquals("the writer still runs", LockoutSnapshot(2, 0L), harness.store.durableState())
         harness.record("X08-write-cancellation", "fallback" to "armed", "callbacks" to 1)
     }

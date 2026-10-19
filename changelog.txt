@@ -4,6 +4,26 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 candidate B3 with the stored fallback deadline   (2026-10-19)
+---------------------------------------------------------------------------------------
+Candidate B3 of phase P3 targets fallback locks that a restart loses because they exist only in memory. Phase P3
+compares candidate fixes for the R-007 lockout storage weaknesses with the current app.
+- The LockoutManager class adds retries that store the deadline of an active fallback lock.
+- New rules in the LockoutModel test class predict these retries and the deadlines that they store.
+- The test harness now passes the wall-clock time of each retry event to that model.
+- Twenty more test cases of the B3 specification now run in the DeadlineRetryTest class. The evidence of each case
+  gives how long the lockout stayed in memory only before a retry stored it.
+- Two older R-007 tests and three tests of candidate B2, which retries failed writes, now expect the B3 results. Four
+  of them get new names that state these results.
+- Three more tests now also expect the retry that a stored count starts while the lockout stays in memory.
+- The harness self-test whose storage replays an outdated value now expects detection one step earlier, during a clock
+  advance. The test also checks that the report names that outdated value.
+- Assertion messages in the R-007 tests of candidates B2 and B3 now state the expected fact.
+- On the combined B2 and B3 branch, the local gate ran 545 unit tests with no failures or skips.
+- In that gate run, the detekt, assembleProdDebug, and compileProdDebugAndroidTestKotlin tasks also passed.
+- A second run of the 109 R-007 tests, 20 more than before, passed together with the detekt task.
+
+
 M7/WP2 (F2 hardening): P3 candidate B3 model rules for the stored fallback deadline   (2026-10-08)
 --------------------------------------------------------------------------------------------------
 The lockout test harness gets the expected behaviour of candidate B3, which keeps an in-memory lockout across a
