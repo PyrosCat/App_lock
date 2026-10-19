@@ -4,6 +4,25 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P2 harness fixes for sweep misses, kill events, and a grep crash   (2026-10-09)
+------------------------------------------------------------------------------------------------------
+The P2 device test harness gets three fixes, two of them from the NucBox report of 2026-10-08. Phase P2 tested the
+current app on phones and emulators, before any fix of the R-007 lockout weaknesses.
+- Android 11 writes the process-kill event (am_kill) with five fields and the r007_proc_events function now
+  reads it.
+- The R3.1c sweep kills the app while it writes the failure count of a wrong PIN to its file. A trial in which the
+  sweep kills nothing is now a miss. Each miss gets its own log line, and no verdict judges it.
+- A failed PIN entry now ends the sweep with a failure.
+- Each sweep's summary line now also counts the confirmed kills and the misses.
+- The M7_WP2_F2H_P2_DEVICE_PLAN.md test plan now defines a miss, the reported counts, and the pass condition of the
+  sweep. The plan, misses count toward the minimum of 60 trials.
+- Case-insensitive matching in the r007_a11y_names_detector function no longer uses `grep -iF`. In the C locale, the
+  grep of Git for Windows 2.45.2 aborts on that call. The abort made the function miss the app's accessibility service.
+- The test_lib_r007.sh script gets four new tests. They cover the Android 11 kill event, a miss, a failed PIN entry,
+  and a sweep of only misses.
+- All 547 tests of the script passed.
+
+
 M7/WP2 (F2 hardening): B3 specification for changed tests, clock limits, and the loss window   (2026-10-09)
 -----------------------------------------------------------------------------------------------------------
 The 2026-10-07_R007_F2_HARDENING_P3_B3_SPEC.md specification of candidate fix B3 now predicts four more changed tests

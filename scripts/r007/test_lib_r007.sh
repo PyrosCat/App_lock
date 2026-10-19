@@ -2199,6 +2199,15 @@ STUB_LOGCAT_FAIL=1 seg cold_read r14_events 4242 1.1
 grep -qx "am_anr=unknown am_kill=unknown" "$WORK/out" \
   && ok "r14_events records am_anr and am_kill as unknown when logcat cannot be read" \
   || bad "r14_events with a failed logcat: $(cat "$WORK/out")"
+# Android 11 logs am_kill with five fields, without the size.
+reset_device
+printf '%s\n' "--------- beginning of events" \
+  "          18.900  1871  2950 I am_anr  : [0,6851,com.applock,952745540,executing service com.applock/.S]" \
+  "          19.000  1871  2950 I am_kill : [0,6851,com.applock,0,bg anr]" > "$STUB_DEVICE/events"
+seg cold_read r007_proc_events 6851
+[ "$(cat "$WORK/out")" = "am_anr 18.900 executing service com.applock/.S
+am_kill 19.000 bg anr" ] && ok "r007_proc_events reads the five-field am_kill line of Android 11" \
+  || bad "r007_proc_events, five-field am_kill: $(tr '\n' ';' < "$WORK/out")"
 # R3.3 with a release that always fails: each submission moves the clock 50 s on, so the release is due at once.
 reset_device
 STUB_UI='<node text="Enter your PIN" />' STUB_RELEASE_FAIL=1 STUB_SUBMIT_STATE=blocked STUB_CASE_PAIR=0,0 \
@@ -2275,6 +2284,36 @@ DEATH_API30_CASES="R3.1b R3.1held R3.1d R3.2 R3.3 R3.4"
 [ "$(death_calls R3.4)" = "r34 S 1 Z;r34 S 1 C4;r34 S 1 reset;r34 L 1 Z;r34 L 1 C4;r34 L 1 reset;" ] \
   && ok "the case selection R3.4 runs only the R3.4 repeats, for each caller" \
   || bad "the death selection R3.4: $(death_calls R3.4)"
+# The R3.1c sweep with stubbed device steps and a quota of 3 trials and 3 kills inside the platform write. MISSES
+# lists the trials in which the loop sees no backup file.
+SWEEP_STUBS='R007_CASE_PID=4242; R007_FIXTURE_PAIR=1,0; R007_LOG_OUT="$WORK/p2.log"; R007_CAPTURE=""
+  reps() { printf 3; }; yn() { if eval "$1"; then printf yes; else printf no; fi; }
+  case_start() { :; }; case_prepare() { :; }; case_open() { :; }; sleep() { :; }; r007_sweep_start() { :; }
+  cut_fixture_name() { echo f; }; cut_fixture() { echo "1 0"; }; r007_submit() { :; }
+  r007_sweep_wait() {
+    if r007_in_list "$trial" "$MISSES"; then R007_SWEEP_ANSWER=timeout; else R007_SWEEP_ANSWER=killed; fi; }
+  r007_wait_dead() { :; }; r007_capture_log() { :; }; r007_begin_pair() { echo 2,0; }
+  r007_inspect_files() { R007_FILES=bak=h; }; r007_sweep_class() { echo platform-write; }; r007_pair() { echo 1,0; }
+  r007_mark() { echo "mark $1 trial=$3"; }; fail() { echo "FAIL $*"; return 1; }'
+sweep_run() { # misses [extra stubs]
+  : > "$WORK/p2.log"
+  MISSES="$1" seg death eval "$SWEEP_STUBS"$'\n'"${2:-:}"$'\n'"r31c S"
+}
+sweep_run "1"
+[ "$(grep -c '^mark R3.1c' "$WORK/out")" = 3 ] && ! grep -q '^FAIL' "$WORK/out" \
+  && grep -qx "## R3.1c-miss caller=S trial=1 delay_ms=0 pid=4242" "$WORK/p2.log" \
+  && grep -qx "## R3.1c caller=S trials=4 kills=3 misses=1 inside_platform_write=3" "$WORK/p2.log" \
+  && ok "R3.1c logs a miss on its own line without a case marker and counts it in the summary, with no failure" \
+  || bad "R3.1c with a miss: $(tr '\n' ';' < "$WORK/out") / $(tr '\n' ';' < "$WORK/p2.log")"
+if sweep_run "" 'r007_submit() { return 1; }'; then bad "R3.1c ends the sweep with a failure when a PIN entry fails"
+else grep -qx "FAIL R3.1c: the PIN entry failed in trial 1" "$WORK/out" \
+  && ok "R3.1c ends the sweep with a failure when a PIN entry fails" \
+  || bad "R3.1c with a failed PIN entry: $(cat "$WORK/out")"; fi
+sweep_run "$(seq -s ' ' 1 150)"
+grep -qx "FAIL R3.1c S: only 0 trials inside the platform write after 150 trials" "$WORK/out" \
+  && grep -qx "## R3.1c caller=S trials=150 kills=0 misses=150 inside_platform_write=0" "$WORK/p2.log" \
+  && ok "R3.1c with a miss in each of the 150 trials fails the quota" \
+  || bad "R3.1c with only misses: $(tail -2 "$WORK/out") / $(tail -1 "$WORK/p2.log")"
 
 echo "UI dump and unlock wait"
 reset_device

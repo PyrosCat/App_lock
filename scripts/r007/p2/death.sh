@@ -152,9 +152,11 @@ r31d() { # caller repeat
 
 # R3.1c: the mid-commit sweep of the P2 device plan. No fault script: the kill targets the platform
 # commit. The loop kills when the backup file appears, after a delay of 0, 2, 5, or 10 ms in turn. At least 60 trials
-# and 10 trials inside the platform write; at most 150 trials.
+# (misses included) and 10 trials inside the platform write; at most 150 trials. A trial in which the loop sees no
+# backup file before its time limit is a miss: nothing was killed, so the trial has no result to judge. The loop logs
+# the miss on its own line and writes no case marker for it.
 r31c() { # caller
-  local caller="$1" trials inside=0 trial n delay count deadline name old new bak class
+  local caller="$1" trials inside=0 kills=0 misses=0 trial n delay count deadline name old new bak class
   local delays=(0 2 5 10)
   n="$(reps 60)"
   for (( trial=1; trial<=150; trial++ )); do
@@ -167,10 +169,16 @@ r31c() { # caller
     if [ "$caller" = L ]; then r007_revoke_detector || return 1; fi
     r007_sweep_start "$R007_CASE_PID" "$delay" || return 1
     sleep 0.5
-    r007_submit "$WRONG_PIN"
+    r007_submit "$WRONG_PIN" || { fail "R3.1c: the PIN entry failed in trial $trial"; return 1; }
     r007_sweep_wait || return 1
-    [ "$R007_SWEEP_ANSWER" = killed ] || { fail "R3.1c: the loop did not kill in trial $trial"; continue; }
+    if [ "$R007_SWEEP_ANSWER" != killed ]; then
+      misses=$((misses + 1))
+      printf '## R3.1c-miss caller=%s trial=%s delay_ms=%s pid=%s\n' "$caller" "$trial" "$delay" "$R007_CASE_PID" \
+        >> "$R007_LOG_OUT"
+      continue
+    fi
     r007_wait_dead "$R007_CASE_PID" || { fail "R3.1c: no confirmed death in trial $trial"; return 1; }
+    kills=$((kills + 1))
     r007_capture_log || { fail "R3.1c: logcat could not be read"; return 1; }
     new="$(r007_begin_pair "$R007_CAPTURE" "$R007_CASE_PID" 0)"
     r007_inspect_files || return 1
@@ -182,7 +190,8 @@ r31c() { # caller
       write_pair="${new:-none}" pair_after="$(r007_pair "$R007_INSPECTION")"
   done
   trials=$((trial - 1))
-  printf '## R3.1c caller=%s trials=%s inside_platform_write=%s\n' "$caller" "$trials" "$inside" >> "$R007_LOG_OUT"
+  printf '## R3.1c caller=%s trials=%s kills=%s misses=%s inside_platform_write=%s\n' \
+    "$caller" "$trials" "$kills" "$misses" "$inside" >> "$R007_LOG_OUT"
   [ "$inside" -ge "$(reps 10)" ] \
     || fail "R3.1c $caller: only $inside trials inside the platform write after $trials trials"
 }

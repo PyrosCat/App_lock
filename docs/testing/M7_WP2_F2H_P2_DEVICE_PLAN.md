@@ -162,8 +162,13 @@ The kill targets the platform commit, not a wrapper hold. The fault script is em
   harness records the hashes of both files before the inspection and the store hash after it, and does not treat
   this change as a failure.
 - Expected at baseline: each trial gives the complete old pair or the complete new pair, never a read error.
-- Count: at least 60 trials per caller per host, and at least 10 trials in the class "inside the platform write". The
-  harness stops at 150 trials and reports the counts.
+- Count: at least 60 trials per caller per host, misses included, and at least 10 trials in the class "inside the
+  platform write". The harness stops at 150 trials. For each caller it reports the trials, the confirmed kills, the
+  misses, and the kills inside the platform write.
+- Miss: in a trial where the loop sees no backup file before its time limit, nothing is killed, so the trial has no
+  result to judge. The harness records the miss on its own line and leaves it out of the judged trials. A failed
+  setup, PIN entry, kill, death confirmation, or evidence read stays a failure. The sweep passes only when both counts
+  are met, every judged trial is as predicted, and no other step failed.
 - The harness commit confirms the backup-file behaviour on the Moto before the recorded run.
 
 ### 3.6 Reboots

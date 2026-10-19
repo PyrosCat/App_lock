@@ -163,11 +163,12 @@ r007_wait_detector() { # state
 
 # Prints "yes" when the first "NAME services:" line of the accessibility DUMP names the detector, in its full or its
 # short component form (case does not matter), "no" when that line does not name it, and "missing" when the dump has
-# no such line. NAME is Enabled, Binding, or Crashed.
+# no such line. NAME is Enabled, Binding, or Crashed. The match does not use `grep -iF`, because the grep of Git for
+# Windows 2.45.2 (GNU grep 3.0) aborts on it in the C locale.
 r007_a11y_names_detector() { # name dump
   local line short="${R007_DETECTOR/\/$APP_ID./\/.}"
   line="$(grep -m1 -E "^ *$1 services:" <<< "$2")" || { printf missing; return 0; }
-  if grep -qiF -e "$R007_DETECTOR" -e "$short" <<< "$line"; then printf yes; else printf no; fi
+  case "${line,,}" in *"${R007_DETECTOR,,}"* | *"${short,,}"*) printf yes ;; *) printf no ;; esac
 }
 
 # Prints the answer of r007_a11y_names_detector NAME for a new `dumpsys accessibility`. Fails when the query fails.
@@ -568,14 +569,15 @@ r007_phase_elapsed() { # text pid op index phase [thread]
 
 # Prints the am_anr and am_kill events of process PID from the events buffer, one per line: "<event> <epoch s>
 # <reason>". The reason of am_anr is its last field (the ANR subject, which can hold commas); the reason of am_kill
-# is its fifth field. Returns 1 when logcat cannot be read. `logcat -c` does not clear the events buffer, so the
-# buffer also holds older processes, and the pid selects the lines.
+# is its fifth field. Android 16 logs a sixth am_kill field (a size) and Android 11 does not. Returns 1 when logcat
+# cannot be read. `logcat -c` does not clear the events buffer, so the buffer also holds older processes, and the pid
+# selects the lines.
 r007_proc_events() { # pid
   local out
   out="$(r007_logcat -b events -d -v epoch -s am_anr:I am_kill:I)" || return 1
   tr -d '\r' <<< "$out" | sed -n -E \
     -e "s/^ *([0-9]+\.[0-9]+) +[0-9]+ +[0-9]+ I am_anr *: \[[0-9]+,$1,[^,]*,[^,]*,(.*)\]$/am_anr \1 \2/p" \
-    -e "s/^ *([0-9]+\.[0-9]+) +[0-9]+ +[0-9]+ I am_kill *: \[[0-9]+,$1,[^,]*,[^,]*,([^,]*),.*$/am_kill \1 \2/p"
+    -e "s/^ *([0-9]+\.[0-9]+) +[0-9]+ +[0-9]+ I am_kill *: \[[0-9]+,$1,[^,]*,[^,]*,([^],]*)(,[^]]*)?\]$/am_kill \1 \2/p"
 }
 
 # Prints the number of writes that process PID began in the log TEXT (its WRITE BEGIN lines). This is the exact V when
