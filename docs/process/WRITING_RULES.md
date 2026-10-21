@@ -31,6 +31,20 @@ fleet machine.
     or `M7_PLAN.md`. When the name is not unique, add the shortest part of the path that makes it unique, for
     example `reports/README.md`. Do not write a full path, because documents move between folders. A command keeps
     the paths that it needs to run.
+11. State the scope supported by the evidence. Include the host, version, configuration, or condition when it
+    affects the result. Do not generalize from one tested environment to an entire platform.
+12. Support factual claims with evidence appropriate to the claim. Existing test results, logs, code inspection, or
+    documentation may be sufficient. Test runtime behaviour when the available evidence does not establish it, a
+    suitable host or device is available, and the applicable test plan or the lead permits the run. Distinguish
+    observations from inferences and predictions. Mark an unverified claim as unverified and state why it could not
+    be checked.
+13. Classify behavioural findings against the applicable requirements and documented behaviour. Check relevant
+    documentation and known issues before calling a behaviour a confirmed defect. A documented known defect remains
+    a defect. When the evidence is incomplete, describe the observation and mark the classification as unresolved.
+    State Android-version and device-maker limits separately from the classification.
+14. Use direct, concrete wording. Replace figurative or conversational phrases when they obscure the action,
+    responsibility, or result. Write "must be assigned to the selected design or to a separately tracked fix", not
+    "needs a home".
 
 ## 2. Code comments and KDoc
 
@@ -40,6 +54,8 @@ fleet machine.
    a decision that is not obvious. Do not shorten them at the cost of accuracy.
 3. Use descriptive and consistent names. Rename only where the new name clearly helps. Do not rename broadly or
    change a public API for style alone.
+4. Remove comments that only announce what other comments contain, or that only repeat the section heading above
+   them. For example, remove "The comments above each test name its case".
 
 ## 3. Test code
 
@@ -57,7 +73,12 @@ fleet machine.
 
 3. When a test needs two objects of one kind, name each one by its role, for example `faultyHarness` and
    `healthyHarness`.
-4. An assertion message states the expected fact. It is not a question.
+4. An assertion message states the expected result. It is not a question. When an assertion runs across several
+   cases, its message matches each case's expectation. Include the case name or expected value when needed.
+
+   | Do not write | Write |
+   |---|---|
+   | `"$caseName: stores the new pair"` (false for a case that keeps the old pair) | `"$caseName: stored state equals $expectedState"` |
 
 ## 4. Repository documents
 
@@ -74,12 +95,14 @@ fleet machine.
    the same length.
 2. Start with an introduction of one or two plain sentences. Then give one flat list of bullets, with no nested
    bullets.
-3. The date is the date on which the work was completed.
+3. The date is the date of the commit that adds the entry. If the commit is made on a later day than the entry
+   was written, update the date.
 4. Change an entry only while it is not committed.
 
 ### 5.2 Content
 
-1. Each sentence says what the change does to what.
+1. Each sentence states what changed. Do not speculate about future decisions or outcomes. Keep conditions needed to
+   describe the scope accurately.
 2. For new code, name what was added and give its purpose in a few words. Do not describe how the code behaves
    or what it guarantees.
 3. Evidence is an action: "The local gate ran 468 unit tests with no failures."
@@ -98,6 +121,10 @@ fleet machine.
    |---|---|
    | The Moto G smoke times of the reboot and biometric segments lower their full-run estimate to about 50 min. | Trial-run timings cut the expected time of the project lead at the phone from 1.5 h to 50 min. |
    | Lead decision 6 confirms the objective rule for residual repeats and for controls that cannot lose a lock. | A case that reproduces a known R-007 weakness as predicted gets the verdict "not met". |
+
+6. An entry for a document that is not yet approved presents its content as proposals, for example "The proposal
+   recommends ..." or "Clock policy is proposed as separate work". It does not present them as decisions, such as
+   "B2 stays in the plan".
 
 ### 5.3 Sentences
 
@@ -128,6 +155,9 @@ fleet machine.
 4. No bullet repeats a bullet of the previous entry word for word. When the evidence has the same form, name what is
    new in this run, for example the commit that the run was compared with.
 5. A bullet does not repeat a phrase of the bullet before it. Refer back instead, for example "these cases".
+6. Merge a bullet into the preceding bullet when it only explains that bullet. Use a second sentence for the
+   explanation. Keep a separate bullet when it records a distinct change or result.
+7. The first bullet adds specific information beyond the introduction. It does not merely repeat the introduction.
 
 ## 6. Commit subjects
 

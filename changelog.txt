@@ -4,6 +4,28 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs: rules for changelog dates, tool versions, claims, and wording   (2026-10-20)
+----------------------------------------------------------------------------------
+The governance rules and the writing rules of the repository now give a changelog entry the date of its commit. New
+rules cover tool versions, claims, findings, and wording.
+- Both date rules require an updated date when the commit is made on a later day than the entry.
+- The version rules in GOVERNANCE.md require upstream research and local checks before a pinned version changes.
+- The changelog entry of such a change must state why the version was chosen and what the checks found. Missing
+  information requires a report of the checks.
+- The enforcement section of GOVERNANCE.md moves to section 7 and dates the new section from 2026-10-20.
+- Claims in any text must be supported by suitable evidence and stay within its scope. A test run also needs
+  permission from the test plan or the lead.
+- Findings must be classified against requirements and documented behaviour before a behaviour is called a confirmed
+  defect.
+- All text must use direct, concrete wording in place of figurative phrases that obscure the meaning.
+- Code comments that only announce other comments or repeat the heading above must be removed.
+- The message of an assertion that runs across several cases must match each case's expected result.
+- Each changelog sentence must state what changed, without speculation about future decisions or outcomes.
+- Changelog entries about unapproved documents must present their content as proposals, not decisions.
+- A bullet that only explains the bullet before it must be merged into that bullet.
+- The first changelog bullet must add information beyond the introduction.
+
+
 M7/WP2 (F2 hardening): P3 decision proposal after P2   (2026-10-19)
 -------------------------------------------------------------------
 The new 2026-10-10_R007_F2_HARDENING_P3_DECISION_PROPOSAL.md document proposes which P3 candidates go forward. Phase

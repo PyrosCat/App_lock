@@ -1,15 +1,15 @@
-# Project Governance Rules — RTM, ADR, Git Workflow, Dates, Document Classes & Risk
+# Project Governance Rules — RTM, ADR, Git Workflow, Dates, Document Classes & Risk, Versions
 
 Authoritative rules for maintaining the Requirements Traceability Matrix, Architecture
-Decision Records, the multi-machine git workflow, date handling, and document classes &
-risk authority. They bind **every contributor — human or AI assistant — on every fleet
-machine.**
+Decision Records, the multi-machine git workflow, date handling, document classes & risk
+authority, and tool and library versions. They bind **every contributor — human or AI
+assistant — on every fleet machine.**
 
 **Keywords:** **MUST** / **MUST NOT** = mandatory, no exceptions without explicit user
 approval recorded in the changelog. **SHOULD** = required unless a justified reason is
 documented where the deviation occurs. **MAY** = optional.
 
-**Precedence:** for the five areas below, this document overrides older guidance in other
+**Precedence:** for the six areas below, this document overrides older guidance in other
 docs; on discovering a conflict, correct the other doc in the next docs commit. Changes to
 this document itself require explicit user approval and a changelog entry.
 
@@ -249,7 +249,9 @@ files — never assume the other machine "knows".
    2026-07-20).
 4. Backdating and future-dating are prohibited. Expected future events are written as
    expectations with a date ("arriving 2026-07-22"), and corrected if reality differs.
-5. Changelog entry dates = the date the work was completed. ADR dates = the decision date.
+5. A changelog entry carries the date of the commit that adds it. If the commit is made on
+   a later day than the entry was written, the author updates the date. ADR dates = the
+   decision date.
 6. When updating a dated statement (fleet arrivals, deadlines), replace it — do not leave
    contradictory dates in the same document.
 
@@ -309,7 +311,7 @@ baselines deliberately share FR/NFR identifiers (reserved, with narrowed 1.0.0 m
 overlapping section numbering, so a bare `SRS §8` or unqualified `FR-042` reading is ambiguous
 where the meanings differ. Spec cross-references **MUST** be version-qualified when ambiguous —
 `v1.0.0 SRS §8`, `v2.0.0 TAS Part 3`. Pre-existing bare references are corrected when next
-touched (§6), not retroactively.
+touched (section 7), not retroactively.
 
 ### 5.4 Classification vocabularies
 
@@ -323,11 +325,34 @@ prioritize plans; they **MUST NOT** be treated as gate criteria.
 
 ---
 
-## 6. Enforcement
+## 6. Tool and Library Versions
+
+Before a commit changes a pinned version of a tool, plugin, or library, the author **MUST**:
+
+1. Review the available upstream release notes and known issues relevant to the project's
+   use. Check for compatibility problems, security advisories, and regressions.
+2. Check the target version's release status and source, including its tag and commit where
+   available. Investigate unexpected differences from the upstream project's documented
+   release process. A release need not come from the default branch.
+3. Run checks that exercise the project's use of the target version. For a secret scanner,
+   include a fake secret that the configured rules are expected to detect.
+
+The author **MUST NOT** select a version solely because it is the newest.
+
+The changelog entry **MUST** state why the version was selected and summarize the checks
+and their results. The changelog entry **MAY** link to a report containing the details.
+
+If the author could not find or access information needed for these checks, the author
+**MUST** write a report of the checks that states what was missing, and the changelog
+entry **MUST** link to it.
+
+---
+
+## 7. Enforcement
 
 - A discovered violation of these rules **MUST** be corrected in the next commit touching
   that artifact, and noted in the changelog if it affected recorded state (e.g. an RTM
   status that was overstated).
-- These rules apply from their adoption date (2026-07-22; §5 from 2026-08-10). Pre-existing
-  artifacts are not retroactively rewritten (history stays honest); they are brought into
-  compliance when next touched.
+- These rules apply from their adoption date (2026-07-22; section 5 from 2026-08-10;
+  section 6 from 2026-10-20). Pre-existing artifacts are not retroactively rewritten
+  (history stays honest); they are brought into compliance when next touched.
