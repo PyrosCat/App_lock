@@ -159,8 +159,8 @@ scripts, tests, and document-generation tooling. Generated outputs and third-par
 
 ## 11. Standard library and Python versions
 
-1. State the minimum Python version of each tool in its module docstring. Use only syntax and standard-library
-   APIs available in that version and every later version in use.
+1. Write code that runs on Python 3.12 and on every newer version in use. State this minimum version in each tool's
+   module docstring.
 2. Check the standard library and the existing project helpers before writing a general-purpose utility. Choose a
    utility by its documented behavior, not only because it shortens the code.
 3. Use `pathlib` for paths, `collections.Counter` for counting, and `defaultdict` for simple grouping.
@@ -175,5 +175,4 @@ scripts, tests, and document-generation tooling. Generated outputs and third-par
 2. Do not write tests that only restate the implementation.
 3. Run the affected tool's tests on its minimum Python version and the newest version used by the project.
    Run applicable existing checks. Report each required test environment that was not available.
-4. Use strict mypy or Pyright checking where it is configured. Otherwise, record the missing type-check coverage.
-   Annotations alone do not prove type safety.
+4. Check types with mypy and the strict settings in `mypy.ini`, report when mypy cannot run.

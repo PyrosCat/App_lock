@@ -1,0 +1,19 @@
+# mypy 2.3.1 and the dependency versions that were current on its release day (2026-08-15).
+# The hashes cover the Windows x64 wheels for Python 3.12 and 3.15. Install into a virtual environment:
+#   py -3.15 -m venv .tools/quality/mypy/2.3.1/windows-x64/venv
+#   .tools/quality/mypy/2.3.1/windows-x64/venv/Scripts/python -m pip install --require-hashes --only-binary :all: -r config/mypy/requirements.txt
+mypy==2.3.1 \
+    --hash=sha256:4c5095a327483591c94e0c8d3ef9e50d4ab1369b541eae007c1f23bc2a41f6bb \
+    --hash=sha256:375d7013876a8233b2d05be185bfa09f689696cd999ce8b1cfe6acac5c80e8a3
+ast-serialize==0.8.0 \
+    --hash=sha256:861794565b06337005c1447ef23103a3d5a627d08bdc827870d00d0b28ef5f51 \
+    --hash=sha256:bd84d60bca7079e741be4ac5dbe237751a59d7f6f9f0126b11880d63822cbe16
+librt==0.15.0 \
+    --hash=sha256:73b30cfa976659b3917c8f6153bdb0591c6a9ec6583599fd24a689b690622022 \
+    --hash=sha256:b87d67e33afaf265262f2a66db578284b88ee2e6fcd224579cb5c15518677ad8
+mypy-extensions==1.1.0 \
+    --hash=sha256:1be4cccdb0f2482337c4743e60421de3a356cd97508abadd57d47403e94f5505
+pathspec==1.1.1 \
+    --hash=sha256:a00ce642f577bf7f473932318056212bc4f8bfdf53128c78bbd5af0b9b20b189
+typing-extensions==4.16.0 \
+    --hash=sha256:481caa481374e813c1b176ada14e97f1f67a4539ce9cfeb3f350d78d6370c2e8

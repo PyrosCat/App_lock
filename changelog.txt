@@ -4,6 +4,27 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Tools: strict mypy type checking for Python   (2026-10-22)
+----------------------------------------------------------
+A new mypy configuration checks the repository's Python code strictly against Python 3.12. The code quality standard
+now sets Python 3.12 as the minimum version and requires type checks with this configuration.
+- The requirements.txt file sets exact versions and SHA-256 hashes for mypy 2.3.1 and five dependencies. The hashes
+  cover the Windows x64 packages for Python 3.12 and 3.15.
+- Mypy 2.3.1 was chosen over 2.4.0, which had five issues titled as 2.4 regressions in its first three weeks.
+- A check of the mypy repository confirmed that the v2.3.1 tag marks the 2026-08-15 commit that sets this version.
+- Searches of the mypy issue tracker found no issue titled as a 2.3 regression since 2.3.0 was released on 2026-07-13.
+- Each dependency version is the one that was current when mypy 2.3.1 was released.
+- Python 3.12 is the oldest version on the Windows 10 development machine. Python 3.12 receives security fixes until
+  October 2028.
+- The build_v1_documents and docx_to_md modules are exempt from the checks until a change brings them into
+  compliance. With these modules exempt, a mypy run on Python 3.15.1 reported no errors in the 7 committed Python
+  files.
+- Python also compiled the same files without syntax errors on versions 3.12.3 and 3.15.1.
+- Imports of the python-docx library are not checked, because the mypy environment does not include it.
+- Sample files confirmed that mypy reports missing annotations, a function added in Python 3.13, and syntax added in
+  Python 3.13. A sample that uses a Python 3.11 module and Python 3.12 syntax passed the check.
+
+
 Docs: Python code quality standard   (2026-10-21)
 -------------------------------------------------
 The new Python standard defines implementation practices for repository scripts, tests, and document-generation
