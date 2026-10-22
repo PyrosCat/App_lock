@@ -22,6 +22,8 @@ The **git repository is the only shared state** between them. Therefore:
 - **Binding writing rules** for comments, test code, documents, changelog entries, and commit
   subjects live in [`process/WRITING_RULES.md`](process/WRITING_RULES.md). Read them before
   writing any of these.
+- Python structure, logic, and resource use follow
+  [`PYTHON_CODE_QUALITY_STANDARD.md`](process/PYTHON_CODE_QUALITY_STANDARD.md).
 
 ## The layout
 

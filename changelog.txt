@@ -4,6 +4,29 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs: Python code quality standard   (2026-10-21)
+-------------------------------------------------
+The new Python standard defines implementation practices for repository scripts, tests, and document-generation
+tooling.
+- Control-flow rules address deep nesting, early exits, and bounded loops.
+- Resource and efficiency rules cover cleanup, algorithm costs, and incremental processing of large inputs. Running
+  time on inputs that grow with use is limited to O(N log N).
+- Design rules cover dependency injection, reusable logic, typed interfaces, configuration, error handling, constants,
+  and mutable defaults.
+- The standard requires code to validate external input before using it. Examples include file contents and API
+  responses.
+- Nesting counts include comprehension loops and exclude resource and exception blocks.
+- Cleanup duties follow resource ownership, including explicit transfers.
+- Encoding rules distinguish repository text, external formats, and subprocess output. Subprocess calls must also
+  check their results and set a timeout when a command can hang.
+- The string rules distinguish ordinary interpolation from logging templates and bound SQL parameters.
+- Each tool must state its minimum Python version. The tests of a tool must run on that version and on the newest
+  version that the project uses.
+- Departures from a "Do not" or "must" rule need the lead's approval, recorded in the changelog. Each departure
+  needs a code comment and a report to the lead.
+- The documentation map links the standard beside the existing writing guidance.
+
+
 Docs: rules for changelog dates, tool versions, claims, and wording   (2026-10-20)
 ----------------------------------------------------------------------------------
 The governance rules and the writing rules of the repository now give a changelog entry the date of its commit. New
