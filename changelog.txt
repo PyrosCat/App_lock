@@ -4,6 +4,17 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Tools: script for the mechanical writing checks   (2026-10-26)
+--------------------------------------------------------------
+The new check_writing.py script reports changed text that breaks one of the writing rules a script can test.
+- The checks cover changelog entries, line widths, section signs, and the assertion messages of Kotlin tests. A new
+  writing_checks package holds them, with a README.md file that describes the script and its files.
+- A new test_check_writing.py script tests each check with good and bad samples and temporary git repositories.
+- All 227 of these tests passed on Windows 10 with Python 3.12.3 and with Python 3.15.1.
+- A strict mypy 2.3.1 run with the repository configuration reported no errors in the new scripts and package.
+- Git now ignores the Python bytecode caches in all folders, including those that the new tests create.
+
+
 Tools: strict mypy type checking for Python   (2026-10-22)
 ----------------------------------------------------------
 A new mypy configuration checks the repository's Python code strictly against Python 3.12. The code quality standard
