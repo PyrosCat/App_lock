@@ -1,8 +1,8 @@
 # Writing Rules
 
-This document gives the rules for the text in this repository: code comments and KDoc, test code, repository
-documents, changelog entries, and commit subjects. The rules bind every contributor, human or AI assistant, on every
-fleet machine.
+This document gives the rules for the text in this repository: code comments, KDoc, docstrings, test code,
+repository documents, changelog entries, and commit subjects. The rules bind every contributor, human or AI
+assistant, on every fleet machine.
 
 - **Class:** living document. The lead approves each change, and each change gets a changelog entry.
 - **Related rules:** report evidence (immutability, host tags, corrections) is in
@@ -46,7 +46,7 @@ fleet machine.
     responsibility, or result. Write "must be assigned to the selected design or to a separately tracked fix", not
     "needs a home".
 
-## 2. Code comments and KDoc
+## 2. Code comments, KDoc, and docstrings
 
 1. Keep comments concise. Remove repetition, obvious descriptions of the code, and project jargon that the
    reader does not need.
@@ -56,6 +56,11 @@ fleet machine.
    change a public API for style alone.
 4. Remove comments that only announce what other comments contain, or that only repeat the section heading above
    them. For example, remove "The comments above each test name its case".
+5. Do not put dated observations or measured counts in comments or docstrings, such as "on 2026-10-23 the largest
+   file had 270 KB". Such observations become outdated without any change to the code. State the lasting reason
+   instead, and put the evidence in a report or the changelog. A date that only identifies a fixed record, such as
+   a changelog entry or a report, describes no current state and is allowed. For example, a comment in a test can
+   refer to the changelog entry of 2026-10-20 that the test uses as a sample.
 
 ## 3. Test code
 
@@ -120,7 +125,7 @@ fleet machine.
    | Do not write | Write |
    |---|---|
    | The Moto G smoke times of the reboot and biometric segments lower their full-run estimate to about 50 min. | Trial-run timings cut the expected time of the project lead at the phone from 1.5 h to 50 min. |
-   | Lead decision 6 confirms the objective rule for residual repeats and for controls that cannot lose a lock. | A case that reproduces a known R-007 weakness as predicted gets the verdict "not met". |
+   | Lead decision 6 gives residual repeats the verdict "not met". | A test case that reproduces a known weakness as predicted gets the verdict "not met". |
 
 6. An entry for a document that is not yet approved presents its content as proposals, for example "The proposal
    recommends ..." or "Clock policy is proposed as separate work". It does not present them as decisions, such as
@@ -150,8 +155,8 @@ fleet machine.
 1. No two bullets of an entry start with the same three words.
 2. Do not chain sentences that start with "It", and avoid chains of "its". Name the item instead.
 3. Do not start the introduction with "This change". Start with the item that changes, for example "The planning
-   document for the R-007 hardening work now shows ...". In a bullet, use "This change ..." only where the action
-   needs it.
+   document for the work on lockouts during storage failures now shows ...". In a bullet, use "This change ..."
+   only where the action needs it.
 4. No bullet repeats a bullet of the previous entry word for word. When the evidence has the same form, name what is
    new in this run, for example the commit that the run was compared with.
 5. A bullet does not repeat a phrase of the bullet before it. Refer back instead, for example "these cases".
@@ -169,8 +174,11 @@ fleet machine.
 
 ## 7. Check before hand-off
 
-1. Read every added line of the change, not only the line widths: `git diff -U0 -- <files>`, then each line that
+1. Run `python scripts/check_writing.py`. For a change on a branch, run the main checkout's copy of the script with
+   the worktree of the branch as the current folder, and add `--base main`. Fix each finding, or state in the
+   hand-off why it is not fixed. The script checks only the mechanical rules, so items 2 and 3 still apply.
+2. Read every added line of the change, not only the line widths: `git diff -U0 -- <files>`, then each line that
    starts with `+`. Include comments, messages, test names, and each header paragraph that the change touches.
-2. For a changelog entry, also read the first three words of each bullet, and check each subject for a noun that
+3. For a changelog entry, also read the first three words of each bullet, and check each subject for a noun that
    says what it is. Then read the entry as a reader outside the project: each term is plain or explained.
-3. The hand-off states that the check was done and what it changed.
+4. The hand-off states that the check was done and what it changed.

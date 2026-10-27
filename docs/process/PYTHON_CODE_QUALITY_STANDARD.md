@@ -31,7 +31,10 @@ scripts, tests, and document-generation tooling. Generated outputs and third-par
 1. Choose the algorithm and data structure for the expected input size, including growth beyond local samples.
    For inputs that grow with use, keep total time within O(N log N). Define N and any other input sizes used in
    the analysis. If the required computation or output exceeds this bound, document the algorithm, expected size,
-   and reason as a departure. State other non-obvious time and memory costs in the function's docstring.
+   and reason as a departure. The reason explains why no suitable algorithm has a lower time complexity. Base the
+   expected size on a fixed limit or on a property of the input that the program enforces or a binding
+   repository rule requires, not on a dated measurement. State other non-obvious time and memory costs in the
+   function's docstring.
 2. Count the work inside each loop, including the functions it calls. A list membership test, `list.index()`,
    `list.pop(0)`, `list.insert(0, x)`, and a slice copy each cost up to O(N). Repeated N times, they cost up to O(N²).
 3. Build a set or dictionary once for repeated membership or key lookups, when its memory cost is acceptable. A hash
@@ -90,6 +93,9 @@ scripts, tests, and document-generation tooling. Generated outputs and third-par
    and the same reason to change, not because it looks similar. Avoid helpers whose flags select unrelated behaviors.
 8. Use small interfaces or `Protocol` types where interchangeable implementations help. Add a framework only when
    plain functions, classes, and protocols cannot meet the need.
+9. Do not create direct or indirect import cycles between modules. To break a cycle, move code that only one module
+   uses into that module, and move code that several modules use into a module that imports none of them. A cycle
+   that uses `from module import name` can stop the modules from loading.
 
 ## 6. Configuration and constants
 
@@ -176,3 +182,9 @@ scripts, tests, and document-generation tooling. Generated outputs and third-par
 3. Run the affected tool's tests on its minimum Python version and the newest version used by the project.
    Run applicable existing checks. Report each required test environment that was not available.
 4. Check types with mypy and the strict settings in `mypy.ini`, report when mypy cannot run.
+5. In a test, patch a name where the code under test looks it up. After `from module import name`, patch `name` in
+   the importing module, which has its own reference to `name`. After `import module`, patch `name` in `module`. A
+   patch in the wrong place leaves the original in use, so the test does not run the replacement.
+6. For a change that only moves code between modules, verify that the moved code is unchanged apart from its
+   imports, for example by comparing the syntax tree of each moved definition before and after the move. Report the
+   method and the result.

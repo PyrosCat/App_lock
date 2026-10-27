@@ -16,7 +16,8 @@ python scripts/check_writing.py FILE ...         # changed lines of these files 
 python scripts/check_writing.py --all FILE ...   # every line of these files
 ```
 
-In a worktree whose branch has no copy of the script, run the copy of the main checkout.
+For a change on a branch, run the main checkout's copy of the script with the worktree of the branch as the current
+folder, and add `--base main`.
 
 ## Report
 

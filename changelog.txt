@@ -4,6 +4,21 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+Docs: rules for the hand-off check, comments, and Python code   (2026-10-26)
+----------------------------------------------------------------------------
+The writing rules of the repository now require the check_writing.py script to run before a change is handed over.
+Each finding must be fixed or explained in the hand-off.
+- On a branch, the main checkout's copy of the script must check the change, with the --base main option. The
+  script's docstring and the README.md file of the writing_checks package now give the same instruction.
+- Comments and docstrings must not hold dated observations or measured counts. A date that only identifies a report
+  or a changelog entry is allowed.
+- The Python code quality standard now forbids import cycles and says where a test must patch a name. A change that
+  only moves code must show that the code is unchanged apart from its imports. The documented reason for exceeding
+  the O(N log N) limit must explain why no suitable algorithm is faster.
+- In the writing rules for changelog entries, the two sentences of the plain-wording example now state the same
+  fact. The example of how an introduction starts now names the work in plain words.
+
+
 Tools: script for the mechanical writing checks   (2026-10-26)
 --------------------------------------------------------------
 The new check_writing.py script reports changed text that breaks one of the writing rules a script can test.

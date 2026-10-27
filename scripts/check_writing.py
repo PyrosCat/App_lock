@@ -8,13 +8,13 @@ Usage:
     python scripts/check_writing.py FILE ...         # changed lines of these files only
     python scripts/check_writing.py --all FILE ...   # every line of these files
 
-Run it anywhere inside the repository or one of its worktrees: git gives the changes. In a
-worktree whose branch has no copy of this script, run the copy of the main checkout. The
-script reads the working files, so a file with staged changes and other changes in the working
-file is an error: the commit takes the staged text. A named file is checked under the name that
-git gives it, so on a file system that ignores case, the case of the name does not matter. For a
-deleted file, this holds for the letters A to Z only. A name in another case that can name two
-files of the index is an error.
+Run it anywhere inside the repository or one of its worktrees: git gives the changes. For a
+change on a branch, run the copy of this script in the main checkout with the worktree of the
+branch as the current folder, and add --base main. The script reads the working files, so a file
+with staged changes and other changes in the working file is an error: the commit takes the
+staged text. A named file is checked under the name that git gives it, so on a file system that
+ignores case, the case of the name does not matter. For a deleted file, this holds for the
+letters A to Z only. A name in another case that can name two files of the index is an error.
 The limits and the rule texts come from WRITING_RULES.md at run time, from the copy in the
 repository of this script. When a rule no longer has the wording that its check expects, the
 check is skipped and an error names the rule.
