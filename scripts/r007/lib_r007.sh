@@ -926,8 +926,7 @@ r007_inspect_evidence() { # inspection
 }
 
 # ---- self-gate ---------------------------------------------------------------------------------
-# Starts MainActivity by its explicit component. launch_main in lib.sh resolves the LAUNCHER intent, and while the
-# WP0 SpikeLauncherActivity also declares LAUNCHER, that resolution opens the system chooser instead.
+# Starts MainActivity by its explicit component, as launch_main in lib.sh does, and waits until the start completes.
 r007_launch_main() { sh_ am start -W -n "$MAIN_ACTIVITY" >/dev/null; }
 
 # Opens the self-gate (MainActivity) and waits until its PIN prompt shows. The prompt builds the lockout manager.

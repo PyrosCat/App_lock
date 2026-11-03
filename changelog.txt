@@ -4,6 +4,26 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): harness start of MainActivity and grep checks without pipes   (2026-11-03)
+-------------------------------------------------------------------------------------------------
+The device test harness in scripts/e2e now starts the main screen of App Lock (MainActivity) by its explicit
+component name. No grep -q check in the scripts/e2e and scripts/r007 folders reads its input from a pipe any more.
+- The launch_main function of lib.sh no longer looks up the launcher activity of the app. That lookup opened the
+  system chooser, because a prototype activity also declares the launcher category.
+- A failed adb call or an error printed by am start now makes launch_main report a failure. This failure makes a
+  stale class name visible when MainActivity moves to another package.
+- Large window dumps no longer make the overlay_z function of lib.sh read a lock overlay behind other windows as
+  absent. Under the bash option pipefail, a grep that stopped at its first match made the pipeline fail.
+- The foreground_is, launch_pkg, and grants_ok functions of lib.sh now give grep a here-string, not a pipe.
+- Here-strings also feed the install check of setup_device.sh and all six grep -q checks of ov4_rapid_relaunch.sh.
+- A temporary host test that replaces adb with a stub passed all 22 of its checks. The checks cover launch_main with
+  am start errors and an offline device, and the launcher lookup for other apps. They also cover the permission
+  grants and the foreground app.
+- With stubbed window dumps of about 450 KB, the overlay_z function gave the right state in all 150 runs.
+- The full host test run of test_lib_r007.sh passed all 547 tests before the change and after it.
+- The bash -n syntax check passed for the five changed scripts, and no device run tested the changes.
+
+
 Docs: rules for the hand-off check, comments, and Python code   (2026-10-26)
 ----------------------------------------------------------------------------
 The writing rules of the repository now require the check_writing.py script to run before a change is handed over.

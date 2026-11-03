@@ -42,18 +42,24 @@ require_device || exit 2
 # stale on-device test build can never be cited as evidence (the conditional-install version could
 # keep a pre-registered stale APK). USE_PREINSTALLED=1 keeps whatever is registered (diagnostic;
 # provenance NOT established).
+# The grep -q checks in this script read here-strings, not pipes: see ui_has() in lib.sh.
 if [ "${USE_PREINSTALLED:-}" = 1 ]; then
-  sh_ pm list instrumentation | grep -q "${APP_ID}.test/" || { fail "OV-4: USE_PREINSTALLED=1 but ${APP_ID}.test is not registered"; summary "OV-4"; exit 1; }
+  grep -q "${APP_ID}.test/" <<< "$(sh_ pm list instrumentation)" \
+    || { fail "OV-4: USE_PREINSTALLED=1 but ${APP_ID}.test is not registered"; summary "OV-4"; exit 1; }
   info "USE_PREINSTALLED=1 — using the already-registered instrumentation (provenance NOT established)"
 elif [ -f "$ANDROIDTEST_APK" ]; then
   hash="$(sha256sum "$ANDROIDTEST_APK" 2>/dev/null | cut -c1-16)"
   info "installing androidTest APK $(basename "$ANDROIDTEST_APK") (sha256 ${hash:-unknown}…)"
   out="$(adbx install -r -g "$(host_path "$ANDROIDTEST_APK")" 2>&1)"
-  printf '%s' "$out" | grep -q 'Success' || { fail "OV-4: androidTest install did not report Success: $(printf '%s' "$out" | tr '\n' ' ' | tail -c 200)"; summary "OV-4"; exit 1; }
+  grep -q 'Success' <<< "$out" || {
+    fail "OV-4: androidTest install did not report Success: $(printf '%s' "$out" | tr '\n' ' ' | tail -c 200)"
+    summary "OV-4"; exit 1
+  }
 else
   fail "OV-4: androidTest APK not found at $ANDROIDTEST_APK (build :app:assembleProdDebugAndroidTest, set ANDROIDTEST_APK, or USE_PREINSTALLED=1)"; summary "OV-4"; exit 1
 fi
-sh_ pm list instrumentation | grep -q "${APP_ID}.test/" || { fail "OV-4: instrumentation ${APP_ID}.test not registered after install"; summary "OV-4"; exit 1; }
+grep -q "${APP_ID}.test/" <<< "$(sh_ pm list instrumentation)" \
+  || { fail "OV-4: instrumentation ${APP_ID}.test not registered after install"; summary "OV-4"; exit 1; }
 
 args=(-e class "$TEST_CLASS" -e ov4_bursts "$OV4_BURSTS" -e ov4_relaunches "$OV4_RELAUNCHES" -e ov4_repeat "$OV4_REPEAT")
 [ -n "$OV4_T_APPEAR_MS" ] && args+=(-e ov4_t_appear_ms "$OV4_T_APPEAR_MS")
@@ -64,7 +70,7 @@ out="$(adbx shell am instrument -w "${args[@]}" "$INSTRUMENTATION" 2>&1 | tr -d 
 counts="$(sh_ logcat -d -s M7SpikeTest | grep -F 'OV-4 overlay race:' | tail -1)"
 
 # assumeTrue-skip (no normal target app) is a MISCONFIG, not a pass.
-if printf '%s' "$out" | grep -qiE 'no suitable target app|AssumptionViolated|OK \(0 tests\)'; then
+if grep -qiE 'no suitable target app|AssumptionViolated|OK \(0 tests\)' <<< "$out"; then
   fail "OV-4: SKIPPED — no normal target app (use an aosp/default image, not aosp-atd). $counts"
   summary "OV-4"; exit 1
 fi
@@ -87,10 +93,10 @@ elif [ "$(( top + behind + absent ))" -ne "$of" ] || [ "$of" -ne "$expected" ]; 
 fi
 
 # Instrumentation verdict (arithmetic already validated above).
-if printf '%s' "$out" | grep -qiE 'ABSENT must be|BEHIND over|FAILURES'; then
+if grep -qiE 'ABSENT must be|BEHIND over|FAILURES' <<< "$out"; then
   fail "OV-4: $counts"
   printf '%s\n' "$out" | grep -iE 'ABSENT must be|BEHIND over|^FAILURES' | head -4 | sed 's/^/    /'
-elif printf '%s' "$out" | grep -q 'OK (1 test)'; then
+elif grep -q 'OK (1 test)' <<< "$out"; then
   pass "OV-4: $counts${OV4_T_APPEAR_MS:+  [diagnostic: scaled T_appear=${OV4_T_APPEAR_MS}ms — non-gate]}"
 else
   fail "OV-4: instrumentation gave no clear result (device booted? test APK matches the app build?)"

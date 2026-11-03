@@ -29,8 +29,9 @@ export MSYS_NO_PATHCONV=1   # Git Bash must not mangle device paths like /sdcard
 : "${POLL_SERVICE:=com.applock/com.applock.platform.spike.UsagePollService}"  # detection FGS; WP2 -> prod
 : "${SPIKE_LAUNCHER:=com.applock/com.applock.platform.spike.SpikeLauncherActivity}"  # spike-only foregrounder
 : "${POLL_INTERVAL_MS:=400}"               # poll interval P handed to the spike FGS (prod D1 = 200; sweepable)
-# MainActivity moved to presentation/applist in WP6; kept here for reference only —
-# launch_main() resolves the launcher activity dynamically so package moves don't stale it out.
+# launch_main() starts MainActivity by this explicit component. Resolving the LAUNCHER activity of the app id
+# returns the system chooser, because the WP0 SpikeLauncherActivity also declares LAUNCHER. When MainActivity
+# moves, change the class name here: launch_main() reports a stale component as a failure.
 MAIN_ACTIVITY="${APP_ID}/com.applock.presentation.applist.MainActivity"
 # UI text signals (from res/values/strings.xml):
 UI_APPLIST_SIGNAL="Open vault"             # content-desc present ONLY in the unlocked App List
@@ -141,10 +142,11 @@ top_component() { # -> pkg/activity of the resumed activity (portable across API
 # sets the production overlay focus flags and revalidates this grep. ABSENT (the security-critical
 # state) read robustly on every OEM; TOP/BEHIND is the soft boundary. Revalidate across the §10
 # lanes — One UI coverage comes via FTL, not the AOSP NucBox lanes.
+# The greps read here-strings, not pipes: see the comment on ui_has().
 overlay_z() {
-  local dump; dump="$(sh_ dumpsys window)"
-  if printf '%s\n' "$dump" | grep -E 'mCurrentFocus' | grep -qF "$OVERLAY_WINDOW_TITLE"; then printf 'TOP'
-  elif printf '%s\n' "$dump" | grep -qF "$OVERLAY_WINDOW_TITLE"; then printf 'BEHIND'
+  local dump focus; dump="$(sh_ dumpsys window)"; focus="$(grep -E 'mCurrentFocus' <<< "$dump")"
+  if grep -qF -- "$OVERLAY_WINDOW_TITLE" <<< "$focus"; then printf 'TOP'
+  elif grep -qF -- "$OVERLAY_WINDOW_TITLE" <<< "$dump"; then printf 'BEHIND'
   else printf 'ABSENT'; fi
 }
 overlay_present() { [ "$(overlay_z)" != ABSENT ]; }
@@ -152,7 +154,7 @@ overlay_on_top()  { [ "$(overlay_z)" = TOP ]; }
 # "lock screen up" now means the overlay lock surface is drawn AND focus-holding (TOP). The
 # name is kept so the OV-3/OV-4/smoke callers stay stable through the engine swap (M7_PLAN WP1).
 is_lockscreen()   { overlay_on_top; }
-foreground_is()   { top_component | grep -q "^$1/"; }
+foreground_is()   { grep -q "^$1/" <<< "$(top_component)"; }
 
 wait_lockscreen() { # timeout-seconds ; returns 0 when lock screen is up
   local t="${1:-$LOCKSCREEN_WAIT}" i
@@ -181,10 +183,14 @@ ui_has() { local x; x="$(ui_xml)"; grep -qF -- "$1" <<< "$x"; }
 # ---- app control ----------------------------------------------------------
 launch_pkg() { # resolve the launcher activity and am-start it (more reliable than monkey)
   local comp; comp="$(sh_ cmd package resolve-activity --brief -c android.intent.category.LAUNCHER "$1" | tail -1)"
-  if [ -n "$comp" ] && printf '%s' "$comp" | grep -q '/'; then sh_ am start -n "$comp" >/dev/null
+  if [ -n "$comp" ] && grep -q '/' <<< "$comp"; then sh_ am start -n "$comp" >/dev/null
   else sh_ monkey -p "$1" -c android.intent.category.LAUNCHER 1 >/dev/null; fi
 }
-launch_main() { launch_pkg "$APP_ID"; }  # resolves MainActivity dynamically (survives package moves)
+launch_main() { # reads stderr too, because am start prints its start errors there
+  local out rc; out="$(adbx shell am start -n "$MAIN_ACTIVITY" 2>&1 | tr -d '\r')"; rc=$?
+  if [ "$rc" -ne 0 ]; then fail "could not start $MAIN_ACTIVITY (exit status $rc): $out"; return 1; fi
+  case "$out" in *Error*|*Exception*) fail "could not start $MAIN_ACTIVITY: $out"; return 1 ;; esac
+}
 dismiss_anr() { # tap "Wait"/"Close app" ANR dialogs that this slow emulator throws
   ui_has "isn't responding" && { sh_ input keyevent KEYCODE_BACK; sleep 1; }
   return 0
@@ -221,8 +227,9 @@ resolve_clock() {
 grant_usage_access() { sh_ appops set "$APP_ID" android:get_usage_stats allow >/dev/null; }
 grant_overlay()      { sh_ appops set "$APP_ID" android:system_alert_window allow >/dev/null; }
 grants_ok() { # both ops report allow?
-  sh_ appops get "$APP_ID" android:system_alert_window | grep -qi allow \
-    && sh_ appops get "$APP_ID" android:get_usage_stats | grep -qi allow
+  local overlay usage
+  overlay="$(sh_ appops get "$APP_ID" android:system_alert_window)" && grep -qi allow <<< "$overlay" \
+    && usage="$(sh_ appops get "$APP_ID" android:get_usage_stats)" && grep -qi allow <<< "$usage"
 }
 revoke_overlay() { sh_ appops set "$APP_ID" android:system_alert_window ignore >/dev/null; }  # negative control (CR-006)
 is_pos_int() { case "${1:-}" in ''|*[!0-9]*|0) return 1;; *) return 0;; esac; }                # positive integer only (CR-003)

@@ -4,6 +4,8 @@
 # never taken for success. Each library call runs in a subshell, so its own PASS/FAIL counters stay separate.
 #
 # Usage: scripts/r007/test_lib_r007.sh
+#
+# A grep -q check reads a file or a here-string, never a pipe: see ui_has() in e2e/lib.sh.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 WORK="$(mktemp -d)"
@@ -907,7 +909,7 @@ ended() { # status passed failed ; the exit status, and one summary with these c
   [ "$(cat "$WORK/rc")" = "$1" ] && [ "$(plain_out | tail -1)" = "stub run: $2 passed, $3 failed" ] \
     && [ "$(plain_out | grep -c '^stub run: ')" = 1 ]
 }
-unexplained() { plain_out | grep -q "the run stopped with exit status"; }
+unexplained() { grep -q "the run stopped with exit status" <<< "$(plain_out)"; }
 reset_device; seed_settings
 run_end 'r007_settings_apply || r007_stop_run; pass "a case"; exit 0'
 ended 0 2 0 && ! unexplained && settings_are "0 1 1" && [ ! -e "$RECORD" ] \
@@ -1134,9 +1136,9 @@ grep -qx "granted=bound" "$WORK/out" && grep -qx "revoked=unbound" "$WORK/out" \
   && [ ! -e "$services_file" ] && [ "$(setting secure.accessibility_enabled)" = 0 ] \
   && ok "a grant binds the detector, and a revoke writes the recorded values back" \
   || bad "the grant cycle: $(cat "$WORK/out")"
-grep -n "secure enabled_accessibility_services" "$STUB_DEVICE/ops" | head -2 | tr '\n' ';' \
-  | grep -qE "^[0-9]+:delete secure enabled_accessibility_services;[0-9]+:put secure enabled_accessibility_services \
-$DETECTOR;$" \
+list_ops="$(grep -n -m2 "secure enabled_accessibility_services" "$STUB_DEVICE/ops" | tr '\n' ';')"
+grep -qE "^[0-9]+:delete secure enabled_accessibility_services;[0-9]+:put secure enabled_accessibility_services \
+$DETECTOR;$" <<< "$list_ops" \
   && ok "the grant deletes the service list before it writes the detector" \
   || bad "the grant order: $(tr '\n' ';' < "$STUB_DEVICE/ops")"
 reset_device; seed_settings; echo "com.x/.Y" > "$services_file"
@@ -1783,7 +1785,7 @@ on="$(line_of "put secure accessibility_enabled 1")"
 reset_device; seed_settings; mkdir -p "$PENDING"; echo 500 > "$PENDING/prefs_mode"
 R007_LOG_OUT="$WORK/p1.log" bash "$HERE/p1_validate.sh" -s stub > "$WORK/out" 2>&1; rc=$?
 [ "$rc" != 0 ] && ! grep -q "^put " "$STUB_DEVICE/ops" && [ ! -e "$RECORD" ] && [ -e "$PENDING/prefs_mode" ] \
-  && plain_out | grep -q "an earlier run left app data changed (prefs_mode)" \
+  && grep -q "an earlier run left app data changed (prefs_mode)" <<< "$(plain_out)" \
   && ok "p1_validate.sh does not start while a marker of an earlier run exists" \
   || bad "p1_validate.sh with a marker: rc $rc, $(plain_out | tail -3 | tr '\n' ';')"
 
@@ -1791,7 +1793,7 @@ echo "recovery without work"
 reset_device; seed_settings
 R007_LOG_OUT="$WORK/recover.log" bash "$HERE/restore_settings.sh" > "$WORK/out" 2>&1; rc=$?
 [ "$rc" = 0 ] && ! grep -q "force-stop" "$STUB_DEVICE/ops" \
-  && plain_out | grep -q "no fault script and no pending app-data change" \
+  && grep -q "no fault script and no pending app-data change" <<< "$(plain_out)" \
   && ok "a recovery with nothing to undo does not stop the app" \
   || bad "the empty recovery: rc $rc, ops $(tr '\n' ';' < "$STUB_DEVICE/ops")"
 reset_device; mkdir -p "$STUB_DEVICE/files/r007"; echo "READ 0 Throw" > "$STUB_DEVICE/files/r007/faults"
@@ -1856,17 +1858,17 @@ grep -qx "rc=0" "$WORK/out" && ! grep -q "^tap " "$STUB_DEVICE/ops" \
   && ok "one lock decision among not-protected decisions counts as protected" \
   || bad "the mixed decisions: $(plain_out | tr '\n' ';')"
 protect "$OLD_LINE"$'\n'"$FREE_LINE"
-grep -qx "rc=1" "$WORK/out" && plain_out | grep -q "Clock is not protected in 2 launches" \
+grep -qx "rc=1" "$WORK/out" && grep -q "Clock is not protected in 2 launches" <<< "$(plain_out)" \
   && [ "$(grep -c "decisions=unprotected state=unprotected" "$WORK/p2.log")" = 2 ] \
   && ok "only not-protected decisions in each launch lead to the app list, and an older lock decision does not count" \
   || bad "the unprotected launches: $(plain_out | tr '\n' ';')"
 protect "$OTHER_APP_LINE"
-grep -qx "rc=1" "$WORK/out" && plain_out | grep -q "unknown after launch 1" \
-  && ! plain_out | grep -q "the app list opens" && ! grep -q "^tap " "$STUB_DEVICE/ops" \
+grep -qx "rc=1" "$WORK/out" && grep -q "unknown after launch 1" <<< "$(plain_out)" \
+  && ! grep -q "the app list opens" <<< "$(plain_out)" && ! grep -q "^tap " "$STUB_DEVICE/ops" \
   && ok "a launch without a decision for Clock stops before the app list" \
   || bad "no decision: $(plain_out | tr '\n' ';')"
 STUB_LOGCAT_FAIL=1 protect "$FREE_LINE"
-grep -qx "rc=1" "$WORK/out" && plain_out | grep -q "unknown after launch 1" \
+grep -qx "rc=1" "$WORK/out" && grep -q "unknown after launch 1" <<< "$(plain_out)" \
   && ok "an unreadable engine log stops before the app list" || bad "the unreadable log: $(plain_out | tr '\n' ';')"
 
 echo "P2 gate wait"
@@ -2224,7 +2226,7 @@ STUB_UI='<node text="Use PIN" bounds="[100,200][300,400]" />' seg biometric tap_
 reset_device
 STUB_UI='<node text="Enter your PIN" />' case_run biometric 'R007_CASE_LABEL="X11a L #1"; tap_use_pin; echo "rc=$?"'
 grep -qx "rc=1" "$WORK/out" && grep -q "the Use PIN button was not found" "$WORK/out" \
-  && grep -A1 "^## use-pin-missing" "$WORK/p2.log" | grep -qF 'text="Enter your PIN"' \
+  && grep -qF 'text="Enter your PIN"' <<< "$(grep -A1 "^## use-pin-missing" "$WORK/p2.log")" \
   && ok "a missing Use PIN button fails after 3 dumps and saves the texts of the last dump" \
   || bad "the missing Use PIN button: $(tr '\n' ';' < "$WORK/out") log $(tr '\n' ';' < "$WORK/p2.log")"
 # X11a: the biometric service logs the rejected attempt of the app, or logs nothing within the finger wait.
@@ -2236,7 +2238,8 @@ x11a_is() { # label log-line expectation(record|fail)
   if [ "$3" = record ]; then
     grep -qx "rc=0 fails=0" "$WORK/out" && grep -qx "tap 200 300" "$STUB_DEVICE/ops" \
       && grep -q "$marker objective=yes$" "$WORK/p2.log" \
-      && grep -A1 "^## bio-rejected X11a L #1" "$WORK/p2.log" | grep -q "onAuthenticated(false)" && ok "$1" \
+      && grep -q "onAuthenticated(false)" <<< "$(grep -A1 "^## bio-rejected X11a L #1" "$WORK/p2.log")" \
+      && ok "$1" \
       || bad "$1: $(tr '\n' ';' < "$WORK/out") log $(grep '^## ' "$WORK/p2.log" | tr '\n' ';')"
   else
     grep -qx "rc=1 fails=1" "$WORK/out" && grep -q "no result within 2 s" "$WORK/out" \

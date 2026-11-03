@@ -27,7 +27,7 @@ elif [ ! -f "$APK" ]; then
   fail "APK not found at $APK (build :app:assembleProdDebug, set APK=, or USE_PREINSTALLED=1)"; summary "setup"; exit 1
 else
   out="$(adbx install -r -g "$(host_path "$APK")" 2>&1)"
-  if printf '%s' "$out" | grep -q 'Success'; then info "installed $(basename "$APK")"
+  if grep -q 'Success' <<< "$out"; then info "installed $(basename "$APK")"
   else fail "install did not report Success: $(printf '%s' "$out" | tr '\n' ' ' | tail -c 200)"; summary "setup"; exit 1; fi
 fi
 
