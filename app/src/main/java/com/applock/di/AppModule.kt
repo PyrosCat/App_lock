@@ -116,7 +116,12 @@ object AppModule {
     @Provides
     @Singleton
     fun provideLockSessionManager(settings: SettingsRepository): LockSessionManager =
-        LockSessionManager(policyProvider = { settings.relockPolicy })
+        // Inject Android's boot-time clock for the relock grace window. SystemClock.elapsedRealtime() is monotonic
+        // and counts deep sleep, so setting the wall clock back cannot extend a session.
+        LockSessionManager(
+            policyProvider = { settings.relockPolicy },
+            elapsedRealtime = SystemClock::elapsedRealtime,
+        )
 
     @Provides
     @Singleton

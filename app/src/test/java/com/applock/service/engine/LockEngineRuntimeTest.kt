@@ -335,7 +335,8 @@ class LockEngineRuntimeTest {
                 LockoutManager(storage, clock = { nowMs }, elapsedRealtime = { nowMs }, ioDispatcher = dispatcher)
             }
         lockoutManagerRef = lockoutManager
-        val sessionManager = LockSessionManager(policyProvider = { RelockPolicy.IMMEDIATE }, clock = { nowMs })
+        val sessionManager =
+            LockSessionManager(policyProvider = { RelockPolicy.IMMEDIATE }, elapsedRealtime = { nowMs })
         val runtime = LockEngineRuntime(
             epoch = epoch,
             scope = scope,

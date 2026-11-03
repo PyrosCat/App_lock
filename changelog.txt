@@ -4,6 +4,25 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (lock sessions): monotonic clock for the relock grace window   (2026-11-03)
+----------------------------------------------------------------------------------
+The relock grace window now runs on the monotonic boot-time clock of Android instead of the wall clock. With the
+relock policy "After 10 seconds", the window lets a protected app reopen without a new unlock.
+- Setting the wall clock back after the user left a protected app extended the window.
+- The LockSessionManager class now takes the clock as a required elapsedRealtime parameter and has no wall-clock
+  default. Both the current lock engine and the new engine in development get this change, because they share the
+  class.
+- The AppModule object now passes SystemClock.elapsedRealtime as this clock. In the LockEngineRuntimeTest class, the
+  test clock now goes to this parameter.
+- The foreground state of a session is now a separate value, not the clock reading 0. An app left at clock reading 0
+  now relocks when the window ends.
+- A clock reading earlier than the leave time now ends the session.
+- The LockSessionManagerTest class gets four new tests. They cover a leave at clock reading 0, an immediate return,
+  and an earlier reading.
+- A Gradle run on Windows 10 passed all 472 JVM unit tests of the prodDebug build variant.
+- In the same run, the detekt task reported no new findings.
+
+
 M7/WP2 (F2 hardening): harness start of MainActivity and grep checks without pipes   (2026-11-03)
 -------------------------------------------------------------------------------------------------
 The device test harness in scripts/e2e now starts the main screen of App Lock (MainActivity) by its explicit
