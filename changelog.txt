@@ -4,6 +4,19 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): record of the P3 decisions D1 to D6   (2026-11-06)
+-------------------------------------------------------------------------
+The new 2026-11-06_M7_R007_F2_HARDENING_P3_DECISIONS.md record holds the lead's six decisions for phase P3 of the
+R-007 lockout work. They set rules for the candidate fixes of the stored PIN lockout that phase P3 compares.
+- Decisions D1 and D2 settle when the stored lockout state counts as trusted and what the app permits until then.
+- Under decision D3, a restart of the app must not change an active lockout or restore used PIN attempts.
+- Decisions D4 to D6 cover the meaning of the stored count, the clock policy, and limits on option A. Option A is an
+  alternative design with an extra stored attempt record.
+- The record also holds the lead's additions for the move from app version 1.0.0 to 2.0.0. They include a blocked
+  state for unsupported storage formats and a rule for disposable test installations.
+- The M7_PLAN.md project plan gets a summary of each decision and the full text of restart decision D3.
+
+
 M7/WP2 (lock sessions): monotonic clock for the relock grace window   (2026-11-03)
 ----------------------------------------------------------------------------------
 The relock grace window now runs on the monotonic boot-time clock of Android instead of the wall clock. With the

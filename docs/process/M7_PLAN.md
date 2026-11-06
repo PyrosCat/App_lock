@@ -90,7 +90,9 @@ R-002 and R-005 dispositioned on evidence per that standard; **RTM synchronized 
   port leaves the seam for it, but no second adapter and no source-selection UI ship in 1.0.0).
 - Tapjacking / obscured-input hardening against hostile third-party overlays (THR-UI-001/003),
   lockout/biometric-failure accounting (CR-005), Play-listing pre-check — **M9/M10**. M7 keeps the
-  existing `FLAG_SECURE` behavior and the existing lockout accounting on the PIN path.
+  existing `FLAG_SECURE` behavior and the existing PIN accounting, except for the changes that F2 hardening
+  decisions D1 to D6 authorize. These are D1's replacement records, D2's rule for biometric results, D4's
+  count saturation, D5's clock rules, and, for C2, the reservation accounting of D4. CR-005 stays M9 work.
 - Interface extraction for auth/repos beyond the two detection/presentation ports — those land with
   their consuming services (M2/M3 lineage, 2.0.0).
 
@@ -106,7 +108,9 @@ These are fixed by ADR-013B and the v1.0.0 SDS/NFR; every work package below mus
    yields an *allow* decision; where Android prevents enforcement, the outcome is *interruption*
    with truthful notice, never a false *Protected*.
 4. Biometric is offered when eligible and PIN fallback is **always** available; the auth screen is
-   `FLAG_SECURE` on non-debug builds (FR-171).
+   `FLAG_SECURE` on non-debug builds (FR-171). F2 hardening decision D2 interprets "always available" with
+   the qualifier of the UI/UX baseline, "when authentication is permitted". This is an interpretation, not an
+   exception.
 5. Entry points (services/activities/receivers) live only in `platform/` or `presentation/`
    (Konsist R4); layer direction holds (R2). `AppDetectionService`'s R4 pinned-exemption is
    **removed** when the file is deleted (WP5).
@@ -116,8 +120,13 @@ These are fixed by ADR-013B and the v1.0.0 SDS/NFR; every work package below mus
    health-history schema** — DDS v1.0.0 §1.3 excludes security-event and persisted-health history
    (plus sessions, foreground identity, and lock requests), and those tables are inactive-schema
    leftovers slated for M8 removal, so writing to them re-activates an excluded domain. Keep state in
-   memory, durable evidence in `docs/reports/`, runtime signal in logcat — not the DB. (Any real
-   persistence would need a governed migration and is out of scope.)
+   memory, durable evidence in `docs/reports/`, runtime signal in logcat — not the DB. (Any other real
+   persistence would need a governed migration and is out of scope.) F2 hardening decision D1 permits the
+   format metadata of the first released format in the encrypted preferences: format identification, reader
+   compatibility information, and explicit credential configuration state. F2 hardening decision D4 permits the
+   lockout-record changes that it names. F2 hardening decision D5 permits two clock fields and an expiry write in
+   the lockout record. Each exception keeps its own scope. An additional record of Option A needs its own
+   exception (F2 hardening decision D6).
 
 ### 2.1 Component ownership after the accessibility removal (seam-transfer checklist)
 
@@ -639,8 +648,10 @@ readiness assumed `Ready`; **B** the readiness fold-in (`PolicyState` -> `Checki
   `LockoutManager` at adapter construction); the projection updates only from the **current lockout
   streak** (a generation bumped on each success) and, within it, only from the newest outcome (the
   monotonic `failureCount`) — so a pre-success or out-of-order follow-up cannot re-lock or regress it,
-  while capture/audit still fire for every consumed failure. **Biometric-cancel** is a token-keyed no-op on request
-  state (re-asserts the lock surface; a stale cancel is ignored). **Rotation /
+  while capture/audit still fire for every consumed failure. F2 hardening decisions D2 and D4 change two of these
+  rules. A biometric success preserves the PIN-accounting generation (the lockout streak). Outcome freshness uses
+  operation identity and revision rather than the stored count, which saturates. **Biometric-cancel** is a
+  token-keyed no-op on request state (re-asserts the lock surface; a stale cancel is ignored). **Rotation /
   recreation** needs no reducer event: the presenter is **state-observing** and reconstructs from
   `state.surface`, which carries the `RequestId`, so a recreated surface completes correctly and no
   request is lost or duplicated. **Process death** is covered by `epoch`: a fresh process rejects any
@@ -715,10 +726,11 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     broadcasts are the optimization, and the correctness rule is to **re-resolve `MAIN/HOME` whenever an
     observed package differs from the cached launcher before classifying it `Other`** (this covers missed
     signals and a default-launcher change). A short-TTL memo can bound the resolve cost.
-  - **Biometric mapping invariant (preserve today's semantics).** PIN rejection -> `UnlockFailed(PIN)`;
-    biometric success -> `UnlockSucceeded(BIOMETRIC)`; biometric cancel / hardware error -> `BiometricCancelled`;
-    `onAuthenticationFailed()` (unrecognized) -> **no event**. Biometric never routes through `UnlockFailed`
-    and never touches the lockout counter.
+  - **Biometric mapping invariant.** PIN rejection -> `UnlockFailed(PIN)`; biometric success ->
+    `UnlockSucceeded(BIOMETRIC)`; biometric cancel / hardware error -> `BiometricCancelled`;
+    `onAuthenticationFailed()` (unrecognized) -> **no event**. Biometric never routes through `UnlockFailed`.
+    Biometric results neither increment nor reset PIN accounting (F2 hardening decision D2). The callers at
+    `19bb707`, listed in the F2 hardening P0 decisions, reset PIN accounting after a biometric success.
   - **Three-fact `EnforcementHealth` owner (`service/`).** One serialized owner stores three independent
     facts (`detector: Enabled|Disabled`, `overlayGrant: Granted|Missing`, `presentation: Unknown|Succeeded|
     Failed(reason)`), and **only the owner mutates** the derived-health `StateFlow`; producers submit facts.
@@ -936,8 +948,8 @@ extensions land here because Phase 2 is the first phase with a state-observing s
     2. **F2** R-007 degraded-storage lockout enforcement: done (`b9e7c53`; residuals `dbfb86b`; report `520f15d`).
     3. **F3** HomeResolver tri-state and episode revalidation: done (`30529e2`; device check `8ad3b4c`; R-008).
     4. **F4** observational adapters: done (`f828a71`; not wired).
-    5. **F2 hardening** R-007 residual treatment: in progress (P0 decisions, P1 exit, and P2 exit recorded; P3
-       started on 2026-10-07; no mechanism selected).
+    5. **F2 hardening** R-007 residual treatment: in progress (P0 decisions, P1 exit, P2 exit, and F2 hardening
+       decisions D1 to D6 recorded; P3 started on 2026-10-07; no mechanism selected).
     6. **F5** graph wiring, not visible, with a fleet checkpoint: pending.
     7. **F6** activation and RTM flip: pending.
     8. **Fleet close-out**: pending.
@@ -1026,7 +1038,9 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       reports it. It keeps no state, so it is thread-safe.
     - `IntruderCapturePort` (`NoOpIntruderCapturePort`): does nothing. Intruder capture is descoped from 1.0.0, and
       `IntruderCaptureManager` writes security events, which invariant 6 excludes. The legacy engine keeps its
-      capture until G deletes it. F6 disables the intruder UI, and M8 removes the feature.
+      capture until G deletes it. If count-first C2 becomes active before G, legacy capture is disabled or made
+      unreachable first, under F2 hardening decision D4. The capture toggle and the threshold in `SettingsScreen`
+      are disabled at the same activation. F6 disables the intruder UI, and M8 removes the feature.
     - Evidence (JVM): `LoggingAuditLogTest`, `LoggingRuntimeDiagnosticsTest`, and `ArchitectureRulesTest` (R2).
     - RTM: no row changes. FR-081 to FR-085 are `descoped-v1`.
   - **F2 hardening — R-007 residual treatment.** The four R-007 residuals move here from F6 (placement adopted
@@ -1043,12 +1057,13 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       mechanism is selected at P5, from the evidence.
     - **Boundaries for every candidate:** never await storage on the runtime drain; keep one ordered writer; do not
       hold the admission lock across I/O; stale work must not replace newer state; recovery never fabricates
-      failures, captures, or audit events, and never extends the fallback deadline; the immediate in-memory reset
-      after an accepted success stays.
+      failures, captures, or audit events, and never extends the fallback deadline. An accepted PIN success clears
+      PIN accounting in memory immediately. An accepted biometric success leaves PIN accounting unchanged, under F2
+      hardening decision D2.
     - **P0 decisions (lead, 2026-09-23).** Baseline `19bb707`: F4 done, F5 not started.
       - Campaign: the full test plan, P0 to P6. The lead can skip a part. A skip is proposed with a reason at a phase
         exit, and the lead approves it. The campaign report lists each skipped case as a gap, not as a pass.
-      - Candidates: B1, B2, B3, C1, and A. No invariant-6 exception exists. Candidates that add a persisted record
+      - Candidates: B1, B2, B3, C1, and A. Candidates that add a persisted record
         (A, C2, C3, C5, C6) are evaluated as a design and a JVM model with fake storage only. A device prototype or
         a selection of these candidates needs an exception that the lead records first. B3 is eligible only if it
         writes the existing `failure_count` and `lockout_until` keys, with no new key or version. C4 stays available
@@ -1063,7 +1078,8 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         and before P3.
       - Unknown or unavailable storage: for a correct PIN, invariant 3 (unknown storage state never yields allow)
         and invariant 4 (PIN fallback always available) conflict. P2 characterizes the baseline. C1 and A are
-        evaluated under a fail-open policy and a fail-closed policy. The lead selects the policy before P3.
+        evaluated under a fail-open policy and a fail-closed policy. The lead selects the policy before P3. The P3
+        criteria select fail-closed, and F2 hardening decision D2 resolves the conflict by interpreting invariant 4.
       - Thresholds (test plan §12, adopted as proposed): zero invariant violations; exact results for the
         deterministic crash-prefix assertions; control events complete before the I/O gate is released; no new
         storage-induced ANR; p95 state read or admission ≤ 10 ms and p95 screen-off or dismissal ≤ 100 ms under the
@@ -1154,9 +1170,7 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       any recorded run whose results enter the P3 comparison report, the evidence matrix, or the ranking.
       - Unknown lockout state: fail-closed. PIN verification is not admitted until the lockout state is trusted. A
         read failure is never treated as an empty store.
-      - Restart allowance: zero extra PIN-verifier entries attributable to a restart, including interrupted checks
-        and outcomes not yet persisted. A restart does not replenish the attempt allowance or reset the lockout
-        ladder. Normal expiry still applies.
+      - Restart allowance: F2 hardening decision D3 below states it.
       - Under these criteria, B1, B2, B3, and every B-only combination are recovery components, not complete
         solutions. C1 addresses the unknown startup state. Preventing guesses lost through interrupted writes also
         needs durable admission, such as A or C2, which costs availability during storage faults.
@@ -1164,12 +1178,110 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         shared base branch that adds the recovery scheduler without changing behaviour. The branches never merge to
         main. The experiments keep the current fail-open admission, so that their runs measure the tradeoffs. A
         measured tradeoff is not accepted for production. The storage policy unblocks C1. A still waits for its
-        recovery and admission rules. The designs are in `2026-10-07_R007_F2_HARDENING_P3_SCHEDULER_SPEC.md`
-        and the B1, B2, and B3 specifications beside it.
+        recovery and admission rules, which its design settles under F2 hardening decision D6. The designs are in
+        `2026-10-07_R007_F2_HARDENING_P3_SCHEDULER_SPEC.md` and the B1, B2, and B3 specifications beside it.
+    - **P3 decisions D1 to D6 (lead, 2026-10-26 to 2026-10-29).** The lead decided the six questions of the P3 decision
+      proposal, `2026-10-10_R007_F2_HARDENING_P3_DECISION_PROPOSAL.md`, before any formal comparison. The full texts are
+      in the decision record, `2026-11-06_M7_R007_F2_HARDENING_P3_DECISIONS.md`, and are authoritative over the
+      summaries here. In this bullet, D1 to D6 name these decisions, not the decisions D0 to D6 of section 5.
+      - D1, trusted state and lost records: authentication requires validated credentials and validated lockout
+        state. After D1 establishes trusted credentials, the recognized active format, storage authority,
+        applicable policy, and a successful record read, absent or invalid lockout history gets a durably installed
+        replacement record at the maximum ladder count and lock duration. An unresolved read failure remains
+        unavailable and does not authorize replacement. Invalid credentials cannot be reconstructed. Setup
+        requires confirmed empty credential and protected-selection state, without treating a storage failure or
+        destructive database reconstruction as empty configuration. Unsupported formats, incomplete migrations,
+        and ambiguous storage authority keep authentication blocked in the CompatibilityBlocked state, without
+        automatic replacement or destructive reset. A `versionCode` of 1 remains reserved for disposable builds.
+        The first build requiring preservation of installed data uses `versionCode` 2 or higher.
+      - D2, permissions: one admission owner admits new PIN checks and accepts biometric results only in the Ready
+        state. The recommended initial model permits one outstanding PIN operation across all callers. Biometric
+        results neither increment nor reset PIN accounting. D2 revises test-plan constraint I6: an accepted PIN
+        success clears PIN accounting in memory at once, and an accepted biometric success leaves it unchanged.
+      - D3, restart allowance:
+        - Process death, force-stop, and process restart must not remove, shorten, restart, or extend an active
+          security delay, and must not restore attempt capacity. Covered delays are the recorded lockout, any
+          degraded fallback retained by the evaluated design, and a durably installed D1 replacement lock. Normal
+          expiry still applies.
+        - At matched times, under equivalent inputs, storage faults, and clock conditions, execution containing
+          process restarts must produce no more PIN-verifier entries than equivalent execution without process
+          restarts. A verifier entry counts when verification begins, including a subsequently interrupted check.
+          An outcome awaiting persistence does not justify additional attempt capacity.
+        - Count-first C2 retains no degraded fallback, so fallback preservation does not apply to C2, including C2
+          combined with B2 reset retries. Fallback preservation applies to every evaluated design retaining a
+          degraded fallback.
+        - Before durable installation of a D1 replacement lock, authentication remains unavailable. After
+          installation, process restart resumes the stored deadline without starting another full replacement
+          delay.
+        - Device reboot and clock-change behavior follow D5. Any accepted departure from delay preservation must be
+          recorded explicitly.
+        - Under permanent write failure, a B-only design cannot satisfy the full rule. B2 and B3 experiments may
+          still measure partial benefits, but successful retry cases cannot establish compliance with D3.
+        - When lockout history is absent or invalid, D1 may install a full maximum-duration replacement lock, even
+          if the replacement increases the remaining wait compared with the lost history. The exception applies
+          only to replacement of untrusted history. A valid persisted replacement record retains the stored
+          deadline across subsequent process restarts. The exception affects the prohibition on extending or
+          restarting delays. The prohibitions on restoring attempt capacity and adding PIN-verifier entries remain
+          unchanged.
+        - After an accepted PIN success whose reset did not persist, a restart can restore the stored count and any
+          remaining delay under D5. The resulting over-enforcement is recorded as residual R-007/4, with
+          disposition UNDECIDED pending an explicit decision. A valid expired deadline does not become a fresh lock
+          merely because the process restarts.
+        - Approval of D5 and its D3 dispositions records the specified exceptions against the frozen restart
+          criterion. All other restart protections remain unchanged.
+      - D4, invariant 6 and count-first C2: a lockout-record exception in two parts.
+        - For any admission design, it permits count saturation, initial lockout-record writes during PIN setup,
+          and D1 replacement writes.
+        - For C2, it also permits reservation accounting in the count, the deadline saved with the reservation, and
+          confirmed reservation persistence before PIN verification. Under C2, the count represents consumed
+          PIN-attempt capacity. A return to binaries from before C2 is unsupported. `LOCKOUT_TRIGGERED` is emitted
+          only for an accepted wrong-PIN result whose own reservation durably established a lockout deadline at or
+          above the threshold. Legacy capture is disabled, or its path unreachable, before C2 is active.
+        - Option A's count and event rules come from A's design under D6.
+      - D5, clock policy: enforcement uses elapsed realtime and the kernel boot ID. Wall, network, and GNSS time
+        never decide or shorten a lock. Two clock fields and the expiry write form their own exception to
+        invariant 6. D5 records two kinds of departure from D3. Its device gate covers one emulator image per API
+        level from 26 to 36 and the Moto G.
+      - D6, Option A: Option A stays a design and a JVM model with fake storage, as the comparator for count-first C2.
+        Advancement requires a recorded finding satisfying every condition in D6 point 3(a) or 3(b) of the decision
+        record. The lead records A's persistence exception before either a device prototype or selection of A. Selection
+        remains a P5 decision under the P0 ranking and the required evidence gates.
+      - Pending records that these decisions require:
+        - Baseline changes: SDS 17.2, DDS 6.3, and DDS 9.3 for the D1 replacement; SRS FR-009, SDS 7.3, and DDS 6.3
+          for C2; DDS 6.3 and DDS 9.3 for D5. The UI/UX interpretation of the authoritative delay (D5) is recorded
+          with them.
+        - The crypto replacement proposal, `2026-09-24_SECURITY_CRYPTO_REPLACEMENT_PLAN.md`, revises its lockout schema
+          and adapter contract to reference the selected admission design's count meaning, the D5 clock fields, the D1
+          replacement rules, and D2's coordination ownership. It also takes CompatibilityBlocked and the format
+          metadata, and it keeps storage migration separate from lockout policy. D1's rule for existing installations
+          becomes an explicit disposition for identified disposable pre-release builds; migration obligations stay for
+          released builds and installations designated for preservation. A migration keeps the same-device clock
+          meaning, the original duration of an active lock, and, where it applies, the atomic relation between the
+          reservation, the count, and the deadline.
+        - The test plan takes the revised I6 for D2. H04 and X11 keep their baseline characterization and state the
+          new candidate expectations separately. For D5, the test plan takes the I8 text, residual IDs with
+          dispositions for each limit and departure, and the X04 expected results.
+        - D5's device qualification has not run. Repeat D5's diagnostic observation checks when the shared
+          production logging policy is implemented, including the central logging service under ADR-008 and
+          bounded diagnostics under ROADMAP M9.
+        - Finding ownership follows the order of work in section 5 of the P3 decision proposal. X14 is assigned to its
+          step 2: the C1 trust rule under D1, count validation and saturation under D1 and D4, and deadline validation,
+          enforcement, and display under D5. X08 and X13 are assigned to the admission protocol and adapted B2 in its
+          steps 2 and 3. In that order of work, step 2 defines the shared write-ownership, cancellation, and callback
+          rules under D2. Step 3 applies those rules to B2 retries. Each finding has one primary tracking entry in the
+          owning specification, with cross-references for obligations belonging to another specification. Each entry
+          records the baseline finding, required treatment, status, and verification evidence. The test plan's X08, X13,
+          and X14 cases provide the corresponding verification cases.
+        - When the P3 decision proposal is adopted, its restrictions on Option A are aligned with D6 in these parts of
+          the proposal: the summary and its table (section 1), section 3.4, the D6 row of the decision table (section
+          4), step 2 of the order of work (section 5), and the proposed decision record (section 7). The D5 question in
+          the proposal's decision table is restated to address clock enforcement and accepted availability limits within
+          the existing threat scope. The proposal's section 3.6 is aligned the same way: D5 keeps the existing threat
+          scope, and its rules also cover device reboots.
     - **Exit:** the selected work passes the local gate and a fleet gate (NucBox, Moto G: fault injection, restart,
       and inspection of the persisted state) with a host-tagged report. The lead records a decision for each
-      residual in the risk register. FR-174 cites re-verification evidence in the same commit. If Option A is
-      chosen, the asynchronous self-gate work planned for F6 moves into it.
+      residual in the risk register. FR-174 cites re-verification evidence in the same commit. If count-first C2
+      or Option A is selected, the asynchronous self-gate work planned for F6 moves into it.
   - **F5 — graph wiring, not visible.** F5 adds providers, binding, and monitoring only. It makes no user-visible or
     health-visible change. The new engine is constructed and bound but stays inert: no foreground events reach it,
     and no overlay is shown.
@@ -1206,12 +1318,13 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       self-gate stays keyed by package and is never forced through a request-id overload.
     - The self-gate PIN callback (`MainActivity.kt`, about line 225) becomes asynchronous. A coroutine awaits the F2
       suspend mutation. An in-flight guard prevents a duplicate submission while one is pending, and a
-      submission-keyed result prevents a stale unlock from a superseded submission. If F2 hardening selects Option
-      A, this work is done there, and F6 reuses it.
+      submission-keyed result prevents a stale unlock from a superseded submission. If F2 hardening selects
+      count-first C2 or Option A, this work is done there, and F6 reuses it.
     - The runtime self-gate runs its `LOCKOUT_TRIGGERED` audit and its capture after its await, so a cancelled
       caller skips them. F6 makes these steps run exactly once for each admitted failure, also for a cancelled
       caller, for example through a completion callback that the manager owns (lead decision of 2026-10-07, P3 of
-      F2 hardening).
+      F2 hardening). If count-first C2 is selected, the `LOCKOUT_TRIGGERED` audit follows the event rule of F2
+      hardening decision D4.
     - `MainActivity.onResume` reports the APP_LOCK arrival signal (the F1 seam; the launch intent carries the
       attempt token) and reads the derived `EnforcementHealth.state` for the banner.
     - Health readers: `ProtectionWatchdogService` and the `MainActivity` banner read the derived health.
@@ -1224,8 +1337,10 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       this gate, ungranted users would lose locking, a regression against the Activity, which needs no grant.
     - Intruder UI: disable the intruder settings in `SettingsScreen` (the capture toggle, the threshold, and the
       intruder-log entry, about line 215). The new engine binds a no-op `IntruderCapturePort` (F4), so the app must
-      not offer a capture that it does not perform. Decide at F6 whether the intruder log stays viewable, so that
-      the user can still review and delete the stored records until M8 removes the feature and its tables.
+      not offer a capture that it does not perform. If count-first C2 is active before F6, the capture toggle and
+      the threshold are already disabled (F4 entry), and F6 reuses that work. Decide at F6 whether the intruder log
+      stays viewable, so that the user can still review and delete the stored records until M8 removes the feature
+      and its tables.
     - `OverlayGrantMonitor` callers: startup (`AppLockApplication.onCreate` seeds the fact), `MainActivity.onResume`
       (a grant made in Settings while the app was in the background), and the `ProtectionWatchdogService` tick. All
       go through the single serialized `refresh()`.
