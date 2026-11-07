@@ -1246,10 +1246,9 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         Advancement requires a recorded finding satisfying every condition in D6 point 3(a) or 3(b) of the decision
         record. The lead records A's persistence exception before either a device prototype or selection of A. Selection
         remains a P5 decision under the P0 ranking and the required evidence gates.
+      - Baseline exceptions: ADR-022 records the exceptions of D1 to D6 to the 1.0.0 specification package. Its C2
+        entry applies only if the lead selects C2 in P5.
       - Pending records that these decisions require:
-        - Baseline changes: SDS 17.2, DDS 6.3, and DDS 9.3 for the D1 replacement; SRS FR-009, SDS 7.3, and DDS 6.3
-          for C2; DDS 6.3 and DDS 9.3 for D5. The UI/UX interpretation of the authoritative delay (D5) is recorded
-          with them.
         - The crypto replacement proposal, `2026-09-24_SECURITY_CRYPTO_REPLACEMENT_PLAN.md`, revises its lockout schema
           and adapter contract to reference the selected admission design's count meaning, the D5 clock fields, the D1
           replacement rules, and D2's coordination ownership. It also takes CompatibilityBlocked and the format
@@ -1258,9 +1257,6 @@ extensions land here because Phase 2 is the first phase with a state-observing s
           released builds and installations designated for preservation. A migration keeps the same-device clock
           meaning, the original duration of an active lock, and, where it applies, the atomic relation between the
           reservation, the count, and the deadline.
-        - The test plan takes the revised I6 for D2. H04 and X11 keep their baseline characterization and state the
-          new candidate expectations separately. For D5, the test plan takes the I8 text, residual IDs with
-          dispositions for each limit and departure, and the X04 expected results.
         - D5's device qualification has not run. Repeat D5's diagnostic observation checks when the shared
           production logging policy is implemented, including the central logging service under ADR-008 and
           bounded diagnostics under ROADMAP M9.

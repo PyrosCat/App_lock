@@ -37,3 +37,4 @@ beneath its root (GOVERNANCE §2.4).
 | [ADR-019](ADR-019-version-split-baseline.md) | Version-Split Documentation Baseline: 1.0.0 Active, Existing Full Spec Becomes the 2.0.0 Target | Accepted — execution staged (migration plan) |
 | [ADR-020](ADR-020-overlay-lock-presentation.md) | Overlay Lock Presentation: Drawn SYSTEM_ALERT_WINDOW Surface, Biometric via Transparent Activity, and the Request-Identity Model | Accepted (2026-08-30) — M7 WP0 |
 | [ADR-021](ADR-021-usagestats-poll-detector.md) | UsageStats Polling Foreground Detector: Consolidated Special-Use Foreground Service, queryEvents Contract, and Poll Interval | Accepted (2026-08-30) — M7 WP0 |
+| [ADR-022](ADR-022-baseline-exceptions-lockout-clock.md) | Exceptions to the Version 1.0.0 Baseline for Lockout State, Authentication States, and Clock Policy | Accepted (2026-11-07) — M7 WP2 F2 hardening |

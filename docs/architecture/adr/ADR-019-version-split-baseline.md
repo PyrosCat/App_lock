@@ -83,7 +83,8 @@ Costs / follow-on work:
 ## Related
 ADR-013B (1.0.0 detection scope) · GOVERNANCE.md §5.1 (document classes), §5.3 (phase/version
 citation) · SRS v1.0.0 Appendix A (authoritative descope list) · `process/ROADMAP.md`,
-`process/rtm/rtm.csv` · migration plan `process/history/VERSION_BASELINE_MIGRATION_PLAN.md`.
+`process/rtm/rtm.csv` · migration plan `process/history/VERSION_BASELINE_MIGRATION_PLAN.md` ·
+ADR-022 (exceptions to the 1.0.0 baseline).
 
 ## Implementation status
 **Not yet executed.** Staged per the migration plan: structure + reviewed-content promotion first,

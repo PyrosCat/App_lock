@@ -4,6 +4,19 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): ADR-022 for exceptions to the 1.0.0 baseline   (2026-11-07)
+----------------------------------------------------------------------------------
+The new ADR-022 records exceptions to the client-approved 1.0.0 specifications for the lead's PIN lockout decisions
+D1 to D6. Each entry of the ADR names the affected clauses, the decision behind it, and the verification it requires.
+- Eleven entries apply to every candidate fix of the PIN lockout. They include a replacement lock for lost lockout
+  history and a cap on the failure count. One of them requires a fingerprint unlock to leave that count unchanged.
+- One entry is limited to count-first admission (C2), which counts each PIN check before it runs.
+- The ADR index lists ADR-022 with the status Accepted.
+- The Related list of ADR-019 gets a cross-link to ADR-022, so readers of the 1.0.0 baseline find the exceptions.
+- In the M7_PLAN.md project plan, the F2 hardening entry now cites ADR-022 for the baseline exceptions. The entry's
+  pending records no longer include the test-plan changes, which the R-007 test plan holds.
+
+
 M7/WP2 (F2 hardening): P3 decisions D1 to D6 in the R-007 test plan   (2026-11-06)
 ----------------------------------------------------------------------------------
 The R-007 test plan now applies the lead's decisions D1 to D6 for candidate fixes of the PIN lockout.
