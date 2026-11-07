@@ -4,6 +4,22 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 decisions D1 to D6 in the R-007 test plan   (2026-11-06)
+----------------------------------------------------------------------------------
+The R-007 test plan now applies the lead's decisions D1 to D6 for candidate fixes of the PIN lockout.
+- Tests of candidate fixes expect an accepted biometric success to leave PIN accounting unchanged. The unlock and
+  biometric cases add this result beside their result for the current app. Under count-first admission (C2), the
+  plan treats a failure event's count as consumed attempt capacity, not confirmed wrong PINs.
+- Restart and reboot cases gain candidate results for each state of the device's boot ID. The deadline expectation
+  for recovery and retries points to the accepted cases of a longer or returning lock. The policy limits and the
+  decision framework add the limit on extra PIN checks after app restarts.
+- The table of remaining risks gets rows R-007/5 to R-007/10 for six accepted restart effects. One row covers the
+  postponed end of a lock at each device restart.
+- Passages that asked for a decision give the decided rule instead, for example on lockout states, unreadable
+  storage, and downgrades. The candidate rows for a startup trust check and a boot-ID clock record mark both as
+  required for every fix.
+
+
 M7/WP2 (F2 hardening): record of the P3 decisions D1 to D6   (2026-11-06)
 -------------------------------------------------------------------------
 The new 2026-11-06_M7_R007_F2_HARDENING_P3_DECISIONS.md record holds the lead's six decisions for phase P3 of the
