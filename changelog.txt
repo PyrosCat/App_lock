@@ -4,6 +4,20 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/M8: DataStore 1.3.0 reassessment in the crypto replacement proposal   (2026-11-08)
+-------------------------------------------------------------------------------------
+The proposal to replace the Jetpack security-crypto library now covers DataStore 1.3.0, whose stable release adds an
+official encryption serializer.
+- The proposal recommends keeping its own Android Keystore serializer as the baseline and treats the official one as a
+  candidate. The official serializer reads files without a size limit and writes no version header. It also reports
+  a transient Keystore failure as data corruption.
+- Tink's keyset manager for Android is proposed for rejection, because it stores its keyset unencrypted when Android
+  Keystore is unavailable.
+- The decision on the encryption API lists four open checks, including Kotlin compatibility and a possible Tink
+  dependency conflict.
+- The assessment rests on the DataStore and Tink source code and their published package files, read without a build.
+
+
 M7/WP2 (F2 hardening): P3 decisions D1 to D6 in the crypto replacement proposal   (2026-11-08)
 ----------------------------------------------------------------------------------------------
 The proposal to replace the Jetpack security-crypto library now applies the lead's PIN lockout decisions D1 to D6.
