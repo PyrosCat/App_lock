@@ -1249,14 +1249,6 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       - Baseline exceptions: ADR-022 records the exceptions of D1 to D6 to the 1.0.0 specification package. Its C2
         entry applies only if the lead selects C2 in P5.
       - Pending records that these decisions require:
-        - The crypto replacement proposal, `2026-09-24_SECURITY_CRYPTO_REPLACEMENT_PLAN.md`, revises its lockout schema
-          and adapter contract to reference the selected admission design's count meaning, the D5 clock fields, the D1
-          replacement rules, and D2's coordination ownership. It also takes CompatibilityBlocked and the format
-          metadata, and it keeps storage migration separate from lockout policy. D1's rule for existing installations
-          becomes an explicit disposition for identified disposable pre-release builds; migration obligations stay for
-          released builds and installations designated for preservation. A migration keeps the same-device clock
-          meaning, the original duration of an active lock, and, where it applies, the atomic relation between the
-          reservation, the count, and the deadline.
         - D5's device qualification has not run. Repeat D5's diagnostic observation checks when the shared
           production logging policy is implemented, including the central logging service under ADR-008 and
           bounded diagnostics under ROADMAP M9.

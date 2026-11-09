@@ -4,6 +4,24 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): P3 decisions D1 to D6 in the crypto replacement proposal   (2026-11-08)
+----------------------------------------------------------------------------------------------
+The proposal to replace the Jetpack security-crypto library now applies the lead's PIN lockout decisions D1 to D6.
+- The proposed lockout record adds two clock fields to the capped attempt count. One holds a deadline measured from
+  device start, and one identifies the device boot.
+- A proposed mapping assigns each storage failure a state of the lock screen. For a damaged lockout record, the
+  proposal puts the strictest lock in a new file and keeps the damaged one. For a lost lockout key, it recommends a
+  narrow exception that creates a new key for that lock.
+- The migration plan gains the reinstall steps for disposable test builds with Android versionCode 1. An interrupted
+  setup that keeps their data resumes without a reinstall. The copy step gains rules that keep each lock's duration
+  and clock fields. For a lost or damaged source lockout record, the proposal recommends the strictest lock after the
+  storage switch.
+- One new test case (Q19) checks unlocking blocked by an unsupported format, an interrupted migration, or an unclear
+  storage state. The test data adds capped counts, strictest locks, and records from an earlier device boot. Two new
+  interruption points test the writes of the strictest lock.
+- In the M7_PLAN.md project plan, the F2 hardening entry no longer lists this revision as a pending record.
+
+
 M7/WP2 (F2 hardening): ADR-022 for exceptions to the 1.0.0 baseline   (2026-11-07)
 ----------------------------------------------------------------------------------
 The new ADR-022 records exceptions to the client-approved 1.0.0 specifications for the lead's PIN lockout decisions
