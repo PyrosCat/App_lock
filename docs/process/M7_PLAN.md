@@ -92,7 +92,8 @@ R-002 and R-005 dispositioned on evidence per that standard; **RTM synchronized 
   lockout/biometric-failure accounting (CR-005), Play-listing pre-check — **M9/M10**. M7 keeps the
   existing `FLAG_SECURE` behavior and the existing PIN accounting, except for the changes that F2 hardening
   decisions D1 to D6 authorize. These are D1's replacement records, D2's rule for biometric results, D4's
-  count saturation, D5's clock rules, and, for C2, the reservation accounting of D4. CR-005 stays M9 work.
+  count saturation, D5's clock rules, and, for F2 candidate C2, the reservation accounting of D4. CR-005 stays M9
+  work.
 - Interface extraction for auth/repos beyond the two detection/presentation ports — those land with
   their consuming services (M2/M3 lineage, 2.0.0).
 
@@ -1038,9 +1039,9 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       reports it. It keeps no state, so it is thread-safe.
     - `IntruderCapturePort` (`NoOpIntruderCapturePort`): does nothing. Intruder capture is descoped from 1.0.0, and
       `IntruderCaptureManager` writes security events, which invariant 6 excludes. The legacy engine keeps its
-      capture until G deletes it. If count-first C2 becomes active before G, legacy capture is disabled or made
-      unreachable first, under F2 hardening decision D4. The capture toggle and the threshold in `SettingsScreen`
-      are disabled at the same activation. F6 disables the intruder UI, and M8 removes the feature.
+      capture until G deletes it. If F2 candidate C2 (count-first admission) becomes active before G, legacy capture
+      is disabled or made unreachable first, under F2 hardening decision D4. The capture toggle and the threshold in
+      `SettingsScreen` are disabled at the same activation. F6 disables the intruder UI, and M8 removes the feature.
     - Evidence (JVM): `LoggingAuditLogTest`, `LoggingRuntimeDiagnosticsTest`, and `ArchitectureRulesTest` (R2).
     - RTM: no row changes. FR-081 to FR-085 are `descoped-v1`.
   - **F2 hardening — R-007 residual treatment.** The four R-007 residuals move here from F6 (placement adopted
@@ -1231,7 +1232,8 @@ extensions land here because Phase 2 is the first phase with a state-observing s
           criterion. All other restart protections remain unchanged.
       - D4, invariant 6 and count-first C2: a lockout-record exception in two parts.
         - For any admission design, it permits count saturation, initial lockout-record writes during PIN setup,
-          and D1 replacement writes.
+          and D1 replacement writes. The lead set the count cap to 11 on 2026-11-09. Section 1.5 of
+          `2026-11-09_M7_R007_F2_HARDENING_P3_STEP2_PROPOSAL.md` (the step 2 proposal) records it.
         - For C2, it also permits reservation accounting in the count, the deadline saved with the reservation, and
           confirmed reservation persistence before PIN verification. Under C2, the count represents consumed
           PIN-attempt capacity. A return to binaries from before C2 is unsupported. `LOCKOUT_TRIGGERED` is emitted
@@ -1247,7 +1249,8 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         record. The lead records A's persistence exception before either a device prototype or selection of A. Selection
         remains a P5 decision under the P0 ranking and the required evidence gates.
       - Baseline exceptions: ADR-022 records the exceptions of D1 to D6 to the 1.0.0 specification package. Its C2
-        entry applies only if the lead selects C2 in P5.
+        entry applies only if the lead selects C2 in P5. ADR-022A replaces its entry 5 and gives every lockout screen
+        a neutral heading.
       - Pending records that these decisions require:
         - D5's device qualification has not run. Repeat D5's diagnostic observation checks when the shared
           production logging policy is implemented, including the central logging service under ADR-008 and
@@ -1259,7 +1262,10 @@ extensions land here because Phase 2 is the first phase with a state-observing s
           rules under D2. Step 3 applies those rules to B2 retries. Each finding has one primary tracking entry in the
           owning specification, with cross-references for obligations belonging to another specification. Each entry
           records the baseline finding, required treatment, status, and verification evidence. The test plan's X08, X13,
-          and X14 cases provide the corresponding verification cases.
+          and X14 cases provide the corresponding verification cases. The step 2 proposal holds the X14 entry in its
+          section 1.10, and its section 2 is to hold the X08 and X13 entries.
+        - Section 1.3 of the step 2 proposal records the storage dependency of integrated C1. The lead resolves the
+          backing store before C1 integration or device qualification.
         - When the P3 decision proposal is adopted, its restrictions on Option A are aligned with D6 in these parts of
           the proposal: the summary and its table (section 1), section 3.4, the D6 row of the decision table (section
           4), step 2 of the order of work (section 5), and the proposed decision record (section 7). The D5 question in
@@ -1306,12 +1312,12 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       self-gate stays keyed by package and is never forced through a request-id overload.
     - The self-gate PIN callback (`MainActivity.kt`, about line 225) becomes asynchronous. A coroutine awaits the F2
       suspend mutation. An in-flight guard prevents a duplicate submission while one is pending, and a
-      submission-keyed result prevents a stale unlock from a superseded submission. If F2 hardening selects
-      count-first C2 or Option A, this work is done there, and F6 reuses it.
+      submission-keyed result prevents a stale unlock from a superseded submission. If F2 hardening selects its
+      candidate C2 (count-first admission) or Option A, this work is done there, and F6 reuses it.
     - The runtime self-gate runs its `LOCKOUT_TRIGGERED` audit and its capture after its await, so a cancelled
       caller skips them. F6 makes these steps run exactly once for each admitted failure, also for a cancelled
       caller, for example through a completion callback that the manager owns (lead decision of 2026-10-07, P3 of
-      F2 hardening). If count-first C2 is selected, the `LOCKOUT_TRIGGERED` audit follows the event rule of F2
+      F2 hardening). If F2 candidate C2 is selected, the `LOCKOUT_TRIGGERED` audit follows the event rule of F2
       hardening decision D4.
     - `MainActivity.onResume` reports the APP_LOCK arrival signal (the F1 seam; the launch intent carries the
       attempt token) and reads the derived `EnforcementHealth.state` for the banner.
@@ -1325,7 +1331,7 @@ extensions land here because Phase 2 is the first phase with a state-observing s
       this gate, ungranted users would lose locking, a regression against the Activity, which needs no grant.
     - Intruder UI: disable the intruder settings in `SettingsScreen` (the capture toggle, the threshold, and the
       intruder-log entry, about line 215). The new engine binds a no-op `IntruderCapturePort` (F4), so the app must
-      not offer a capture that it does not perform. If count-first C2 is active before F6, the capture toggle and
+      not offer a capture that it does not perform. If F2 candidate C2 is active before F6, the capture toggle and
       the threshold are already disabled (F4 entry), and F6 reuses that work. Decide at F6 whether the intruder log
       stays viewable, so that the user can still review and delete the stored records until M8 removes the feature
       and its tables.

@@ -1,7 +1,7 @@
 # ADR-022 — Exceptions to the Version 1.0.0 Baseline for Lockout State, Authentication States, and Clock Policy
 
-**Status:** Accepted (2026-11-07) · **Date:** 2026-11-07 · **Source/authority:** Project lead (decisions D1 to D6,
-2026-10-26 to 2026-10-29; this record, 2026-11-07)
+**Status:** Accepted (2026-11-07); entry 5 superseded by ADR-022A (2026-11-09) · **Date:** 2026-11-07 ·
+**Source/authority:** Project lead (decisions D1 to D6, 2026-10-26 to 2026-10-29; this record, 2026-11-07)
 
 ## Context
 The client approved the 1.0.0 specification package on 2026-08-14 (ADR-019). Decisions D1 to D6 of the F2 hardening
@@ -76,7 +76,11 @@ because no limit or departure of D5 admits a PIN check before the original durat
 v1.0.0 SRS: FR-009, FR-010, FR-014, FR-174.
 
 ## Related
-ADR-019 (the 1.0.0 baseline).
+ADR-019 (the 1.0.0 baseline). ADR-022A (supersedes entry 5, added 2026-11-09).
 
 ## Implementation status
 2026-11-07: proposed and accepted. No code implements an entry, and no entry has verification evidence.
+
+2026-11-09: ADR-022A supersedes entry 5. Cases written after this ADR cover entries whose Verification cell names no
+test-plan case. In the test plan, X17 covers entry 1, and X18 and X20 cover the handling of entries 3 and 8 by C1, the
+trusted-state admission gate. Q07 and Q19 of the crypto replacement proposal test entries 4 and 8 on real storage.

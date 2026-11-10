@@ -4,7 +4,26 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
-M7/M8: DataStore 1.3.0 reassessment in the crypto replacement proposal   (2026-11-08)
+M7/WP2 (F2 hardening): C1 in the P3 step 2 proposal, and ADR-022A   (2026-11-10)
+--------------------------------------------------------------------------------
+The new 2026-11-09_M7_R007_F2_HARDENING_P3_STEP2_PROPOSAL.md proposal drafts the first section of step 2 in phase P3
+of the PIN lockout work. In that section, candidate C1 admits no PIN check or fingerprint unlock until the stored
+lockout state is trusted.
+- The proposal derives eight unlock states from four results: credentials, storage format, lockout record, and device
+  boot ID. A valid lockout record cannot override blocked storage or invalid credentials.
+- Failed startup reads and failed boot-ID reads get separate retries, so a stalled storage write cannot delay a boot-ID
+  retry.
+- The proposal and the M7_PLAN.md project plan record the lead's cap of 11 on the PIN attempt count. Before C1 enters
+  the app, its storage must tell a missing count from zero, which the current encrypted preferences cannot.
+- The R-007 test plan gains cases X17 to X21. They cover the strict lock that replaces lost lockout history, setup,
+  blocked storage, screen texts, and boot-ID retries.
+- With the new ADR-022A, every lock screen shows "Try again later" instead of "Too many attempts". It replaces entry 5
+  of ADR-022, because the lock for lost history can occur without any wrong PIN.
+- ADR-022 gets a dated status note and a cross-link, so its readers find ADR-022A. A dated note points to the newer
+  test cases.
+
+
+M7/M8: DataStore 1.3.0 reassessment in the crypto replacement proposal   (2026-11-09)
 -------------------------------------------------------------------------------------
 The proposal to replace the Jetpack security-crypto library now covers DataStore 1.3.0, whose stable release adds an
 official encryption serializer.
