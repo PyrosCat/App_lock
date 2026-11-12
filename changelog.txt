@@ -4,6 +4,24 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): shared protocol, C2, and Option A in the P3 step 2 proposal   (2026-11-11)
+-------------------------------------------------------------------------------------------------
+The 2026-11-09_M7_R007_F2_HARDENING_P3_STEP2_PROPOSAL.md proposal gains the remaining sections of step 2 in phase P3
+of the PIN lockout work. They propose shared rules for unlock attempts and two designs that store each PIN attempt
+before its check.
+- One owner admits each PIN check and each fingerprint prompt under the proposed rules of section 2. A PIN attempt
+  blocks every other unlock attempt until its stored accounting is settled.
+- A cancelled request cannot drop its storage write. Section 2 tracks the baseline test findings on cancellation and
+  callbacks (X08 and X13).
+- Candidate C2 gets its transition table in section 3. C2 counts each PIN attempt in storage before the check, and an
+  unconfirmed write still costs that attempt.
+- Section 4 proposes Option A as the comparison design. An unfinished reservation costs one attempt after a restart.
+  A reservation that is cancelled before its check is released.
+- Both designs are modelled in test code only, and four measures compare their security exposure.
+- The R-007 test plan labels its crash points DA01 to DA08 and adds cases DA09 to DA14. It also lists two proposed
+  residuals, R-007/11 and R-007/12. A restart can end a storage stall or a running PIN check that blocked unlocking.
+
+
 M7/WP2 (F2 hardening): C1 in the P3 step 2 proposal, and ADR-022A   (2026-11-10)
 --------------------------------------------------------------------------------
 The new 2026-11-09_M7_R007_F2_HARDENING_P3_STEP2_PROPOSAL.md proposal drafts the first section of step 2 in phase P3
