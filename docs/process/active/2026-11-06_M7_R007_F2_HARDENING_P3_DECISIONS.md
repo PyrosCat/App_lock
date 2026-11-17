@@ -958,3 +958,58 @@ demonstrated protocol limit.":
 > a recorded finding satisfying every condition in D6 point 3(a) or 3(b). The lead records A's persistence exception
 > before either a device prototype or selection of A. Selection remains a P5 decision under the P0 ranking and the
 > required evidence gates.
+
+## 9. Adoption of the step 2 designs (2026-11-12)
+
+The lead adopted sections 1 to 4 of `2026-11-09_M7_R007_F2_HARDENING_P3_STEP2_DESIGNS.md` (the step 2 designs) on
+2026-11-12. This section records the adoption and the refinements of earlier clauses that it includes. The text of
+sections 2 to 8 stays unchanged. The step 2 designs hold the detailed contracts, and the test plan holds the cases and
+the residual rows.
+
+**1. Scope.** The adoption approves the designs of C1 with B1 (section 1 of the step 2 designs), the shared D2 protocol
+(section 2), count-first C2 (section 3), and Option A (section 4). It authorizes the JVM models of C2 and Option A,
+starting with C2. Option A stays the comparator under D6. The adoption selects no design, and these conditions stay:
+- The selection stays a P5 decision under the P0 ranking. It still needs real-thread checks of constraints I1 and I3,
+  actual storage, and device qualification (section 3.4 of the step 2 designs).
+- The lead records A's persistence exception before a device prototype or a selection of A (D6 point 4).
+- Integrated C1 and device qualification wait for the lead's choice of the lockout backing store (section 1.3 of the
+  step 2 designs).
+
+**2. Settlement barrier.** This point refines D2 refinement 3 (section 3.3), which blocks competing PIN and biometric
+operations "until completion or cancellation".
+- A PIN operation blocks competing PIN and fingerprint operations until it is settled. It is settled when a check that
+  it started has returned and storage has confirmed its accounting.
+- Cancellation and invalidation do not settle an operation. At settlement, readiness is evaluated again.
+- A storage fault that persists can therefore block the fingerprint path for as long as it lasts.
+- Contract: section 2.3 of the step 2 designs. Sections 3.3 and 4.4 give the confirmation of each design.
+
+**3. Failed C2 reservation write.** This point refines D4 point 3 (section 6), under which a persisted reservation stays
+consumed, and the sentence of D3 that C2 retains no degraded fallback (section 4).
+- A reservation write that returns false or throws is no evidence that storage holds the reservation, and none that
+  storage does not hold it.
+- C2 rolls forward. The reservation becomes the record in memory with its count and its deadline, and its durability is
+  marked unconfirmed. No PIN check starts for that operation, now or later.
+- Retries write the same payload, so they neither raise the count nor move the anchor. A newer expiry write keeps the
+  debit.
+- The first acknowledged write that holds the debit settles the operation, with no wrong-PIN event.
+- Until storage acknowledges the debit, only memory enforces it. The debit is enforcement data, not a confirmed failure
+  for 2.0.0.
+- Contract: row 4 of the C2 transition table (section 3.2) and section 3.3 of the step 2 designs.
+
+**4. Restart departures from D3.** This point records two departures from D3 (section 4) as residuals R-007/11 and
+R-007/12 of the test plan. Both apply to C1 with C2 or with Option A. Both keep the stored count, the ladder, and the
+applicable D5 deadlines, and each new verifier entry has its own confirmed reservation. This guarantee does not apply to
+C1 alone.
+- **R-007/11, storage blockage.** A storage call has not returned, or confirmation or release retries have not
+  succeeded. A restart ends the blockage, and the new process can admit a PIN check or a fingerprint operation that the
+  earlier process would still refuse. This departs from D3's matched-times comparison of PIN-verifier entries. Under C2,
+  a debit that only memory held ends with the process when storage does not hold its reservation. The restart then
+  returns that attempt capacity and removes that lock, which the first paragraph of D3 prohibits. The departure accepts
+  this broader scope. No PIN check started for such a debit.
+- **R-007/12, unfinished check.** A PIN check has not returned, and no storage call is blocked. The restarted process
+  can reserve and start another check, so the run with the restart has one more verifier entry at matched times. Both
+  entries have their own confirmed reservations, and storage keeps both attempts consumed.
+
+The adoption accepts these specified departures only. It does not show compliance with the unrestricted matched-times
+comparison of D3. The models keep measuring both departures and report each one separately. Contract: section 2.3 of
+the step 2 designs, and cases DA13, DA14a, and DA14b of the test plan.

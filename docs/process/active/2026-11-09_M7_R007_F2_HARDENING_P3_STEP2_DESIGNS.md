@@ -2,12 +2,14 @@
 
 **Date:** 2026-11-09
 
-**Status:** Proposal for the lead, not approved.
+**Status:** Sections 1 to 4 adopted by the lead on 2026-11-12. The adoption authorizes the JVM models of C2 and Option
+A, starting with C2. Option A stays the comparator under D6. The adoption selects no design. Section 3.4 states what
+the selection still needs, and section 4.1 states when the lead records A's persistence exception. Section 9 of the
+decision record holds the adoption text.
 
 **Scope:** Step 2 of the order of work in section 5 of `2026-10-10_R007_F2_HARDENING_P3_DECISION_PROPOSAL.md` (the P3
 decision proposal). Section 1 specifies C1 with B1. Section 2 gives the shared D2 protocol, which the B2 work of step 3
-also cites. Sections 3 and 4 give the transition table and JVM model requirements of count-first C2 and of Option A. The
-lead reviews section 1 first, section 2 before sections 3 and 4 depend on it, and each design before its model runs.
+also cites. Sections 3 and 4 give the transition table and JVM model requirements of count-first C2 and of Option A.
 
 **Labels:** D1 to D6, their points, the transition additions and refinements, and rules A and B are those of
 `2026-11-06_M7_R007_F2_HARDENING_P3_DECISIONS.md` (the decision record). The constraints I1 to I9, the case IDs, the
@@ -223,10 +225,16 @@ payload (D5 point 3, constraint I8).
   Unless an earlier row matches, rows 12 and 13 then decide between LockedOut and Ready.
 - A write that returns false, throws, or does not return leaves the replacement unconfirmed, so row 11 still applies.
   Section 2 gives the retry rules.
-- A process death before the write reached storage leaves the old record, and the next process builds a new payload with
-  a new anchor. Authentication was unavailable throughout, so no attempt capacity was restored (D3).
+- A process death before the write reached storage loses the pending replacement. Its count 11 and its deadline were
+  never committed. The next process validates and enforces the last committed record:
+  - The original record: D1 and D5 apply to it. The next process replaces it only when its validation requires that,
+    and then builds a new payload with a new anchor.
+  - The reservation of an operation that section 2.5 suppressed (sections 3 and 4): the next process keeps its consumed
+    count and its deadline. The check of that operation never resumes.
 - A process death after the write reached storage leaves the replacement, also when the acknowledgement was lost. The
-  next process reads it as Valid and keeps its deadline (section 4.1 of the decision record).
+  next process reads it as Valid and keeps count 11 and its original deadline (section 4.1 of the decision record).
+- The lost pending replacement departs from D3. The test plan records it as the proposed residual R-007/13 (section
+  2.3). Keeping the pending replacement across a restart would require a protocol change.
 - A replacement emits no `LOCKOUT_TRIGGERED`, no audit event, and no capture (D1 qualification 3, D4 point 6).
 
 ### 1.8 Deadline enforcement and expiry
@@ -273,7 +281,7 @@ shows "The lock history could not be read." while that lock lasts. After a resta
 validation under D5 point 8, and enforcement and display under D5 point 4 (section 1.8). An invalid record leads to the
 replacement of section 1.7.
 
-**Status.** Specified in this proposal. Not implemented.
+**Status.** Specified in this document. Not implemented.
 
 **Verification.** No evidence yet. The cases are X14 and X17 of the test plan, and the D5 point 11 cases on records and
 trust.
@@ -354,18 +362,24 @@ does not cover a PIN operation in progress.
 **Restart.** A restart ends what blocks admission inside one process. The restarted process reads the stored record,
 and it can admit a PIN check or a fingerprint operation that the earlier process would still refuse. The stored count,
 the ladder, and the applicable D5 deadlines stay preserved. Under C1 with C2 or with Option A, each new verifier entry
-has its own confirmed reservation. This guarantee does not apply to C1 alone. The test plan records two proposed
-residuals for the departures from D3:
+has its own confirmed reservation. This guarantee does not apply to C1 alone. The lead adopted two departures from D3
+on 2026-11-12, and the test plan records them as residuals:
 
 - **R-007/11, storage blockage.** A storage call has not returned, or confirmation or release retries have not
   succeeded. The restart departs from the matched-times comparison of D3. Where only memory held a C2 debit (section
   3.3) and storage does not hold its reservation, the restart also returns that attempt capacity and removes that
-  lock. D3 prohibits both. No PIN check ever started for such a debit. Case DA13 holds the schedules.
+  lock. D3 prohibits both, and the departure accepts both. No PIN check ever started for such a debit. Case DA13 holds
+  the schedules.
 - **R-007/12, unfinished check.** A PIN check has not returned, and no storage call is blocked. The restarted process
   can reserve and start another check, so its run has one more verifier entry at matched times. Both checks have their
-  own confirmed reservations, and storage keeps both attempts consumed. Case DA14 holds the schedules.
+  own confirmed reservations, and storage keeps both attempts consumed. Cases DA14a and DA14b hold the schedules.
 
-Until the lead adopts a departure, each of its schedules is a failed D3 property.
+The adoption accepts these two departures only. It does not show that the designs meet the unrestricted
+matched-times comparison of D3. The models measure and report each departure separately.
+
+The test plan also records the proposed residual R-007/13: a restart can lose a pending D1 replacement before that
+replacement commits (section 1.7). It applies to C1 alone as well, and it changes the guarantee of D1 recovery, so it
+stays separate from R-007/11. Until the lead adopts it, the restart schedule of case DA14d is a failed D3 comparison.
 
 ### 2.4 Result acceptance and invalidation
 
@@ -406,10 +420,12 @@ session, no reset, and no authentication event. Its reservation follows the rule
   neither the record in memory nor readiness. Its acknowledgement can only confirm the accounting of an operation
   (section 2.3). The scheduler spec ends a retry that lost its ownership without a completion step, so the
   acknowledgement must not depend on that step. The B2 work of step 3 changes the scheduler for this rule.
-- **Replaced record.** When section 1.7 replaces the record during an operation, no later step of that operation
+- **Replaced record.** A record that becomes invalid during an operation leads to the replacement of section 1.7 (row
+  11 of section 1.4). From that moment, also before the replacement is confirmed, no later step of that operation
   changes the record in memory or submits a write. This holds for the return of its write and for the return of its
-  check, which count only for the settlement of section 2.3. The replacement holds the cap, so it covers the attempt
-  of that operation, and its deadline keeps its own anchor.
+  check. Each return still counts for the settlement of section 2.3, and the acknowledgement rule above still applies.
+  Row 11 closes admission until the replacement is confirmed. The confirmed replacement holds the cap, so it covers the
+  attempt of that operation, and its deadline keeps its own anchor.
 - **Retries.** The recovery scheduler holds one WRITE chain. Its target is the latest record mutation, once the write
   of that mutation returned false or threw. Each retry writes the original payload of the target (constraint I8).
   Before its I/O and before its publication, a retry checks that the manager has not stopped, that its sequence number
@@ -443,7 +459,7 @@ session, no reset, and no authentication event. Its reservation follows the rule
 
 **Required treatment.** The ownership and completion rules of section 2.5.
 
-**Status.** Specified in this proposal. Not implemented.
+**Status.** Specified in this document. Not implemented.
 
 **Verification.** No evidence yet. The cases are X08 and DA09 of the test plan.
 
@@ -457,7 +473,7 @@ its exception.
 
 **Required treatment.** The delivery rules of section 2.6.
 
-**Status.** Specified in this proposal. Not implemented.
+**Status.** Specified in this document. Not implemented.
 
 **Verification.** No evidence yet. The case is X13 of the test plan.
 
@@ -474,7 +490,7 @@ Section 2 is accepted on these cases of the test plan:
 | Admission, settlement, and callers | X10, DA12, DA13, DA14 |
 | Fingerprint acceptance and invalidation | X11, DA12, and the D5 point 11 case on a contradiction during an operation |
 | Write ownership and cancellation | X08, DA09, X06, X07 |
-| Retries, acknowledgements, and completions that are no longer current | X01, X17, DA13, and the D5 point 11 cases on expiry cleanup |
+| Retries, acknowledgements, and completions that are no longer current | X01, X17, DA13, DA14, and the D5 point 11 cases on expiry cleanup |
 | Result delivery | X13 |
 
 ## 3. Count-first C2: transition table and JVM model requirements
@@ -498,15 +514,15 @@ Limits:
 - A write fault closes the PIN path, because a reservation that is not confirmed starts no check.
 - A reservation write that is not acknowledged costs one count without a check. Until storage acknowledges that
   debit, only memory enforces it (section 3.3). A restart can then return the count and remove the lock, which is part
-  of the proposed residual R-007/11.
+  of residual R-007/11.
 - An interrupted operation costs one count, also when its PIN was correct (the availability cost of D2).
 - A restart after an accepted PIN success whose reset did not persist stays residual R-007/4.
 
 ### 3.2 Transition table
 
 One PIN operation is in the state Reserving, Checking, or Unconfirmed until it ends. Section 2.4 defines an active
-operation. After a replacement of the record under section 1.7, the rows change nothing in memory and submit no write
-(section 2.5).
+operation. Once the record has become invalid during the operation, the rows change nothing in memory and submit no
+write, also before the replacement is confirmed (section 2.5).
 
 | Row | State | Event | Effect | Next state |
 |---|---|---|---|---|
@@ -549,7 +565,7 @@ The numbers are those of the requirements still to prove in section 3.2 of the P
   states, and the result is accepted under the same rules. One reservation admits one check. The next admission needs
   Ready, so it comes no earlier than the end of that deadline.
 - **Restart (3).** The stored record needs no recovery step, and C2 adds no state to the state table of D2. A restart
-  neither restores stored capacity nor moves a stored deadline (D3, constraint I8). The two proposed departures of
+  neither restores stored capacity nor moves a stored deadline (D3, constraint I8). The two adopted departures of
   section 2.3 concern a restart after row 4 or during row 6.
 - **Accounting (4).** An unfinished reservation is no evidence of a wrong PIN. Rows 3, 5, 10, and 11 emit no audit
   event, no `LOCKOUT_TRIGGERED`, and no capture (D4 points 3 and 6). Legacy capture is disabled or unreachable before
@@ -595,8 +611,13 @@ because step 3 adds them.
 
 For each schedule with restarts, the model also runs the matched schedule without restarts, with equivalent inputs,
 faults, and clocks. The run with restarts must show no more verifier entries, no restored attempt capacity, and no
-removed delay (D3). The model counts separately what only the end of an in-process blockage permits (the proposed
-residuals R-007/11 and R-007/12). These results fail the check until the lead adopts the departure.
+removed delay (D3). The model counts these results separately, and they pass the check:
+- the earlier admission after a boot-ID change that D5 accepts (R-007/10);
+- what only the end of an in-process blockage permits (R-007/11 and R-007/12, section 2.3).
+
+It also counts separately what a lost pending replacement permits, under the proposed residual R-007/13. These results
+fail the check until the lead adopts R-007/13. Any other extra verifier entry, restored capacity, or removed delay
+fails the check.
 
 ### 3.5 Acceptance cases
 
@@ -656,8 +677,9 @@ commit:
 
 ### 4.3 Transition table
 
-One PIN operation is in the state Reserving, Checking, or Releasing until it ends. After a replacement of the record
-under section 1.7, the rows change nothing in memory and submit no write (section 2.5).
+One PIN operation is in the state Reserving, Checking, or Releasing until it ends. Once the record has become invalid
+during the operation, the rows change nothing in memory and submit no write, also before the replacement is confirmed
+(section 2.5).
 
 | Row | State | Event | Effect | Next state |
 |---|---|---|---|---|
@@ -670,7 +692,7 @@ under section 1.7, the rows change nothing in memory and submit no write (sectio
 | 7 | Releasing | The release write returns true, and memory still holds the reservation of this operation | The reservation leaves memory. The base record is unchanged, so the attempt is not consumed. The operation is settled. | Ended |
 | 8 | Releasing | The release write returns false or throws | The release write retries under section 2.5 with the same payload. The operation stays unsettled. | Releasing |
 | 9 | Checking | The check returns wrong, and the operation is active | The result is accepted. The consumed record of section 4.4 becomes the base record in memory, and the reservation leaves memory. The outcome write holds that base record and no reservation. The caller gets the wrong-PIN result. | Ended |
-| 10 | Checking | The check returns, and the operation is not active | The result is discarded. While memory still holds the reservation of this operation, the attempt is consumed as an unknown outcome: memory and the outcome write change as in row 9, with no event. After a replacement of the record, nothing changes and no write follows. | Ended |
+| 10 | Checking | The check returns, and the operation is not active | The result is discarded. While memory still holds the reservation of this operation, the attempt is consumed as an unknown outcome: memory and the outcome write change as in row 9, with no event. Once the record has become invalid during the operation, nothing changes and no write follows. | Ended |
 | 11 | Checking | The check returns correct, and the operation is active | The result is accepted under section 2.4. The reset write holds count 0, NONE in all three clock keys, and no reservation. | Ended |
 | 12 | Any | The process dies | Storage holds the last record that a write committed. The next process applies the recovery of section 4.4 to a stored reservation. | None |
 
@@ -770,7 +792,8 @@ for each schedule and each model:
 1. Verifier entries without a valid, durable reservation for that operation. Another reservation record in storage
    does not count.
 2. Extra verifier entries of a run with restarts, against its matched run without restarts, with equivalent inputs,
-   faults, and clocks. The entries under the proposed residuals R-007/11 and R-007/12 are reported separately.
+   faults, and clocks. The entries under residuals R-007/10, R-007/11, R-007/12, and R-007/13 are reported
+   separately.
 3. Unauthorized loss of enforcement capacity. These are not losses: a committed release under section 4.5, with or
    without an acknowledgement, an accepted reset, normal expiry, and the replacement of an invalid record. In the
    process that submitted a release, freeing the capacity before the acknowledgement is a loss. A debit that only

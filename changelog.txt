@@ -4,6 +4,26 @@ Newest entries on top. Each entry holds the longer detail that would
 otherwise go in the git commit body; commit subjects stay to one line.
 
 
+M7/WP2 (F2 hardening): adoption of the P3 step 2 designs   (2026-11-17)
+-----------------------------------------------------------------------
+The project lead adopted the step 2 designs for keeping the PIN lockout correct during storage failures. The lead
+also authorized test-code models of candidate C2 and of the comparison design Option A, starting with C2.
+- Candidate C1 admits no unlock until the stored lockout state is trusted. Candidate C2 and Option A both store each
+  PIN attempt before its check. Choosing a design for the app still needs real storage and device tests.
+- A PIN attempt blocks every other unlock attempt until storage confirms its accounting and any started check
+  returns. When the lockout record proves invalid, the attempt is invalidated immediately and a 30-minute replacement
+  lock is queued. A write that the attempt already started can still finish. That completion cannot change the
+  lockout record in memory or submit another write.
+- The lead accepted two residual risks of a restart. A restart can end a storage stall that blocks unlocking
+  (R-007/11). Under C2, that restart can also return an attempt that only memory counted. A restart during a running
+  PIN check allows one more check (R-007/12). A third risk, R-007/13, is proposed but not accepted. Before storage
+  holds a replacement lock, a restart can lose it. The next process validates the last stored record, enforces a
+  valid one, and replaces an invalid one.
+- The adopted document moves to the folder of active documents as
+  2026-11-09_M7_R007_F2_HARDENING_P3_STEP2_DESIGNS.md. A new dated section of the P3 decision record holds the
+  adoption.
+
+
 M7/WP2 (F2 hardening): shared protocol, C2, and Option A in the P3 step 2 proposal   (2026-11-11)
 -------------------------------------------------------------------------------------------------
 The 2026-11-09_M7_R007_F2_HARDENING_P3_STEP2_PROPOSAL.md proposal gains the remaining sections of step 2 in phase P3

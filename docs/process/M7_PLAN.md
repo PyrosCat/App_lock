@@ -1201,7 +1201,7 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         success clears PIN accounting in memory at once, and an accepted biometric success leaves it unchanged. On
         2026-11-11 the lead refined the cancellation rule of D2 refinement 3: a PIN operation blocks competing PIN and
         fingerprint operations until its accounting is settled, not only until it is cancelled. Section 2.3 of
-        `2026-11-09_M7_R007_F2_HARDENING_P3_STEP2_PROPOSAL.md` (the step 2 proposal) records the refinement.
+        `2026-11-09_M7_R007_F2_HARDENING_P3_STEP2_DESIGNS.md` (the step 2 designs) records the refinement.
       - D3, restart allowance:
         - Process death, force-stop, and process restart must not remove, shorten, restart, or extend an active
           security delay, and must not restore attempt capacity. Covered delays are the recorded lockout, any
@@ -1233,17 +1233,21 @@ extensions land here because Phase 2 is the first phase with a state-observing s
           merely because the process restarts.
         - Approval of D5 and its D3 dispositions records the specified exceptions against the frozen restart
           criterion. All other restart protections remain unchanged.
+        - On 2026-11-12 the lead adopted two departures from D3 for C1 with C2 or with Option A, as residuals
+          R-007/11 and R-007/12 of the test plan. A restart ends an in-process storage blockage, including a C2 debit
+          that only memory held (R-007/11), or an unfinished PIN check (R-007/12). The adoption does not show
+          compliance with the unrestricted matched-times comparison.
       - D4, invariant 6 and count-first C2: a lockout-record exception in two parts.
         - For any admission design, it permits count saturation, initial lockout-record writes during PIN setup,
           and D1 replacement writes. The lead set the count cap to 11 on 2026-11-09. Section 1.5 of the step 2
-          proposal records it.
+          designs records it.
         - For C2, it also permits reservation accounting in the count, the deadline saved with the reservation, and
           confirmed reservation persistence before PIN verification. Under C2, the count represents consumed
           PIN-attempt capacity. A return to binaries from before C2 is unsupported. `LOCKOUT_TRIGGERED` is emitted
           only for an accepted wrong-PIN result whose own reservation durably established a lockout deadline at or
           above the threshold. Legacy capture is disabled, or its path unreachable, before C2 is active. A
           reservation write that is not acknowledged rolls forward: memory enforces the debit, and retries confirm it
-          without a PIN check (lead, 2026-11-11; section 3.3 of the step 2 proposal).
+          without a PIN check (lead, 2026-11-11; section 3.3 of the step 2 designs).
         - Option A's count and event rules come from A's design under D6.
       - D5, clock policy: enforcement uses elapsed realtime and the kernel boot ID. Wall, network, and GNSS time
         never decide or shorten a lock. Two clock fields and the expiry write form their own exception to
@@ -1254,7 +1258,13 @@ extensions land here because Phase 2 is the first phase with a state-observing s
         record. The lead records A's persistence exception before either a device prototype or selection of A. Selection
         remains a P5 decision under the P0 ranking and the required evidence gates. On 2026-11-11 the lead set the form
         of the JVM models and named the exposure measures and the shared schedule of D6 point 3(b). Sections 3.4 and
-        4.7 of the step 2 proposal record them.
+        4.7 of the step 2 designs record them.
+      - Step 2 designs (lead, 2026-11-12): the lead adopted all four sections of the step 2 designs: C1 with B1, the
+        shared D2 protocol, count-first C2, and Option A. The adoption authorizes the JVM models of C2 and Option A,
+        starting with C2, and selects no design. The selection stays a P5 decision and still needs real-thread checks,
+        actual storage, and device qualification. The lead records A's persistence exception before a device
+        prototype or a selection of A. Section 9 of the decision record holds the adoption text, the D2 and D4
+        refinements of 2026-11-11, and the two departures from D3.
       - Baseline exceptions: ADR-022 records the exceptions of D1 to D6 to the 1.0.0 specification package. Its C2
         entry applies only if the lead selects C2 in P5. ADR-022A replaces its entry 5 and gives every lockout screen
         a neutral heading.
@@ -1269,14 +1279,13 @@ extensions land here because Phase 2 is the first phase with a state-observing s
           rules under D2. Step 3 applies those rules to B2 retries. Each finding has one primary tracking entry in the
           owning specification, with cross-references for obligations belonging to another specification. Each entry
           records the baseline finding, required treatment, status, and verification evidence. The test plan's X08, X13,
-          and X14 cases provide the corresponding verification cases. The step 2 proposal holds the X14 entry in its
-          section 1.10, the X08 entry in its section 2.7, and the X13 entry in its section 2.8.
-        - Section 1.3 of the step 2 proposal records the storage dependency of integrated C1. The lead resolves the
+          and X14 cases provide the corresponding verification cases. The step 2 designs hold the X14 entry in section
+          1.10, the X08 entry in section 2.7, and the X13 entry in section 2.8.
+        - Section 1.3 of the step 2 designs records the storage dependency of integrated C1. The lead resolves the
           backing store before C1 integration or device qualification.
-        - Residuals R-007/11 and R-007/12 of the test plan are proposed as departures from D3. A restart ends an
-          in-process storage blockage (R-007/11) or an unfinished PIN check (R-007/12). Under R-007/11, a C2 debit that
-          only memory held can also end with the process. Until the lead adopts a departure, its schedules are a failed
-          D3 property of count-first C2 and Option A.
+        - Residual R-007/13 of the test plan is proposed as a departure from D3: a restart can lose a pending D1
+          replacement before that replacement commits. Section 1.7 of the step 2 designs states what the next process
+          enforces. Until the lead adopts R-007/13, the restart schedule of case DA14d is a failed D3 comparison.
         - When the P3 decision proposal is adopted, its restrictions on Option A are aligned with D6 in these parts of
           the proposal: the summary and its table (section 1), section 3.4, the D6 row of the decision table (section
           4), step 2 of the order of work (section 5), and the proposed decision record (section 7). The D5 question in
